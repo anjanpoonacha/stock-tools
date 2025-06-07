@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import Link from 'next/link';
+import { MobileNav } from '@/components/MobileNav';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -28,14 +30,26 @@ export default function RootLayout({
 		<html lang='en' suppressHydrationWarning>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
 				<ThemeProvider>
-					<nav className='w-full flex justify-center items-center py-3 gap-4 bg-card border-b mb-4'>
+					{/* Desktop nav */}
+					<nav className='hidden md:flex w-full items-center py-3 gap-4 bg-card border-b mb-4'>
+						<Link href='/' className='font-bold text-lg mr-6'>
+							Stock Tools
+						</Link>
 						<Link href='/' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
 							Stock Converter
 						</Link>
 						<Link href='/csv-watchlist' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
 							CSV Watchlist
 						</Link>
+						{/* Theme toggle for desktop only */}
+						<div className='ml-auto flex items-center'>
+							<div className='hidden md:block'>
+								<ThemeToggle />
+							</div>
+						</div>
 					</nav>
+					{/* Mobile nav */}
+					<MobileNav />
 					{children}
 				</ThemeProvider>
 			</body>
