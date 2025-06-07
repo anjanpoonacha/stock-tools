@@ -71,7 +71,7 @@ export default function CsvWatchlistPage() {
 							.filter(Boolean)
 							.join(',')}`
 				)
-				.join('');
+				.join(',');
 		} catch (e: unknown) {
 			const message = e instanceof Error ? e.message : 'Unknown error';
 			setError('Error converting symbols: ' + message);
