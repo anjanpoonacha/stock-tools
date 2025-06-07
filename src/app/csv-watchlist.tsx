@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { downloadTextFile } from '@/lib/utils';
 import { useMemo, useState } from 'react';
-import allNseStocks from '../all_nse.json';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -34,66 +33,6 @@ function toTVSymbol(symbol: string | undefined) {
 	if (symbol.endsWith('.NS')) return 'NSE:' + symbol.replace(/\.NS$/, '');
 	if (symbol.endsWith('.BS') || symbol.endsWith('.BO')) return 'BSE:' + symbol.replace(/\.(BS|BO)$/, '');
 	return symbol;
-}
-
-// Helper to build a symbol-to-industry/sector map from all_nse.json
-function buildSymbolMap() {
-	// Only include entries with Symbol, Industry, and Sector
-	const map: Record<string, { Industry?: string; Sector?: string }> = {};
-	(allNseStocks as any[]).forEach((entry) => {
-		if (entry.Symbol) {
-			map[entry.Symbol] = {
-				Industry: entry.Industry,
-				Sector: entry.Sector,
-			};
-		}
-	});
-	return map;
-}
-
-const symbolInfoMap = buildSymbolMap();
-
-// Helper to regroup a TV watchlist string from one grouping to another (e.g., Sector -> Industry)
-function regroupTVWatchlist(input: string, fromGroup: 'Sector' | 'Industry', toGroup: 'Sector' | 'Industry'): string {
-	// Parse the input into groups
-	const groupRegex = /###([^,]+),([^#]*)/g;
-	let match;
-	const symbolList: { symbol: string; group: string }[] = [];
-	while ((match = groupRegex.exec(input))) {
-		const group = match[1].trim();
-		const symbols = match[2]
-			.split(',')
-			.map((s) => s.trim())
-			.filter(Boolean);
-		for (const symbol of symbols) {
-			symbolList.push({ symbol, group });
-		}
-	}
-	// If no groups found, treat as flat list
-	if (symbolList.length === 0) {
-		const flatSymbols = input
-			.split(',')
-			.map((s) => s.trim())
-			.filter(Boolean);
-		for (const symbol of flatSymbols) {
-			symbolList.push({ symbol, group: '' });
-		}
-	}
-	// Map each symbol to its new group using all_nse.json
-	const regrouped: Record<string, string[]> = {};
-	for (const { symbol } of symbolList) {
-		// Remove NSE:/BSE: prefix for lookup
-		let lookup = symbol.replace(/^NSE:|^BSE:/, '');
-		if (!lookup.endsWith('.NS')) lookup += '.NS'; // Try .NS if not present
-		const info = symbolInfoMap[lookup] || symbolInfoMap[lookup.replace('.NS', '.BO')];
-		const newGroup = info?.[toGroup] || 'Other';
-		if (!regrouped[newGroup]) regrouped[newGroup] = [];
-		regrouped[newGroup].push(symbol);
-	}
-	// Build the output string
-	return Object.entries(regrouped)
-		.map(([group, symbols]) => `###${group},${symbols.join(',')}`)
-		.join(',');
 }
 
 export default function CsvWatchlistPage() {

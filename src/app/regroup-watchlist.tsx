@@ -1,15 +1,15 @@
 'use client';
 
-import { useState } from 'react';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useState } from 'react';
 import allNseStocks from '../all_nse.json';
 
 // Build a symbol map for fast lookup
 const symbolInfoMap: Record<string, { Industry?: string; Sector?: string }> = (() => {
 	const map: Record<string, { Industry?: string; Sector?: string }> = {};
-	(allNseStocks as any[]).forEach((entry) => {
+	(allNseStocks as Array<{ Symbol: string; Industry?: string; Sector?: string }>).forEach((entry) => {
 		if (entry.Symbol) {
 			map[entry.Symbol] = {
 				Industry: entry.Industry,
@@ -65,11 +65,21 @@ function regroupTVWatchlist(input: string, toGroup: 'Sector' | 'Industry'): stri
 
 export default function RegroupWatchlistPage() {
 	const [input, setInput] = useState('');
-	const [toGroup, setToGroup] = useState<'Sector' | 'Industry'>('Industry');
+	const [toGroup, setToGroup] = useState<'Sector' | 'Industry' | 'None'>('Industry');
 	const [output, setOutput] = useState('');
 
 	const handleConvert = () => {
-		setOutput(regroupTVWatchlist(input, toGroup));
+		if (toGroup === 'None') {
+			// Flat list, remove all groupings and output as comma-separated
+			const flatSymbols = input
+				.replace(/###([^,]+),/g, '')
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean);
+			setOutput(flatSymbols.join(','));
+		} else {
+			setOutput(regroupTVWatchlist(input, toGroup as 'Sector' | 'Industry'));
+		}
 	};
 
 	return (
@@ -88,13 +98,14 @@ export default function RegroupWatchlistPage() {
 				<div className='flex flex-wrap gap-4 items-center'>
 					<div>
 						<Label htmlFor='to-group'>Group by</Label>
-						<Select value={toGroup} onValueChange={(v) => setToGroup(v as any)}>
+						<Select value={toGroup} onValueChange={(v: 'Sector' | 'Industry' | 'None') => setToGroup(v)}>
 							<SelectTrigger id='to-group' className='w-32'>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
 								<SelectItem value='Sector'>Sector</SelectItem>
 								<SelectItem value='Industry'>Industry</SelectItem>
+								<SelectItem value='None'>None</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
