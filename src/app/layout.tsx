@@ -41,6 +41,12 @@ export default function RootLayout({
 						<Link href='/csv-watchlist' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
 							CSV Watchlist
 						</Link>
+						<Link
+							href='/regroup-watchlist'
+							className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'
+						>
+							Regroup TV Watchlist
+						</Link>
 						{/* Theme toggle for desktop only */}
 						<div className='ml-auto flex items-center'>
 							<div className='hidden md:block'>

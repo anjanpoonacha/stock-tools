@@ -33,6 +33,9 @@ export function MobileNav() {
 							<DropdownMenuItem asChild>
 								<Link href='/csv-watchlist'>CSV Watchlist</Link>
 							</DropdownMenuItem>
+							<DropdownMenuItem asChild>
+								<Link href='/regroup-watchlist'>Regroup TV Watchlist</Link>
+							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
 					{/* Theme toggle for mobile */}
