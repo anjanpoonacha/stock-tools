@@ -5,6 +5,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import {
+	Table,
+	TableHeader,
+	TableBody,
+	TableFooter,
+	TableHead,
+	TableRow,
+	TableCell,
+	TableCaption,
+} from '@/components/ui/table';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -16,9 +26,9 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
 }
 
 // Helper to group rows by a column
-function groupBy<T>(rows: T[], key: keyof T) {
+function groupBy<T extends Record<string, any>>(rows: T[], key: keyof T) {
 	return rows.reduce((acc, row) => {
-		const group = row[key] || 'Other';
+		const group = String(row[key] || 'Other');
 		if (!acc[group]) acc[group] = [];
 		acc[group].push(row);
 		return acc;
@@ -116,28 +126,24 @@ export default function CsvWatchlistPage() {
 				)}
 				{headers.length > 0 && (
 					<div className='overflow-x-auto rounded border bg-muted'>
-						<table className='min-w-full text-sm font-mono'>
-							<thead>
-								<tr>
+						<Table>
+							<TableHeader>
+								<TableRow>
 									{headers.map((h) => (
-										<th key={h} className='px-2 py-1 text-left font-bold'>
-											{h}
-										</th>
+										<TableHead key={h}>{h}</TableHead>
 									))}
-								</tr>
-							</thead>
-							<tbody>
+								</TableRow>
+							</TableHeader>
+							<TableBody>
 								{sortedRows.map((row, i) => (
-									<tr key={i} className='border-t'>
+									<TableRow key={i}>
 										{headers.map((h) => (
-											<td key={h} className='px-2 py-1 whitespace-nowrap'>
-												{row[h]}
-											</td>
+											<TableCell key={h}>{row[h]}</TableCell>
 										))}
-									</tr>
+									</TableRow>
 								))}
-							</tbody>
-						</table>
+							</TableBody>
+						</Table>
 					</div>
 				)}
 				{headers.length > 0 && (
