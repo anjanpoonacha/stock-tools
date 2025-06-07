@@ -37,7 +37,9 @@ function groupBy<T extends Record<string, any>>(rows: T[], key: keyof T) {
 }
 
 // Helper to convert symbol to TV format
-function toTVSymbol(symbol: string) {
+function toTVSymbol(symbol: string | undefined) {
+	if (!symbol) return '';
+	if (typeof symbol !== 'string') return '';
 	if (symbol.endsWith('.NS')) return 'NSE:' + symbol.replace(/\.NS$/, '');
 	if (symbol.endsWith('.BS')) return 'BSE:' + symbol.replace(/\.BS$/, '');
 	return symbol;
@@ -47,6 +49,7 @@ export default function CsvWatchlistPage() {
 	const [csv, setCsv] = useState('');
 	const [groupByCol, setGroupByCol] = useState<string>('Sector');
 	const [sortCol, setSortCol] = useState<string>('Symbol');
+	const [error, setError] = useState<string | null>(null);
 
 	const { headers, rows } = useMemo(() => parseCSV(csv), [csv]);
 	const rowObjs = useMemo(
@@ -68,19 +71,26 @@ export default function CsvWatchlistPage() {
 
 	// TV Watchlist output
 	const tvWatchlist = useMemo(() => {
-		return Object.entries(grouped)
-			.map(
-				([group, items]) =>
-					`###${group},${items
-						.map((row) => toTVSymbol(row.Symbol))
-						.filter(Boolean)
-						.join(',')}`
-			)
-			.join('');
+		try {
+			setError(null);
+			return Object.entries(grouped)
+				.map(
+					([group, items]) =>
+						`###${group},${items
+							.map((row) => toTVSymbol(row.Symbol))
+							.filter(Boolean)
+							.join(',')}`
+				)
+				.join('');
+		} catch (e: any) {
+			setError('Error converting symbols: ' + (e?.message || 'Unknown error'));
+			return '';
+		}
 	}, [grouped]);
 
 	return (
 		<div className='flex flex-col items-center min-h-screen bg-background px-2 py-6'>
+			{error && <div className='text-red-500 mb-2 text-sm font-mono'>{error}</div>}
 			<div className='w-full max-w-4xl bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
 				<h1 className='text-2xl font-bold mb-2 text-center'>CSV to TradingView Watchlist</h1>
 				<Label htmlFor='csv-input'>Paste CSV Content</Label>
@@ -91,9 +101,9 @@ export default function CsvWatchlistPage() {
 					placeholder='Paste your CSV here...'
 					className='min-h-[120px] font-mono text-base shadow-md'
 				/>
-				<ClipboardActions value={csv} onPaste={setCsv} />
+
 				{headers.length > 0 && (
-					<div className='flex flex-wrap gap-4 items-center'>
+					<div className='flex flex-wrap gap-4 items-center mt-4'>
 						<div>
 							<Label htmlFor='group-by'>Group by</Label>
 							<Select value={groupByCol} onValueChange={setGroupByCol}>
@@ -101,7 +111,7 @@ export default function CsvWatchlistPage() {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{headers.map((h) => (
+									{headers.filter(Boolean).map((h) => (
 										<SelectItem key={h} value={h}>
 											{h}
 										</SelectItem>
@@ -116,7 +126,7 @@ export default function CsvWatchlistPage() {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									{headers.map((h) => (
+									{headers.filter(Boolean).map((h) => (
 										<SelectItem key={h} value={h}>
 											{h}
 										</SelectItem>
@@ -127,7 +137,20 @@ export default function CsvWatchlistPage() {
 					</div>
 				)}
 				{headers.length > 0 && (
-					<div className='overflow-x-auto rounded border bg-muted'>
+					<div className='mt-4'>
+						<Label>TradingView Watchlist Output</Label>
+						<Textarea
+							value={tvWatchlist}
+							readOnly
+							className='min-h-[80px] font-mono text-base bg-muted/50 shadow-inner mt-2'
+						/>
+						<ClipboardActions value={tvWatchlist} onPaste={() => {}} disabledPaste />
+					</div>
+				)}
+
+				<ClipboardActions value={csv} onPaste={setCsv} />
+				{headers.length > 0 && (
+					<div className='overflow-x-auto rounded border bg-muted mt-2'>
 						<Table>
 							<TableHeader>
 								<TableRow>
@@ -146,17 +169,6 @@ export default function CsvWatchlistPage() {
 								))}
 							</TableBody>
 						</Table>
-					</div>
-				)}
-				{headers.length > 0 && (
-					<div className='mt-4'>
-						<Label>TradingView Watchlist Output</Label>
-						<Textarea
-							value={tvWatchlist}
-							readOnly
-							className='min-h-[80px] font-mono text-base bg-muted/50 shadow-inner mt-2'
-						/>
-						<ClipboardActions value={tvWatchlist} onPaste={() => {}} disabledPaste />
 					</div>
 				)}
 			</div>
