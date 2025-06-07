@@ -14,7 +14,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 
 export function MobileNav() {
 	return (
-		<nav className='md:hidden w-full border-b bg-card z-50'>
+		<nav className='md:hidden w-full border-b bg-card z-50 sticky top-0'>
 			<div className='flex items-center justify-between px-4 py-3'>
 				<Link href='/' className='font-bold text-lg'>
 					Stock Tools
