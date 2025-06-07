@@ -31,7 +31,7 @@ function toTVSymbol(symbol: string | undefined) {
 	if (!symbol) return '';
 	if (typeof symbol !== 'string') return '';
 	if (symbol.endsWith('.NS')) return 'NSE:' + symbol.replace(/\.NS$/, '');
-	if (symbol.endsWith('.BS')) return 'BSE:' + symbol.replace(/\.BS$/, '');
+	if (symbol.endsWith('.BS') || symbol.endsWith('.BO')) return 'BSE:' + symbol.replace(/\.(BS|BO)$/, '');
 	return symbol;
 }
 
@@ -63,21 +63,28 @@ export default function CsvWatchlistPage() {
 	const tvWatchlist = useMemo(() => {
 		try {
 			setError(null);
-			return Object.entries(grouped)
-				.map(
-					([group, items]) =>
-						`###${group},${items
-							.map((row) => toTVSymbol(row.Symbol))
-							.filter(Boolean)
-							.join(',')}`
-				)
-				.join(',');
+			// If grouping is disabled (groupByCol is empty or 'None'), just list all symbols
+			if (!groupByCol || groupByCol === 'None') {
+				return rowObjs
+					.map((row) => toTVSymbol(row.Symbol))
+					.filter(Boolean)
+					.join(',');
+			}
+			const groupStrings = Object.entries(grouped).map(
+				([group, items]) =>
+					`###${group},${items
+						.map((row) => toTVSymbol(row.Symbol))
+						.filter(Boolean)
+						.join(',')}`
+			);
+			// Join with comma, but do not prepend a comma at the start
+			return groupStrings.filter(Boolean).join(',');
 		} catch (e: unknown) {
 			const message = e instanceof Error ? e.message : 'Unknown error';
 			setError('Error converting symbols: ' + message);
 			return '';
 		}
-	}, [grouped]);
+	}, [grouped, rowObjs, groupByCol]);
 
 	const handleDownload = () => {
 		downloadTextFile(tvWatchlist, 'tv-watchlist.txt');
@@ -118,6 +125,9 @@ export default function CsvWatchlistPage() {
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
+									<SelectItem key='None' value='None'>
+										None
+									</SelectItem>
 									{headers.filter(Boolean).map((h) => (
 										<SelectItem key={h} value={h}>
 											{h}
