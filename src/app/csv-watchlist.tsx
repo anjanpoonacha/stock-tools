@@ -15,6 +15,7 @@ import {
 	TableCell,
 	TableCaption,
 } from '@/components/ui/table';
+import { ClipboardActions } from '@/components/ClipboardActions';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -90,6 +91,7 @@ export default function CsvWatchlistPage() {
 					placeholder='Paste your CSV here...'
 					className='min-h-[120px] font-mono text-base shadow-md'
 				/>
+				<ClipboardActions value={csv} onPaste={setCsv} />
 				{headers.length > 0 && (
 					<div className='flex flex-wrap gap-4 items-center'>
 						<div>
@@ -154,6 +156,7 @@ export default function CsvWatchlistPage() {
 							readOnly
 							className='min-h-[80px] font-mono text-base bg-muted/50 shadow-inner mt-2'
 						/>
+						<ClipboardActions value={tvWatchlist} onPaste={() => {}} disabledPaste />
 					</div>
 				)}
 			</div>
