@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import Link from 'next/link';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -26,7 +27,17 @@ export default function RootLayout({
 	return (
 		<html lang='en' suppressHydrationWarning>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-				<ThemeProvider>{children}</ThemeProvider>
+				<ThemeProvider>
+					<nav className='w-full flex justify-center items-center py-3 gap-4 bg-card border-b mb-4'>
+						<Link href='/' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
+							Stock Converter
+						</Link>
+						<Link href='/csv-watchlist' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
+							CSV Watchlist
+						</Link>
+					</nav>
+					{children}
+				</ThemeProvider>
 			</body>
 		</html>
 	);
