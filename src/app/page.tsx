@@ -1,5 +1,11 @@
 import StockFormatConverter from './StockFormatConverter';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Home() {
-	return <StockFormatConverter />;
+	return (
+		<>
+			<ThemeToggle />
+			<StockFormatConverter />
+		</>
+	);
 }
