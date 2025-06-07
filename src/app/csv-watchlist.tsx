@@ -15,6 +15,7 @@ import {
 	TableCell,
 	TableCaption,
 } from '@/components/ui/table';
+import { downloadTextFile } from '@/lib/utils';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -87,6 +88,10 @@ export default function CsvWatchlistPage() {
 		}
 	}, [grouped]);
 
+	const handleDownload = () => {
+		downloadTextFile(tvWatchlist, 'tv-watchlist.txt');
+	};
+
 	return (
 		<div className='flex items-center justify-center min-h-screen bg-background px-2'>
 			<div className='w-full bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
@@ -108,6 +113,8 @@ export default function CsvWatchlistPage() {
 					value={tvWatchlist}
 					readOnly
 					showCopy
+					showDownload
+					onDownload={handleDownload}
 					className='min-h-[120px] font-mono text-base bg-muted/50 shadow-inner'
 					disabledCopy={!tvWatchlist}
 				/>

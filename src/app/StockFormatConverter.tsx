@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Download } from 'lucide-react';
+import { downloadTextFile } from '@/lib/utils';
 
 const DELIMITERS = [',', ' ', '\n', ';', '|'];
 
@@ -64,18 +65,7 @@ export default function StockFormatConverter() {
 	};
 
 	const handleDownload = () => {
-		if (!output) return;
-		const blob = new Blob([output], { type: 'text/plain' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = 'converted-symbols.txt';
-		document.body.appendChild(a);
-		a.click();
-		setTimeout(() => {
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-		}, 0);
+		downloadTextFile(output, 'converted-symbols.txt');
 	};
 
 	return (
