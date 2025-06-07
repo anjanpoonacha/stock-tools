@@ -46,8 +46,8 @@ function convertSymbols(symbols: string[], direction: Direction) {
 export default function StockFormatConverter() {
 	const [input, setInput] = useState('');
 	const [delimiter, setDelimiter] = useState(',');
-	const [direction, setDirection] = useState<Direction>('mio-to-tv');
 	const [output, setOutput] = useState('');
+	const [direction, setDirection] = useState<Direction>('mio-to-tv');
 
 	const handleConvert = () => {
 		const symbols = parseInput(input, delimiter);
@@ -55,64 +55,66 @@ export default function StockFormatConverter() {
 		setOutput(converted.join(delimiter === '\n' ? '\n' : delimiter));
 	};
 
+	const handleToggleDirection = () => {
+		setDirection((prev) => (prev === 'mio-to-tv' ? 'tv-to-mio' : 'mio-to-tv'));
+		setOutput(''); // Clear output on direction change
+	};
+
 	return (
-		<div className='max-w-md mx-auto p-4 flex flex-col gap-4 min-h-screen bg-background'>
-			<h1 className='text-2xl font-bold mb-2 text-center'>Stock Format Converter</h1>
-			<Label htmlFor='input' className='mb-1'>
-				Input
-			</Label>
-			<Textarea
-				id='input'
-				value={input}
-				onChange={(e) => setInput(e.target.value)}
-				placeholder='Paste or type your stock list here...'
-				className='min-h-[120px] font-mono text-base shadow-md'
-				autoFocus
-			/>
-			<div className='flex flex-wrap gap-2 items-center justify-between'>
-				<div className='flex flex-col flex-1 min-w-[120px]'>
-					<Label htmlFor='delimiter'>Delimiter</Label>
-					<Select value={delimiter} onValueChange={setDelimiter}>
-						<SelectTrigger id='delimiter' className='w-full'>
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{DELIMITERS.map((d) => (
-								<SelectItem key={d} value={d}>
-									{d === '\n' ? 'Newline' : d === ' ' ? 'Space' : d}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</div>
-				{/* Only show prefix selection for MIO → TV */}
-				{direction === 'mio-to-tv' && (
+		<div className='flex items-center justify-center min-h-screen bg-background px-2'>
+			<div className='w-full max-w-xl bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
+				<h1 className='text-2xl font-bold mb-2 text-center'>Stock Format Converter</h1>
+				<Label htmlFor='input' className='mb-1'>
+					Input
+				</Label>
+				<Textarea
+					id='input'
+					value={input}
+					onChange={(e) => setInput(e.target.value)}
+					placeholder='Paste or type your stock list here...'
+					className='min-h-[120px] font-mono text-base shadow-md'
+					autoFocus
+				/>
+				<div className='flex flex-wrap gap-2 items-center justify-between'>
 					<div className='flex flex-col flex-1 min-w-[120px]'>
-						<Label htmlFor='prefix'>Prefix</Label>
-						<div className='w-full rounded border px-3 py-2 bg-muted/50 text-muted-foreground'>NSE:</div>
+						<Label htmlFor='delimiter'>Delimiter</Label>
+						<Select value={delimiter} onValueChange={setDelimiter}>
+							<SelectTrigger id='delimiter' className='w-full'>
+								<SelectValue />
+							</SelectTrigger>
+							<SelectContent>
+								{DELIMITERS.map((d) => (
+									<SelectItem key={d} value={d}>
+										{d === '\n' ? 'Newline' : d === ' ' ? 'Space' : d}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
 					</div>
-				)}
+				</div>
+				<div className='flex flex-col gap-2 justify-center mt-2'>
+					<Button variant='default' className='w-full text-base font-semibold py-3' onClick={handleConvert}>
+						{direction === 'mio-to-tv' ? 'MIO → TV' : 'TV → MIO'}
+					</Button>
+					<Button
+						variant='outline'
+						className='w-full text-xs py-2 opacity-80'
+						onClick={handleToggleDirection}
+						type='button'
+					>
+						Switch to {direction === 'mio-to-tv' ? 'TV → MIO' : 'MIO → TV'}
+					</Button>
+				</div>
+				<Label htmlFor='output' className='mt-4 mb-1'>
+					Output
+				</Label>
+				<Textarea
+					id='output'
+					value={output}
+					readOnly
+					className='min-h-[120px] font-mono text-base bg-muted/50 shadow-inner'
+				/>
 			</div>
-			<div className='flex gap-2 justify-center mt-2'>
-				<Button variant={direction === 'mio-to-tv' ? 'default' : 'outline'} onClick={() => setDirection('mio-to-tv')}>
-					MarketInOut → TradingView
-				</Button>
-				<Button variant={direction === 'tv-to-mio' ? 'default' : 'outline'} onClick={() => setDirection('tv-to-mio')}>
-					TradingView → MarketInOut
-				</Button>
-			</div>
-			<Button className='w-full mt-2' onClick={handleConvert}>
-				Convert
-			</Button>
-			<Label htmlFor='output' className='mt-4 mb-1'>
-				Output
-			</Label>
-			<Textarea
-				id='output'
-				value={output}
-				readOnly
-				className='min-h-[120px] font-mono text-base bg-muted/50 shadow-inner'
-			/>
 		</div>
 	);
 }
