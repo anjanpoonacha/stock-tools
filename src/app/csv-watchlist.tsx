@@ -1,21 +1,11 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import {
-	Table,
-	TableHeader,
-	TableBody,
-	TableFooter,
-	TableHead,
-	TableRow,
-	TableCell,
-	TableCaption,
-} from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { downloadTextFile } from '@/lib/utils';
+import { useMemo, useState } from 'react';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -27,7 +17,7 @@ function parseCSV(text: string): { headers: string[]; rows: string[][] } {
 }
 
 // Helper to group rows by a column
-function groupBy<T extends Record<string, any>>(rows: T[], key: keyof T) {
+function groupBy<T extends Record<string, unknown>>(rows: T[], key: keyof T) {
 	return rows.reduce((acc, row) => {
 		const group = String(row[key] || 'Other');
 		if (!acc[group]) acc[group] = [];
@@ -82,8 +72,9 @@ export default function CsvWatchlistPage() {
 							.join(',')}`
 				)
 				.join('');
-		} catch (e: any) {
-			setError('Error converting symbols: ' + (e?.message || 'Unknown error'));
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : 'Unknown error';
+			setError('Error converting symbols: ' + message);
 			return '';
 		}
 	}, [grouped]);

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { ClipboardCopy, ClipboardPaste, ChevronDown, ChevronUp, FileText, Download, Upload } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { ChevronDown, ChevronUp, ClipboardCopy, ClipboardPaste, Download, Upload } from 'lucide-react';
+import React, { useState } from 'react';
 
 interface EditorWithClipboardProps {
 	id: string;

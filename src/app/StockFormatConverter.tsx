@@ -3,15 +3,12 @@
 // Main UI for Stock Format Converter
 // Mobile-first, code-editor-like input, delimiter/prefix options, conversion logic
 
-import React, { useState } from 'react';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { downloadTextFile } from '@/lib/utils';
+import { useState } from 'react';
 
 const DELIMITERS = [',', ' ', '\n', ';', '|'];
 
