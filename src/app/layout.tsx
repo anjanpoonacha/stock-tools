@@ -31,7 +31,7 @@ export default function RootLayout({
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
 				<ThemeProvider>
 					{/* Desktop nav */}
-					<nav className='hidden md:flex w-full items-center py-3 gap-4 bg-card border-b mb-4'>
+					<nav className='hidden md:flex w-full items-center py-3 gap-4 bg-card border-b mb-4 sticky top-0 z-40'>
 						<Link href='/' className='font-bold text-lg mr-6'>
 							Stock Tools
 						</Link>

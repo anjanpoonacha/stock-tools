@@ -20,7 +20,6 @@ export function MobileNav() {
 					Stock Tools
 				</Link>
 				<div className='flex items-center gap-2'>
-					<ThemeToggle />
 					<DropdownMenu>
 						<DropdownMenuTrigger asChild>
 							<Button variant='ghost' size='icon' aria-label='Open menu'>
@@ -36,6 +35,8 @@ export function MobileNav() {
 							</DropdownMenuItem>
 						</DropdownMenuContent>
 					</DropdownMenu>
+					{/* Theme toggle for mobile */}
+					<ThemeToggle />
 				</div>
 			</div>
 		</nav>

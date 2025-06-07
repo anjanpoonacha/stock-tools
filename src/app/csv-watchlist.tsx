@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Textarea } from '@/components/ui/textarea';
+import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,6 @@ import {
 	TableCell,
 	TableCaption,
 } from '@/components/ui/table';
-import { ClipboardActions } from '@/components/ClipboardActions';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -89,19 +88,29 @@ export default function CsvWatchlistPage() {
 	}, [grouped]);
 
 	return (
-		<div className='flex flex-col items-center min-h-screen bg-background px-2 py-6'>
-			{error && <div className='text-red-500 mb-2 text-sm font-mono'>{error}</div>}
-			<div className='w-full max-w-4xl bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
+		<div className='flex items-center justify-center min-h-screen bg-background px-2'>
+			<div className='w-full bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
 				<h1 className='text-2xl font-bold mb-2 text-center'>CSV to TradingView Watchlist</h1>
-				<Label htmlFor='csv-input'>Paste CSV Content</Label>
-				<Textarea
+				{error && <div className='text-red-500 mb-2 text-sm font-mono'>{error}</div>}
+				<EditorWithClipboard
 					id='csv-input'
+					label='CSV Input'
 					value={csv}
-					onChange={(e) => setCsv(e.target.value)}
-					placeholder='Paste your CSV here...'
-					className='min-h-[120px] font-mono text-base shadow-md'
+					onChange={setCsv}
+					onPaste={setCsv}
+					placeholder='Paste or type your CSV here...'
+					showPaste
+					className='min-h-[120px] font-mono text-base shadow-md mb-4'
 				/>
-
+				<EditorWithClipboard
+					id='tv-output'
+					label='TV Output'
+					value={tvWatchlist}
+					readOnly
+					showCopy
+					className='min-h-[120px] font-mono text-base bg-muted/50 shadow-inner'
+					disabledCopy={!tvWatchlist}
+				/>
 				{headers.length > 0 && (
 					<div className='flex flex-wrap gap-4 items-center mt-4'>
 						<div>
@@ -136,19 +145,6 @@ export default function CsvWatchlistPage() {
 						</div>
 					</div>
 				)}
-				{headers.length > 0 && (
-					<div className='mt-4'>
-						<Label>TradingView Watchlist Output</Label>
-						<Textarea
-							value={tvWatchlist}
-							readOnly
-							className='min-h-[80px] font-mono text-base bg-muted/50 shadow-inner mt-2'
-						/>
-						<ClipboardActions value={tvWatchlist} onPaste={() => {}} disabledPaste />
-					</div>
-				)}
-
-				<ClipboardActions value={csv} onPaste={setCsv} />
 				{headers.length > 0 && (
 					<div className='overflow-x-auto rounded border bg-muted mt-2'>
 						<Table>
