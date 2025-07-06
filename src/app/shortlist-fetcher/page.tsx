@@ -6,7 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
+import { RegroupBar } from '@/components/RegroupBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { MultiSelect } from '@/components/ui/multi-select';
+// import {  } from '@/components/ui/multiselect'; // You need to add this component or use a library
 
 type Watchlist = {
 	id: number;
@@ -20,9 +23,10 @@ export default function ShortlistFetcher() {
 	const [cookie, setCookie] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
-	const [selectedId, setSelectedId] = useState<number | null>(null);
+	const [selectedIds, setSelectedIds] = useState<number[]>([]);
 	const [error, setError] = useState('');
 	const [url, setUrl] = useState('https://www.tradingview.com/api/v1/symbols_list/all/');
+	const [regrouped, setRegrouped] = useState('');
 
 	// Load sessionid from localStorage on mount
 	useEffect(() => {
@@ -39,7 +43,7 @@ export default function ShortlistFetcher() {
 		setLoading(true);
 		setError('');
 		setWatchlists([]);
-		setSelectedId(null);
+		setSelectedIds([]);
 		try {
 			const res = await fetch('/api/tv-shortlist', {
 				method: 'POST',
@@ -51,9 +55,10 @@ export default function ShortlistFetcher() {
 			const lists: Watchlist[] = data.watchlists || [];
 			setWatchlists(lists);
 
-			// Prefer "Shortlist" by name, else first
-			const shortlist = lists.find((w) => w.name?.toLowerCase() === 'shortlist') || lists[0];
-			setSelectedId(shortlist?.id ?? null);
+			// Prefer "Shortlist" by name, else select all by default
+			const shortlist = lists.find((w) => w.name?.toLowerCase() === 'shortlist');
+			if (shortlist) setSelectedIds([shortlist.id]);
+			else setSelectedIds(lists.map((w) => w.id));
 		} catch (e: any) {
 			setError(e.message || 'Unknown error');
 		} finally {
@@ -61,7 +66,8 @@ export default function ShortlistFetcher() {
 		}
 	};
 
-	const selected = watchlists.find((w) => w.id === selectedId);
+	const selectedWatchlists = watchlists.filter((w) => selectedIds.includes(w.id));
+	const allSymbols = selectedWatchlists.flatMap((w) => w.symbols).join(', ');
 
 	return (
 		<div className='max-w-md mx-auto p-4 flex flex-col gap-4'>
@@ -83,31 +89,42 @@ export default function ShortlistFetcher() {
 			{error && <div className='text-red-600 text-sm'>{error}</div>}
 			{watchlists.length > 0 && (
 				<div className='flex flex-col gap-2'>
-					<Label htmlFor='watchlist-select'>Select Watchlist</Label>
-					<Select value={selectedId?.toString() ?? ''} onValueChange={(v) => setSelectedId(Number(v))}>
-						<SelectTrigger id='watchlist-select' className='w-full'>
-							<SelectValue placeholder='Choose a watchlist' />
-						</SelectTrigger>
-						<SelectContent>
-							{watchlists.map((w) => (
-								<SelectItem key={w.id} value={w.id.toString()}>
-									{w.name || `Watchlist ${w.id}`}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-					{selected && (
+					<Label htmlFor='watchlist-multiselect'>Select Watchlists</Label>
+					<MultiSelect
+						id='watchlist-multiselect'
+						options={watchlists.map((w) => ({
+							label: w.name || `Watchlist ${w.id}`,
+							value: w.id.toString(),
+						}))}
+						value={selectedIds.map(String)}
+						onValueChange={(ids) => setSelectedIds(ids.map(Number))}
+						placeholder='Choose one or more watchlists'
+					/>
+					<Label>All Selected Symbols (comma separated)</Label>
+					<EditorWithClipboard
+						id='shortlist-output'
+						label=''
+						value={allSymbols}
+						readOnly
+						showCopy
+						className='font-mono text-sm mt-1'
+						disabledCopy={allSymbols.length === 0}
+					/>
+					{/* RegroupBar integration */}
+					{allSymbols && (
 						<>
-							<Label>Symbols (comma separated)</Label>
-							<EditorWithClipboard
-								id='shortlist-output'
-								label=''
-								value={selected.symbols.join(', ')}
-								readOnly
-								showCopy
-								className='font-mono text-sm mt-1'
-								disabledCopy={selected.symbols.length === 0}
-							/>
+							<RegroupBar value={allSymbols} onRegroup={setRegrouped} />
+							{regrouped && (
+								<EditorWithClipboard
+									id='regrouped-output'
+									label='Regrouped Output'
+									value={regrouped}
+									readOnly
+									showCopy
+									className='min-h-[80px] font-mono text-base bg-muted/50 shadow-inner mt-2'
+									disabledCopy={!regrouped}
+								/>
+							)}
 						</>
 					)}
 				</div>

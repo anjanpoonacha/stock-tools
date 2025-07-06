@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
 		}
 		const watchlists = await fetchTradingViewWatchlistsWithAuth(url, cookie);
 		return NextResponse.json({ watchlists }); // <-- Return as { watchlists }
-	} catch (error: any) {
-		return NextResponse.json({ error: error.message }, { status: 500 });
+	} catch (error) {
+		const message = error instanceof Error ? error.message : 'An unknown error occurred';
+		return NextResponse.json({ error: message }, { status: 500 });
 	}
 }

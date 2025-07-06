@@ -18,8 +18,8 @@ export async function fetchTradingViewWatchlistsWithAuth(url: string, cookie: st
 		}
 		// Only return id, name, and symbols for each watchlist
 		return data
-			.filter((list: any) => Array.isArray(list.symbols))
-			.map((list: any) => ({
+			.filter((list) => Array.isArray(list.symbols))
+			.map((list) => ({
 				id: list.id,
 				name: list.name,
 				symbols: list.symbols,
