@@ -53,7 +53,10 @@ export function EditorWithClipboard({
 				onPaste(text);
 				setPasteStatus('pasted');
 				setTimeout(() => setPasteStatus('idle'), 1200);
-			} catch {}
+			} catch (e) {
+				console.error('Failed to read clipboard', e);
+				setPasteStatus('idle');
+			}
 		}
 	};
 

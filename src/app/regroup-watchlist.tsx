@@ -91,6 +91,7 @@ export default function RegroupWatchlistPage() {
 					label='TV Watchlist Input'
 					value={input}
 					onChange={setInput}
+					onPaste={setInput}
 					placeholder='Paste your TradingView sectioned/grouped watchlist here...'
 					showPaste
 					className='min-h-[120px] font-mono text-base shadow-md mb-4'
