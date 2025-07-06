@@ -58,8 +58,9 @@ export default function ShortlistFetcher() {
 			const shortlist = lists.find((w) => w.name?.toLowerCase() === 'shortlist');
 			if (shortlist) setSelectedIds([shortlist.id]);
 			else setSelectedIds(lists.map((w) => w.id));
-		} catch (e: any) {
-			setError(e.message || 'Unknown error');
+		} catch (e) {
+			if (e instanceof Error) setError(e.message);
+			else setError('Unknown error');
 		} finally {
 			setLoading(false);
 		}
@@ -136,7 +137,7 @@ export default function ShortlistFetcher() {
 					<li>
 						Copy the value of <code>sessionid</code> (and any other required cookies).
 					</li>
-					<li>Paste it above and click "Fetch Watchlists".</li>
+					<li>Paste it above and click &quot;Fetch Watchlists&quot;.</li>
 				</ol>
 				<span className='block mt-2 text-yellow-700'>Never share your session cookie with untrusted parties.</span>
 			</div>
