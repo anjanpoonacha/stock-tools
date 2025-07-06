@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,6 +14,8 @@ type Watchlist = {
 	symbols: string[];
 };
 
+const SESSION_KEY = 'tv_sessionid';
+
 export default function ShortlistFetcher() {
 	const [cookie, setCookie] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -21,6 +23,17 @@ export default function ShortlistFetcher() {
 	const [selectedId, setSelectedId] = useState<number | null>(null);
 	const [error, setError] = useState('');
 	const [url, setUrl] = useState('https://www.tradingview.com/api/v1/symbols_list/all/');
+
+	// Load sessionid from localStorage on mount
+	useEffect(() => {
+		const stored = localStorage.getItem(SESSION_KEY);
+		if (stored) setCookie(stored);
+	}, []);
+
+	// Store sessionid in localStorage when changed
+	useEffect(() => {
+		if (cookie) localStorage.setItem(SESSION_KEY, cookie);
+	}, [cookie]);
 
 	const handleFetch = async () => {
 		setLoading(true);
@@ -35,12 +48,12 @@ export default function ShortlistFetcher() {
 			});
 			const data = await res.json();
 			if (data.error) throw new Error(data.error);
-			// data.symbols is now an array of symbols for "Shortlist" only
-			// But we want to support all watchlists, so expect data.watchlists
-			const lists: Watchlist[] =
-				data.watchlists || ([{ id: 134340368, name: 'Shortlist', symbols: data.symbols }] as Watchlist[]);
+			const lists: Watchlist[] = data.watchlists || [];
 			setWatchlists(lists);
-			if (lists.length > 0) setSelectedId(lists[0].id);
+
+			// Prefer "Shortlist" by name, else first
+			const shortlist = lists.find((w) => w.name?.toLowerCase() === 'shortlist') || lists[0];
+			setSelectedId(shortlist?.id ?? null);
 		} catch (e: any) {
 			setError(e.message || 'Unknown error');
 		} finally {

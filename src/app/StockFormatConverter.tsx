@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { downloadTextFile } from '@/lib/utils';
 import { useState } from 'react';
+import { RegroupBar } from '@/components/RegroupBar';
 
 const DELIMITERS = [',', ' ', '\n', ';', '|'];
 
@@ -110,6 +111,7 @@ export default function StockFormatConverter() {
 							Switch to {direction === 'mio-to-tv' ? 'TV → MIO' : 'MIO → TV'}
 						</Button>
 					</div>
+					<RegroupBar value={input} onRegroup={setOutput} />
 					<EditorWithClipboard
 						id='output'
 						label='Output'

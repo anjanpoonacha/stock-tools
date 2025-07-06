@@ -1,3 +1,4 @@
+'use client';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -5,6 +6,8 @@ import { ThemeProvider } from '@/components/ThemeProvider';
 import Link from 'next/link';
 import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { usePathname } from 'next/navigation';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -16,10 +19,40 @@ const geistMono = Geist_Mono({
 	subsets: ['latin'],
 });
 
-export const metadata: Metadata = {
+export const manifest: Metadata = {
 	title: 'Stock Format Converter – MarketInOut & TradingView',
 	description: 'Convert stock symbol lists between MarketInOut and TradingView formats. Mobile-first, fast, and easy.',
 };
+
+// Tab navigation component
+function TabNav() {
+	const pathname = usePathname();
+	let value: string = 'converter';
+	if (pathname.startsWith('/shortlist-fetcher')) value = 'fetch';
+	else if (pathname.startsWith('/csv-watchlist')) value = 'csv';
+
+	return (
+		<Tabs value={value} className='w-full max-w-md'>
+			<TabsList className='w-full'>
+				<TabsTrigger value='converter' asChild>
+					<Link href='/' className='w-full text-center'>
+						Stock Format Converter
+					</Link>
+				</TabsTrigger>
+				<TabsTrigger value='csv' asChild>
+					<Link href='/csv-watchlist' className='w-full text-center'>
+						CSV Watchlist
+					</Link>
+				</TabsTrigger>
+				<TabsTrigger value='fetch' asChild>
+					<Link href='/shortlist-fetcher' className='w-full text-center'>
+						Fetch Watchlist
+					</Link>
+				</TabsTrigger>
+			</TabsList>
+		</Tabs>
+	);
+}
 
 export default function RootLayout({
 	children,
@@ -35,18 +68,6 @@ export default function RootLayout({
 						<Link href='/' className='font-bold text-lg mr-6'>
 							Stock Tools
 						</Link>
-						<Link href='/' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
-							Stock Converter
-						</Link>
-						<Link href='/csv-watchlist' className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'>
-							CSV Watchlist
-						</Link>
-						<Link
-							href='/regroup-watchlist'
-							className='font-semibold px-3 py-1 rounded hover:bg-muted transition-colors'
-						>
-							Regroup TV Watchlist
-						</Link>
 						{/* Theme toggle for desktop only */}
 						<div className='ml-auto flex items-center'>
 							<div className='hidden md:block'>
@@ -55,8 +76,11 @@ export default function RootLayout({
 						</div>
 					</nav>
 					{/* Mobile nav */}
-					<MobileNav />
-					{children}
+					{/* <MobileNav /> */}
+					<div className='w-full flex justify-center pt-4'>
+						<TabNav />
+					</div>
+					<main className='pt-4'>{children}</main>
 				</ThemeProvider>
 			</body>
 		</html>

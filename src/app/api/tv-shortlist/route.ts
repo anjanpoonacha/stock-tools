@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchTradingViewShortlistWithAuth } from './tv-fetch-shortlist';
+import { fetchTradingViewWatchlistsWithAuth } from './tv-fetch-shortlist';
 
 export async function POST(req: NextRequest) {
 	try {
@@ -7,8 +7,8 @@ export async function POST(req: NextRequest) {
 		if (!url || !cookie) {
 			return NextResponse.json({ error: 'Missing url or cookie' }, { status: 400 });
 		}
-		const symbols = await fetchTradingViewShortlistWithAuth(url, cookie);
-		return NextResponse.json({ symbols });
+		const watchlists = await fetchTradingViewWatchlistsWithAuth(url, cookie);
+		return NextResponse.json({ watchlists }); // <-- Return as { watchlists }
 	} catch (error: any) {
 		return NextResponse.json({ error: error.message }, { status: 500 });
 	}

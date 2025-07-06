@@ -21,7 +21,7 @@ const symbolInfoMap: Record<string, { Industry?: string; Sector?: string }> = ((
 })();
 
 // Regroup a TradingView watchlist string from one grouping to another (e.g., Sector -> Industry)
-function regroupTVWatchlist(input: string, toGroup: 'Sector' | 'Industry'): string {
+export function regroupTVWatchlist(input: string, toGroup: 'Sector' | 'Industry'): string {
 	// Parse the input into groups
 	const groupRegex = /###([^,]+),([^#]*)/g;
 	let match;
