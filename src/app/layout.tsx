@@ -1,13 +1,13 @@
-'use client';
+import { ThemeProvider } from '@/components/ThemeProvider';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
-import './globals.css';
-import { ThemeProvider } from '@/components/ThemeProvider';
 import Link from 'next/link';
+import './globals.css';
 // import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { usePathname } from 'next/navigation';
+
+// Move TabNav to its own file or mark it as a client component if it uses usePathname
+import TabNav from '@/components/TabNav';
 
 const geistSans = Geist({
 	variable: '--font-geist-sans',
@@ -19,40 +19,10 @@ const geistMono = Geist_Mono({
 	subsets: ['latin'],
 });
 
-export const manifest: Metadata = {
+export const metadata: Metadata = {
 	title: 'Stock Format Converter – MarketInOut & TradingView',
 	description: 'Convert stock symbol lists between MarketInOut and TradingView formats. Mobile-first, fast, and easy.',
 };
-
-// Tab navigation component
-function TabNav() {
-	const pathname = usePathname();
-	let value: string = 'converter';
-	if (pathname.startsWith('/shortlist-fetcher')) value = 'fetch';
-	else if (pathname.startsWith('/csv-watchlist')) value = 'csv';
-
-	return (
-		<Tabs value={value} className='w-full max-w-md'>
-			<TabsList className='w-full'>
-				<TabsTrigger value='converter' asChild>
-					<Link href='/' className='w-full text-center'>
-						Stock Format Converter
-					</Link>
-				</TabsTrigger>
-				<TabsTrigger value='csv' asChild>
-					<Link href='/csv-watchlist' className='w-full text-center'>
-						CSV Watchlist
-					</Link>
-				</TabsTrigger>
-				<TabsTrigger value='fetch' asChild>
-					<Link href='/shortlist-fetcher' className='w-full text-center'>
-						Fetch Watchlist
-					</Link>
-				</TabsTrigger>
-			</TabsList>
-		</Tabs>
-	);
-}
 
 export default function RootLayout({
 	children,
