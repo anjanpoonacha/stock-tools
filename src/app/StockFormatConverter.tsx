@@ -111,7 +111,7 @@ export default function StockFormatConverter() {
 							Switch to {direction === 'mio-to-tv' ? 'TV → MIO' : 'MIO → TV'}
 						</Button>
 					</div>
-					<RegroupBar value={input} onRegroup={setOutput} />
+					<RegroupBar value={output || input} onRegroup={setOutput} />
 					<EditorWithClipboard
 						id='output'
 						label='Output'
