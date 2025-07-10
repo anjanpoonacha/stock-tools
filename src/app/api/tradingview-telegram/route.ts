@@ -9,7 +9,8 @@ const TELEGRAM_TOPIC_ID = process.env.TELEGRAM_TOPIC_ID; // Optional
 export async function POST(req: NextRequest) {
 	try {
 		const alert = (await req.json()) as TradingViewAlertPayload;
-		const message = alert.message || JSON.stringify(alert);
+		// Support both TradingView's "text" and custom "message" fields
+		const message = alert.text || JSON.stringify(alert);
 
 		await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message, TELEGRAM_TOPIC_ID);
 
