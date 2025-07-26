@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchTradingViewWatchlistsWithAuth } from '../tv-shortlist/tv-fetch-shortlist';
+import { fetchWatchlistsWithAuth } from '@/lib/tradingview';
 
 export async function POST(req: NextRequest) {
 	try {
@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 		}
 		const url = 'https://www.tradingview.com/api/v1/symbols_list/all/';
 		const cookie = `sessionid=${sessionid}`;
-		const watchlists = await fetchTradingViewWatchlistsWithAuth(url, cookie);
+		const watchlists = await fetchWatchlistsWithAuth(url, cookie);
 		return NextResponse.json({ watchlists });
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'An unknown error occurred';
