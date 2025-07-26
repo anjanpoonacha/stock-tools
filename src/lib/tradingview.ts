@@ -14,7 +14,7 @@
  * @param params - Parameters for fetching shortlist.
  * @returns Promise with shortlist data.
  */
-export async function fetchShortlist(params: Record<string, unknown>): Promise<any> {
+export async function fetchShortlist(): Promise<never> {
 	// TODO: Implement TradingView shortlist fetch logic.
 	throw new Error('fetchShortlist not implemented');
 }
@@ -24,7 +24,7 @@ export async function fetchShortlist(params: Record<string, unknown>): Promise<a
  * @param payload - Alert payload.
  * @returns Promise with TradingView response.
  */
-export async function postAlert(payload: Record<string, unknown>): Promise<any> {
+export async function postAlert(): Promise<never> {
 	// TODO: Implement TradingView alert posting logic.
 	throw new Error('postAlert not implemented');
 }
@@ -34,7 +34,7 @@ export async function postAlert(payload: Record<string, unknown>): Promise<any> 
  * @param data - Raw payload data.
  * @returns Parsed payload.
  */
-export function parseAlertPayload(data: any): any {
+export function parseAlertPayload<T>(data: T): T {
 	// TODO: Implement payload parsing logic.
 	return data;
 }
@@ -45,7 +45,14 @@ export function parseAlertPayload(data: any): any {
  * @param cookie - Authentication cookie.
  * @returns Promise with filtered watchlist data.
  */
-export async function fetchWatchlistsWithAuth(url: string, cookie: string): Promise<any[]> {
+// Watchlist type for TradingView
+export type TradingViewWatchlist = {
+	id: string;
+	name: string;
+	symbols: string[];
+};
+
+export async function fetchWatchlistsWithAuth(url: string, cookie: string): Promise<TradingViewWatchlist[]> {
 	try {
 		const res = await fetch(url, {
 			headers: {
@@ -65,7 +72,16 @@ export async function fetchWatchlistsWithAuth(url: string, cookie: string): Prom
 		}
 		// Only return id, name, and symbols for each watchlist
 		return data
-			.filter((list) => Array.isArray(list.symbols))
+			.filter((list: unknown): list is TradingViewWatchlist => {
+				return (
+					typeof list === 'object' &&
+					list !== null &&
+					'id' in list &&
+					'name' in list &&
+					'symbols' in list &&
+					Array.isArray((list as { symbols: unknown }).symbols)
+				);
+			})
 			.map((list) => ({
 				id: list.id,
 				name: list.name,

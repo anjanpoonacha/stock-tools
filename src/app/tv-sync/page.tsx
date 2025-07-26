@@ -62,14 +62,13 @@ const DEFAULT_URLS = [
 
 export default function TvSyncPage() {
 	const [grouping, setGrouping] = useState<'Sector' | 'Industry' | 'None'>('None');
-	const [symbols, setSymbols] = useState<string[]>([]);
 	const [output, setOutput] = useState('');
 	const [sessionid, setSessionid] = useState(DEFAULT_SESSIONID);
 	const [watchlistId, setWatchlistId] = useState('');
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
-	const [loading, setLoading] = useState(false);
 	const toast = useToast();
+	// Removed unused symbols state to fix lint error
 
 	useEffect(() => {
 		if (!sessionid) return;
@@ -92,12 +91,13 @@ export default function TvSyncPage() {
 				toast('Failed to fetch watchlists', 'error');
 				return;
 			}
+			type Watchlist = { id: string; name: string };
 			const { data } = await res.json();
-			setWatchlists(Array.isArray(data) ? data.map((w: any) => ({ id: w.id, name: w.name })) : []);
+			setWatchlists(Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : []);
 			toast('Fetched watchlists.', 'success');
 		}
 		fetchWatchlists();
-	}, [sessionid]);
+	}, [sessionid, toast]);
 
 	const handleUrlChange = (i: number, value: string) => {
 		const next = [...urls];
@@ -158,6 +158,7 @@ export default function TvSyncPage() {
 
 	async function appendToWatchlist(symbols: string[]) {
 		// Always send a flat array of symbols to TradingView append API
+		console.log({ symbols });
 		const payload = output;
 		toast(`Appending symbols to TradingView: ${JSON.stringify(payload)}`);
 		const res = await fetch('/api/proxy', {
@@ -193,7 +194,6 @@ export default function TvSyncPage() {
 				allSymbols = allSymbols.concat(mioSymbols);
 			}
 			const tvSymbols = allSymbols.map(toTV).filter(Boolean) as string[];
-			setSymbols(tvSymbols);
 			setOutput(groupSymbols(tvSymbols, grouping));
 		}
 		updateSymbolsAndOutput();
@@ -291,10 +291,14 @@ export default function TvSyncPage() {
 				</Button>
 			</div>
 			<div className='flex gap-2 mb-4'>
-				<Button onClick={() => appendToWatchlist(symbols)} disabled={loading || !watchlistId} className='flex-1'>
-					{loading ? 'Syncing...' : 'Sync'}
+				<Button
+					onClick={() => appendToWatchlist(output.split(',').filter(Boolean))}
+					disabled={!watchlistId}
+					className='flex-1'
+				>
+					Sync
 				</Button>
-				<Button variant='secondary' onClick={cleanUpWatchlist} disabled={loading || !watchlistId} className='flex-1'>
+				<Button variant='secondary' onClick={cleanUpWatchlist} disabled={!watchlistId} className='flex-1'>
 					Clean Up Watchlist
 				</Button>
 			</div>

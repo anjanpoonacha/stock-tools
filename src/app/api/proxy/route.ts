@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json({ error: 'Missing url' }, { status: 400 });
 		}
 
-		let fetchOptions: RequestInit = { method, headers };
+		const fetchOptions: RequestInit = { method, headers };
 		let setJson = false;
 
 		if (body && method !== 'GET') {
