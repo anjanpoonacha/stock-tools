@@ -11,7 +11,7 @@ export default function TabNav() {
 	else if (pathname.startsWith('/csv-watchlist')) value = 'csv';
 
 	return (
-		<Tabs value={value} className='w-full max-w-md'>
+		<Tabs value={value} className='w-full'>
 			<TabsList className='w-full'>
 				<TabsTrigger value='converter'>
 					<Link href='/' className='w-full text-center'>

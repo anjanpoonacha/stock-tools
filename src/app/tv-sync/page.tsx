@@ -6,6 +6,7 @@ import { EditorWithClipboard } from '../../components/EditorWithClipboard';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../../components/ui/select';
+import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
 
 function parseMioSymbols(raw: string): string[] {
@@ -67,13 +68,13 @@ export default function TvSyncPage() {
 	const [watchlistId, setWatchlistId] = useState('');
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
-	const [logs, setLogs] = useState<string[]>([]);
 	const [loading, setLoading] = useState(false);
+	const toast = useToast();
 
 	useEffect(() => {
 		if (!sessionid) return;
 		async function fetchWatchlists() {
-			setLogs((l) => [...l, 'Fetching TradingView watchlists...']);
+			toast('Fetching TradingView watchlists...');
 			const res = await fetch('/api/proxy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -88,12 +89,12 @@ export default function TvSyncPage() {
 				}),
 			});
 			if (!res.ok) {
-				setLogs((l) => [...l, 'Failed to fetch watchlists']);
+				toast('Failed to fetch watchlists', 'error');
 				return;
 			}
 			const { data } = await res.json();
 			setWatchlists(Array.isArray(data) ? data.map((w: any) => ({ id: w.id, name: w.name })) : []);
-			setLogs((l) => [...l, 'Fetched watchlists.']);
+			toast('Fetched watchlists.', 'success');
 		}
 		fetchWatchlists();
 	}, [sessionid]);
@@ -121,16 +122,17 @@ export default function TvSyncPage() {
 			}),
 		});
 		if (!res.ok) {
-			setLogs((l) => [...l, `Failed to fetch: ${url}`]);
+			toast(`Failed to fetch: ${url}`, 'error');
 			return [];
 		}
 		const { data } = await res.json();
-		setLogs((l) => [...l, `Raw API response from ${url}: ${data}`]);
+		/* Remove noisy toast for raw API response */
+		// toast(`Raw API response from ${url}: ${data}`);
 		return parseMioSymbols(data);
 	}
 
 	async function cleanUpWatchlist() {
-		setLogs((l) => [...l, 'Cleaning up watchlist...']);
+		toast('Cleaning up watchlist...');
 		const cleanupRes = await fetch('/api/proxy', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -148,16 +150,16 @@ export default function TvSyncPage() {
 		});
 		if (!cleanupRes.ok) {
 			const { error, data } = await cleanupRes.json().catch(() => ({}));
-			setLogs((l) => [...l, `Failed to clean up watchlist: ${error || data || cleanupRes.statusText}`]);
+			toast(`Failed to clean up watchlist: ${error || data || cleanupRes.statusText}`, 'error');
 			return;
 		}
-		setLogs((l) => [...l, 'Watchlist cleaned up.']);
+		toast('Watchlist cleaned up.', 'success');
 	}
 
 	async function appendToWatchlist(symbols: string[]) {
 		// Always send a flat array of symbols to TradingView append API
 		const payload = output;
-		setLogs((l) => [...l, `Appending symbols to TradingView: ${JSON.stringify(payload)}`]);
+		toast(`Appending symbols to TradingView: ${JSON.stringify(payload)}`);
 		const res = await fetch('/api/proxy', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -174,12 +176,12 @@ export default function TvSyncPage() {
 			}),
 		});
 		const respText = await res.text();
-		setLogs((l) => [...l, `TradingView response: ${respText}`]);
+		toast(`TradingView response: ${respText}`);
 		if (!res.ok) {
-			setLogs((l) => [...l, `Failed to append symbols: ${respText}`]);
+			toast(`Failed to append symbols: ${respText}`, 'error');
 			return;
 		}
-		setLogs((l) => [...l, 'Symbols appended successfully.']);
+		toast('Symbols appended successfully.', 'success');
 	}
 
 	// Fetch and group symbols when URLs or grouping changes
@@ -296,7 +298,7 @@ export default function TvSyncPage() {
 					Clean Up Watchlist
 				</Button>
 			</div>
-			<pre className='bg-zinc-900 text-zinc-100 p-3 mt-4 min-h-[100px] rounded'>{logs.join('\n')}</pre>
+			{/* Logs removed */}
 		</div>
 	);
 }

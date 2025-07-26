@@ -6,6 +6,7 @@ import './globals.css';
 // regroup-watchlist is deprecated and will be removed
 // import { MobileNav } from '@/components/MobileNav';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ToastProvider } from '../components/ui/toast';
 
 // Move TabNav to its own file or mark it as a client component if it uses usePathname
 import TabNav from '@/components/TabNav';
@@ -34,24 +35,26 @@ export default function RootLayout({
 		<html lang='en' suppressHydrationWarning>
 			<body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
 				<ThemeProvider>
-					{/* Desktop nav */}
-					<nav className='hidden md:flex w-full items-center py-3 gap-4 bg-card border-b mb-4 sticky top-0 z-40'>
-						<Link href='/' className='font-bold text-lg mr-6'>
-							Stock Tools
-						</Link>
-						{/* Theme toggle for desktop only */}
-						<div className='ml-auto flex items-center'>
-							<div className='hidden md:block'>
-								<ThemeToggle />
+					<ToastProvider>
+						{/* Desktop nav */}
+						<nav className='hidden md:flex w-full items-center py-3 gap-4 bg-card border-b mb-4 sticky top-0 z-40'>
+							<Link href='/' className='font-bold text-lg mr-6'>
+								Stock Tools
+							</Link>
+							{/* Theme toggle for desktop only */}
+							<div className='ml-auto flex items-center'>
+								<div className='hidden md:block'>
+									<ThemeToggle />
+								</div>
 							</div>
+						</nav>
+						{/* Mobile nav */}
+						{/* <MobileNav /> */}
+						<div className='w-full flex justify-center pt-4'>
+							<TabNav />
 						</div>
-					</nav>
-					{/* Mobile nav */}
-					{/* <MobileNav /> */}
-					<div className='w-full flex justify-center pt-4'>
-						<TabNav />
-					</div>
-					<main className='pt-4'>{children}</main>
+						<main className='pt-4'>{children}</main>
+					</ToastProvider>
 				</ThemeProvider>
 			</body>
 		</html>
