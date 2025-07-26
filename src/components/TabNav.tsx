@@ -28,6 +28,11 @@ export default function TabNav() {
 						Fetch Watchlist
 					</Link>
 				</TabsTrigger>
+				<TabsTrigger value='sync'>
+					<Link href='/tv-sync' className='w-full text-center'>
+						Sync Watchlist
+					</Link>
+				</TabsTrigger>
 			</TabsList>
 		</Tabs>
 	);
