@@ -93,4 +93,28 @@ export async function fetchWatchlistsWithAuth(url: string, cookie: string): Prom
 	}
 }
 
+/**
+ * Append a symbol to a TradingView watchlist.
+ * @param watchlistId - The ID of the watchlist.
+ * @param symbol - The symbol to append (e.g. "NSE:TCS").
+ * @param cookie - The TradingView session cookie (e.g. "sessionid=...")
+ */
+export async function appendSymbolToWatchlist(watchlistId: string, symbol: string, cookie: string): Promise<void> {
+	const url = `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/append/`;
+	const res = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Cookie: cookie,
+			Origin: 'https://www.tradingview.com',
+			'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+		},
+		body: JSON.stringify([symbol]),
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`[TradingView API] Failed to append symbol: ${res.status} ${res.statusText} - ${text}`);
+	}
+}
+
 // Add more TradingView-related abstractions as needed.

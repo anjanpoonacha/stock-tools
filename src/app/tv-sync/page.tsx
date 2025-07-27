@@ -206,7 +206,7 @@ export default function TvSyncPage() {
 			setOutput(groupSymbols(tvSymbols, grouping));
 		}
 		updateSymbolsAndOutput();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
+		 
 	}, [urls, grouping]);
 
 	return (
