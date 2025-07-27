@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
+import { getInternalSessionId } from '@/lib/useInternalSessionId';
 import { useSessionId } from '@/lib/useSessionId';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
@@ -21,8 +22,8 @@ const MioSyncPage: React.FC = () => {
 	>([]);
 	const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
 	const [mioWatchlistsError, setMioWatchlistsError] = useState<string | null>(null);
-	const [internalSessionId] = useSessionId('marketinout');
 	const [sessionId, setSessionId] = useSessionId('tradingview');
+	const [internalSessionId, setInternalSessionId] = useState('');
 	const [symbols, setSymbols] = useState('');
 	const regroupOptions: { value: RegroupOption; label: string }[] = [
 		{ value: 'Industry', label: 'Industry' },
@@ -36,6 +37,14 @@ const MioSyncPage: React.FC = () => {
 	const showToast = useToast();
 
 	/* Session IDs are now managed by useSessionId hook */
+
+	React.useEffect(() => {
+		// Always get the latest internal session ID from localStorage
+		setInternalSessionId(getInternalSessionId());
+		const handler = () => setInternalSessionId(getInternalSessionId());
+		window.addEventListener('focus', handler);
+		return () => window.removeEventListener('focus', handler);
+	}, []);
 
 	React.useEffect(() => {
 		// Restore all saved combinations from localStorage
