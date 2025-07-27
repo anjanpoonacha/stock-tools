@@ -7,7 +7,6 @@ import { useToast } from '@/components/ui/toast';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
-import { MIOService } from '@/lib/MIOService';
 import { useSessionId } from '@/lib/useSessionId';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';

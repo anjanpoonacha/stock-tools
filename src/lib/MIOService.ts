@@ -2,12 +2,6 @@ import { getPlatformSession } from './sessionStore';
 
 // src/lib/MIOService.ts
 
-type AddWatchlistParams = {
-	aspSessionId: string;
-	mioWlid: string;
-	symbols: string;
-};
-
 type AddWatchlistWithSessionParams = {
 	internalSessionId: string;
 	mioWlid: string;

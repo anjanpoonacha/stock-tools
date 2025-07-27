@@ -17,8 +17,9 @@ export async function sessionAuth(req: NextRequest) {
 		return NextResponse.json({ error: 'Unauthorized: Invalid session' }, { status: 401 });
 	}
 
+	type NextRequestWithSession = NextRequest & { session?: unknown };
 	// Attach session data to request (for downstream handlers)
-	(req as any).session = session;
+	(req as NextRequestWithSession).session = session;
 
 	return null; // Indicates authentication passed
 }

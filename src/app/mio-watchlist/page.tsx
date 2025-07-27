@@ -64,8 +64,9 @@ export default function MioWatchlistPage() {
 					name: w.name,
 				}))
 			);
-		} catch (err: any) {
-			setWatchlistsError(err.message || 'Failed to load watchlists.');
+		} catch (err: unknown) {
+			const message = err instanceof Error ? err.message : String(err);
+			setWatchlistsError(message || 'Failed to load watchlists.');
 			setWatchlists([]);
 		} finally {
 			setWatchlistsLoading(false);
@@ -97,8 +98,9 @@ export default function MioWatchlistPage() {
 			if (data.error) throw new Error(data.error);
 			setResult('Watchlist updated successfully.');
 			fetchWatchlists();
-		} catch (e: any) {
-			setError(e.message || 'Failed to add to watchlist.');
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : String(e);
+			setError(message || 'Failed to add to watchlist.');
 		} finally {
 			setLoading(false);
 		}
@@ -119,8 +121,9 @@ export default function MioWatchlistPage() {
 			if (data.error) throw new Error(data.error);
 			setResult('Watchlist created successfully.');
 			fetchWatchlists();
-		} catch (e: any) {
-			setError(e.message || 'Failed to create watchlist.');
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : String(e);
+			setError(message || 'Failed to create watchlist.');
 		} finally {
 			setLoading(false);
 		}
@@ -141,8 +144,9 @@ export default function MioWatchlistPage() {
 			if (data.error) throw new Error(data.error);
 			setResult('Watchlists deleted successfully.');
 			fetchWatchlists();
-		} catch (e: any) {
-			setError(e.message || 'Failed to delete watchlists.');
+		} catch (e: unknown) {
+			const message = e instanceof Error ? e.message : String(e);
+			setError(message || 'Failed to delete watchlists.');
 		} finally {
 			setLoading(false);
 		}

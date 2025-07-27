@@ -2,7 +2,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { MIOService } from '@/lib/MIOService';
-import { getPlatformSession } from '@/lib/sessionStore';
 
 export async function POST(req: NextRequest) {
 	try {
@@ -27,8 +26,9 @@ export async function POST(req: NextRequest) {
 				const { validateAndCleanupMarketinoutSession } = await import('@/lib/sessionValidation');
 				const watchlists = await validateAndCleanupMarketinoutSession(internalSessionId);
 				return NextResponse.json({ watchlists });
-			} catch (err: any) {
-				return NextResponse.json({ error: err.message || 'Session expired. Please re-authenticate.' }, { status: 401 });
+			} catch (err: unknown) {
+				const message = err instanceof Error ? err.message : String(err);
+				return NextResponse.json({ error: message || 'Session expired. Please re-authenticate.' }, { status: 401 });
 			}
 		}
 
@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
 			symbols,
 		});
 		return NextResponse.json({ result });
-	} catch (e: any) {
-		return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
+	} catch (e: unknown) {
+		const message = e instanceof Error ? e.message : String(e);
+		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
 	}
 }
 
@@ -59,8 +60,9 @@ export async function PUT(req: NextRequest) {
 		}
 		const result = await MIOService.createWatchlist(sessionKeyValue.key, sessionKeyValue.value, name);
 		return NextResponse.json({ result });
-	} catch (e: any) {
-		return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
+	} catch (e: unknown) {
+		const message = e instanceof Error ? e.message : String(e);
+		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
 	}
 }
 
@@ -78,7 +80,8 @@ export async function DELETE(req: NextRequest) {
 		}
 		const result = await MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 		return NextResponse.json({ result });
-	} catch (e: any) {
-		return NextResponse.json({ error: e.message || 'Unknown error' }, { status: 500 });
+	} catch (e: unknown) {
+		const message = e instanceof Error ? e.message : String(e);
+		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
 	}
 }

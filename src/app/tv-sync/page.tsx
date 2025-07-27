@@ -186,7 +186,6 @@ export default function TvSyncPage() {
 				body: JSON.stringify(payload),
 			}),
 		});
-		const respText = await res.text();
 		/* Removed toast: TradingView response */
 		if (!res.ok) {
 			/* Removed toast: Failed to append symbols */

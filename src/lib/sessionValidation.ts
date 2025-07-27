@@ -16,9 +16,10 @@ export async function validateAndCleanupMarketinoutSession(
 			throw new Error('Session expired. Please re-authenticate.');
 		}
 		return watchlists;
-	} catch (err: any) {
+	} catch (err: unknown) {
 		const { deleteSession } = await import('./sessionStore');
 		deleteSession(internalSessionId);
-		throw new Error(err.message || 'Session expired. Please re-authenticate.');
+		const message = err instanceof Error ? err.message : String(err);
+		throw new Error(message || 'Session expired. Please re-authenticate.');
 	}
 }
