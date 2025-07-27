@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Textarea } from '@/components/ui/textarea';
 import { useEffect, useState } from 'react';
+import { useSessionId } from '@/lib/useSessionId';
 
 type Watchlist = {
 	id: number;
@@ -15,10 +16,8 @@ type Watchlist = {
 	symbols: string[];
 };
 
-const SESSION_KEY = 'tv_sessionid';
-
 export default function ShortlistFetcherClient() {
-	const [cookie, setCookie] = useState('');
+	const [cookie, setCookie] = useSessionId('tradingview');
 	const [loading, setLoading] = useState(false);
 	const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
 	const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -26,14 +25,7 @@ export default function ShortlistFetcherClient() {
 	const [url, setUrl] = useState('https://www.tradingview.com/api/v1/symbols_list/all/');
 	const [regrouped, setRegrouped] = useState('');
 
-	useEffect(() => {
-		const stored = localStorage.getItem(SESSION_KEY);
-		if (stored) setCookie(stored);
-	}, []);
-
-	useEffect(() => {
-		if (cookie) localStorage.setItem(SESSION_KEY, cookie);
-	}, [cookie]);
+	/* Session ID is now managed by useSessionId hook */
 
 	const handleFetch = async () => {
 		setLoading(true);
@@ -44,7 +36,7 @@ export default function ShortlistFetcherClient() {
 			const res = await fetch('/api/tv-shortlist', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ url, cookie }),
+				body: JSON.stringify({ url, sessionid: cookie }),
 			});
 			const data = await res.json();
 			if (data.error) throw new Error(data.error);

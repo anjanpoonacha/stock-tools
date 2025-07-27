@@ -9,6 +9,8 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
+import { MIOService } from '@/lib/MIOService';
+import { useSessionId } from '@/lib/useSessionId';
 
 const fetchWatchlistSymbols = async (watchlistId: string, sessionId: string) => {
 	const res = await fetch('/api/proxy', {
@@ -55,12 +57,8 @@ const MioSyncPage: React.FC = () => {
 	const [showAddDialog, setShowAddDialog] = useState(false);
 	const [newWlid, setNewWlid] = useState('');
 	const [newWlidName, setNewWlidName] = useState('');
-	const [aspSessionId, setAspSessionId] = useState(() =>
-		typeof window !== 'undefined' ? localStorage.getItem('mio_aspSessionId') || '' : ''
-	);
-	const [sessionId, setSessionId] = useState(() =>
-		typeof window !== 'undefined' ? localStorage.getItem('mio_tvSessionId') || '' : ''
-	);
+	const [aspSessionId, setAspSessionId] = useSessionId('marketinout');
+	const [sessionId, setSessionId] = useSessionId('tradingview');
 	const [symbols, setSymbols] = useState('');
 	const regroupOptions: { value: RegroupOption; label: string }[] = [
 		{ value: 'Industry', label: 'Industry' },
@@ -73,13 +71,7 @@ const MioSyncPage: React.FC = () => {
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const showToast = useToast();
 
-	// Persist session IDs
-	React.useEffect(() => {
-		if (aspSessionId) localStorage.setItem('mio_aspSessionId', aspSessionId);
-	}, [aspSessionId]);
-	React.useEffect(() => {
-		if (sessionId) localStorage.setItem('mio_tvSessionId', sessionId);
-	}, [sessionId]);
+	/* Session IDs are now managed by useSessionId hook */
 
 	React.useEffect(() => {
 		if (typeof window !== 'undefined') {
@@ -179,35 +171,14 @@ const MioSyncPage: React.FC = () => {
 		setLoading(true);
 		setResponse('');
 		try {
-			const formData = new URLSearchParams({
-				mode: 'add',
-				wlid: mioWlid,
-				overwrite: '0',
-				name: '',
-				stock_list: regroupTVWatchlist(symbols, groupBy),
-			}).toString();
-			const res = await fetch('/api/proxy', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/x-www-form-urlencoded',
-				},
-				body: JSON.stringify({
-					url: 'https://www.marketinout.com/wl/watch_list.php',
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/x-www-form-urlencoded',
-						Cookie: `ASPSESSIONIDCECTBSAC=${aspSessionId}`,
-					},
-					body: formData,
-				}),
+			const text = await MIOService.addWatchlist({
+				aspSessionId,
+				mioWlid,
+				symbols: regroupTVWatchlist(symbols, groupBy),
+				groupBy,
 			});
-			const text = await res.text();
 			setResponse(text);
-			if (res.ok) {
-				showToast('Watchlist synced to MarketInOut.', 'success');
-			} else {
-				showToast('Failed to sync. Please check your credentials.', 'error');
-			}
+			showToast('Watchlist synced to MarketInOut.', 'success');
 		} catch (err) {
 			showToast('Network or server error.', 'error');
 		} finally {

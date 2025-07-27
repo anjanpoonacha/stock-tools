@@ -1,0 +1,23 @@
+curl 'https://www.marketinout.com/wl/my_watch_lists.php?mode=new&name=NewTestWatchlist1&wlid=' \
+  -b 'ASPSESSIONIDCECTBSAC=NFPKMGKCKBPDKEINDEDFLNKF' 
+
+###
+
+curl 'https://www.marketinout.com/wl/my_watch_lists.php?todelete=72608&todelete=72609&todelete=72610&todelete=72611&todelete=72612&todelete=72613&todelete=72614&mode=delete' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -b 'ASPSESSIONIDCECTBSAC=NFPKMGKCKBPDKEINDEDFLNKF' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://www.marketinout.com/wl/my_watch_lists.php' \
+  -H 'sec-ch-ua: "Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'sec-gpc: 1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36'

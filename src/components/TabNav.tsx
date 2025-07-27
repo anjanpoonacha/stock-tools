@@ -10,6 +10,7 @@ const ROUTES = [
 	{ path: '/shortlist-fetcher', label: 'Fetch Watchlist', value: 'fetch' },
 	{ path: '/tv-sync', label: 'Sync Watchlist', value: 'sync' },
 	{ path: '/mio-sync', label: 'MIO Sync', value: 'mio' },
+	{ path: '/mio-watchlist', label: 'MIO Watchlist', value: 'miowatchlist' },
 ];
 
 export default function TabNav() {

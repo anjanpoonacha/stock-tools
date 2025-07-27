@@ -8,6 +8,7 @@ import { Label } from '../../components/ui/label';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../../components/ui/select';
 import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
+import { useSessionId } from '../../lib/useSessionId';
 
 function parseMioSymbols(raw: string): string[] {
 	return raw
@@ -54,7 +55,6 @@ function groupSymbols(symbols: string[], groupBy: 'Sector' | 'Industry' | 'None'
 		.join(',');
 }
 
-const DEFAULT_SESSIONID = 'fr3qd6jw5y0vnq1c9s17857d1jsfz2pj';
 const DEFAULT_URLS = [
 	{ label: 'PPC_no_sma', value: 'https://api.marketinout.com/run/screen?key=eed4a72303564710' },
 	{ label: 'Second Screener', value: 'https://api.marketinout.com/run/screen?key=79505328ba974866' },
@@ -63,7 +63,7 @@ const DEFAULT_URLS = [
 export default function TvSyncPage() {
 	const [grouping, setGrouping] = useState<'Sector' | 'Industry' | 'None'>('None');
 	const [output, setOutput] = useState('');
-	const [sessionid, setSessionid] = useState(DEFAULT_SESSIONID);
+	const [sessionid, setSessionid] = useSessionId('tradingview');
 	const [watchlistId, setWatchlistId] = useState('');
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
