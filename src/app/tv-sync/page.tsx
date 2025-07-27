@@ -97,7 +97,7 @@ export default function TvSyncPage() {
 			toast('Fetched watchlists.', 'success');
 		}
 		fetchWatchlists();
-	}, [sessionid, toast]);
+	}, [sessionid]);
 
 	const handleUrlChange = (i: number, value: string) => {
 		const next = [...urls];

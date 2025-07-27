@@ -109,16 +109,18 @@ export function EditorWithClipboard({
 				{showPaste && (
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								type='button'
-								variant='ghost'
-								size='icon'
-								aria-label='Paste from clipboard'
-								onClick={handlePaste}
-								disabled={disabledPaste}
-							>
-								<ClipboardPaste className='w-5 h-5' />
-							</Button>
+							<span>
+								<Button
+									type='button'
+									variant='ghost'
+									size='icon'
+									aria-label='Paste from clipboard'
+									onClick={handlePaste}
+									disabled={disabledPaste}
+								>
+									<ClipboardPaste className='w-5 h-5' />
+								</Button>
+							</span>
 						</TooltipTrigger>
 						<TooltipContent>{pasteStatus === 'pasted' ? 'Pasted!' : 'Paste from clipboard'}</TooltipContent>
 					</Tooltip>
@@ -127,23 +129,25 @@ export function EditorWithClipboard({
 				{showPaste && (
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								type='button'
-								variant='ghost'
-								size='icon'
-								aria-label='Import from file'
-								onClick={handleFileButtonClick}
-								disabled={disabledPaste}
-							>
-								<Upload className='w-5 h-5' />
-								<input
-									type='file'
-									accept='.txt,.csv,.tsv,.json,text/plain'
-									ref={fileInputRef}
-									onChange={handleFileChange}
-									style={{ display: 'none' }}
-								/>
-							</Button>
+							<span>
+								<Button
+									type='button'
+									variant='ghost'
+									size='icon'
+									aria-label='Import from file'
+									onClick={handleFileButtonClick}
+									disabled={disabledPaste}
+								>
+									<Upload className='w-5 h-5' />
+									<input
+										type='file'
+										accept='.txt,.csv,.tsv,.json,text/plain'
+										ref={fileInputRef}
+										onChange={handleFileChange}
+										style={{ display: 'none' }}
+									/>
+								</Button>
+							</span>
 						</TooltipTrigger>
 						<TooltipContent>
 							{fileStatus === 'loaded' ? 'Loaded!' : fileStatus === 'error' ? 'Error reading file' : 'Import from file'}
@@ -153,16 +157,18 @@ export function EditorWithClipboard({
 				{showCopy && (
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								type='button'
-								variant='ghost'
-								size='icon'
-								aria-label='Copy to clipboard'
-								onClick={handleCopy}
-								disabled={disabledCopy || !value}
-							>
-								<ClipboardCopy className='w-5 h-5' />
-							</Button>
+							<span>
+								<Button
+									type='button'
+									variant='ghost'
+									size='icon'
+									aria-label='Copy to clipboard'
+									onClick={handleCopy}
+									disabled={disabledCopy || !value}
+								>
+									<ClipboardCopy className='w-5 h-5' />
+								</Button>
+							</span>
 						</TooltipTrigger>
 						<TooltipContent>{copyStatus === 'copied' ? 'Copied!' : 'Copy to clipboard'}</TooltipContent>
 					</Tooltip>
@@ -171,16 +177,18 @@ export function EditorWithClipboard({
 				{showDownload && (
 					<Tooltip>
 						<TooltipTrigger asChild>
-							<Button
-								type='button'
-								variant='ghost'
-								size='icon'
-								aria-label='Download as file'
-								onClick={onDownload}
-								disabled={!value}
-							>
-								<Download className='w-5 h-5' />
-							</Button>
+							<span>
+								<Button
+									type='button'
+									variant='ghost'
+									size='icon'
+									aria-label='Download as file'
+									onClick={onDownload}
+									disabled={!value}
+								>
+									<Download className='w-5 h-5' />
+								</Button>
+							</span>
 						</TooltipTrigger>
 						<TooltipContent>Download as file</TooltipContent>
 					</Tooltip>

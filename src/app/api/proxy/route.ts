@@ -17,13 +17,23 @@ function parseRequestBody(body: unknown): unknown {
 	return arr;
 }
 
-// Helper to normalize headers and set content-type if needed
+/**
+ * Helper to normalize headers.
+ * If content-type is present in original headers, keep it as-is.
+ * If setJson is true and no content-type is present, set to application/json.
+ */
 function normalizeHeaders(headers: Record<string, string>, setJson: boolean): Headers {
 	const result = new Headers();
+	let hasContentType = false;
 	for (const [k, v] of Object.entries(headers)) {
-		if (k.toLowerCase() !== 'content-type') result.set(k, v);
+		if (k.toLowerCase() === 'content-type') {
+			hasContentType = true;
+			result.set(k, v);
+		} else {
+			result.set(k, v);
+		}
 	}
-	if (setJson) result.set('content-type', 'application/json');
+	if (setJson && !hasContentType) result.set('content-type', 'application/json');
 	return result;
 }
 
@@ -35,18 +45,27 @@ export async function POST(req: NextRequest) {
 		}
 
 		const fetchOptions: RequestInit = { method, headers };
+
 		let setJson = false;
 
+		// If there is a body and it's not a GET, handle content-type and body forwarding
 		if (body && method !== 'GET') {
-			let parsedBody: unknown;
-			if (typeof body === 'string') {
-				parsedBody = parseRequestBody(body);
+			const contentType = headers['content-type'] || headers['Content-Type'] || '';
+
+			let parsedBody: unknown = body;
+
+			// If content-type is application/json or not set, stringify the body
+			if (!contentType || contentType.includes('application/json')) {
+				if (typeof body === 'string') {
+					parsedBody = parseRequestBody(body);
+				}
+				fetchOptions.body = JSON.stringify(parsedBody);
 				setJson = true;
 			} else {
-				parsedBody = body;
-				setJson = true;
+				// For all other content-types, forward the body as-is
+				fetchOptions.body = body;
+				setJson = false;
 			}
-			fetchOptions.body = JSON.stringify(parsedBody);
 			fetchOptions.headers = normalizeHeaders(headers, setJson);
 		}
 
