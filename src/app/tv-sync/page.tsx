@@ -70,8 +70,14 @@ export default function TvSyncPage() {
 	const toast = useToast();
 	// Removed unused symbols state to fix lint error
 
+	const fetchedRef = React.useRef<string | null>(null);
+
+	const fetchingRef = React.useRef(false);
+
 	useEffect(() => {
 		if (!sessionid) return;
+		if (fetchingRef.current) return;
+		fetchingRef.current = true;
 		async function fetchWatchlists() {
 			toast('Fetching TradingView watchlists...');
 			const res = await fetch('/api/proxy', {
@@ -94,7 +100,10 @@ export default function TvSyncPage() {
 			type Watchlist = { id: string; name: string };
 			const { data } = await res.json();
 			setWatchlists(Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : []);
-			toast('Fetched watchlists.', 'success');
+			if (fetchedRef.current !== sessionid) {
+				toast('Fetched watchlists.', 'success');
+				fetchedRef.current = sessionid;
+			}
 		}
 		fetchWatchlists();
 	}, [sessionid]);

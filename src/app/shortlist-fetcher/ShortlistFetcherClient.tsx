@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Textarea } from '@/components/ui/textarea';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSessionId } from '@/lib/useSessionId';
 
 type Watchlist = {

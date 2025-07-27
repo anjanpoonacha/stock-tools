@@ -3,10 +3,8 @@ import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/components/ui/toast';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogTrigger, DialogContent } from '@/components/ui/dialog';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
 import { MIOService } from '@/lib/MIOService';
@@ -14,42 +12,11 @@ import { useSessionId } from '@/lib/useSessionId';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 
-const fetchWatchlistSymbols = async (watchlistId: string, sessionId: string) => {
-	const res = await fetch('/api/proxy', {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/`,
-			method: 'GET',
-			headers: {
-				'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-				Cookie: `sessionid=${sessionId}`,
-				Accept: 'application/json',
-			},
-		}),
-	});
-	if (!res.ok) throw new Error('Failed to fetch watchlist symbols');
-	const { data } = await res.json();
-	return Array.isArray(data?.symbols) ? data.symbols.map((s: any) => s.s) : [];
-};
-
-const convertToMioFormat = (symbols: string[]) => {
-	return symbols
-		.map((s) => {
-			if (s.startsWith('NSE:')) return s.replace('NSE:', '') + '.NS';
-			if (s.startsWith('BSE:')) return s.replace('BSE:', '') + '.BO';
-			return s;
-		})
-		.join(',');
-};
-
 const MioSyncPage: React.FC = () => {
 	const [tvWlid, setTvWlid] = useState('');
 	const [mioWlid, setMioWlid] = useState('');
 	const [mioWatchlists, setMioWatchlists] = useState<{ id: string; name: string }[]>([]);
-	const [combination, setCombination] = useState<{ tvWlid: string; mioWlid: string; groupBy: RegroupOption } | null>(
-		null
-	);
+	/* Removed unused state: combination */
 	const [savedCombinations, setSavedCombinations] = useState<
 		{ tvWlid: string; mioWlid: string; groupBy: RegroupOption }[]
 	>([]);
@@ -64,7 +31,7 @@ const MioSyncPage: React.FC = () => {
 		{ value: 'None', label: 'None' },
 	];
 	const [groupBy, setGroupBy] = useState<RegroupOption>('None');
-	const [response, setResponse] = useState('');
+	/* Removed unused state: response */
 	const [loading, setLoading] = useState(false);
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const showToast = useToast();
@@ -84,7 +51,7 @@ const MioSyncPage: React.FC = () => {
 						setTvWlid(combos[0].tvWlid);
 						setMioWlid(combos[0].mioWlid);
 						setGroupBy(combos[0].groupBy);
-						setCombination(combos[0]);
+						// Removed setCombination
 					}
 				}
 			} catch {}
@@ -101,41 +68,48 @@ const MioSyncPage: React.FC = () => {
 			body: JSON.stringify({ aspSessionId }),
 		})
 			.then((res) => res.json())
-			.then((data) => {
+			.then((data: { error?: string; watchlists?: { id: string | number; name: string }[] }) => {
 				if (data.error) throw new Error(data.error);
-				setMioWatchlists((data.watchlists || []).map((w: any) => ({ id: String(w.id), name: w.name })));
+				setMioWatchlists(
+					(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
+						id: String(w.id),
+						name: w.name,
+					}))
+				);
 			})
 			.catch((err) => setMioWatchlistsError(err.message))
 			.finally(() => setMioWatchlistsLoading(false));
 	}, [aspSessionId]);
 
-	const fetchWatchlists = async () => {
-		if (!sessionId) {
-			showToast('TradingView sessionid required', 'error');
-			return;
-		}
-		setLoading(true);
-		try {
-			const res = await fetch('/api/tradingview-watchlists', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ sessionid: sessionId }),
-			});
-			const data = await res.json();
-			if (data.error) throw new Error(data.error);
-			setWatchlists((data.watchlists || []).map((w: any) => ({ id: String(w.id), name: w.name })));
-			showToast('Fetched TradingView watchlists.', 'success');
-		} catch (err) {
-			showToast('Failed to fetch watchlists from TradingView.', 'error');
-		} finally {
-			setLoading(false);
-		}
-	};
+	/* fetchWatchlists removed: now inlined in useEffect */
 
 	React.useEffect(() => {
-		fetchWatchlists();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [sessionId]);
+		// Inline fetchWatchlists to avoid dependency warning
+		if (!sessionId) return;
+		setLoading(true);
+		(async () => {
+			try {
+				const res = await fetch('/api/tradingview-watchlists', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ sessionid: sessionId }),
+				});
+				const data: { error?: string; watchlists?: { id: string | number; name: string }[] } = await res.json();
+				if (data.error) throw new Error(data.error);
+				setWatchlists(
+					(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
+						id: String(w.id),
+						name: w.name,
+					}))
+				);
+				showToast('Fetched TradingView watchlists.', 'success');
+			} catch {
+				showToast('Failed to fetch watchlists from TradingView.', 'error');
+			} finally {
+				setLoading(false);
+			}
+		})();
+	}, [sessionId, showToast]);
 
 	React.useEffect(() => {
 		if (!tvWlid || !sessionId) return;
@@ -159,7 +133,7 @@ const MioSyncPage: React.FC = () => {
 					setSymbols('');
 					return;
 				}
-				const { data, status } = await res.json();
+				const { data }: { data: { symbols?: string[] } } = await res.json();
 				// Debug: Show raw API response if no symbols
 				if (!data?.symbols || !Array.isArray(data.symbols) || data.symbols.length === 0) {
 					console.error('No symbols returned. Raw response:', data);
@@ -170,7 +144,7 @@ const MioSyncPage: React.FC = () => {
 				try {
 					const tvSymbols = Array.isArray(data.symbols) ? data.symbols : [];
 					const mioSymbols = tvSymbols
-						.map((s: string) => {
+						.map((s) => {
 							if (typeof s !== 'string') {
 								console.error('Invalid symbol entry:', s);
 								return '';
@@ -182,34 +156,29 @@ const MioSyncPage: React.FC = () => {
 						.filter(Boolean)
 						.join(',');
 					setSymbols(mioSymbols);
-				} catch (err) {
-					console.error('Error processing symbols:', err, data?.symbols);
+				} catch {
 					showToast('Error processing symbols. See console for details.', 'error');
 					setSymbols('');
 				}
-			} catch (err: any) {
-				console.error('Error fetching symbols:', err);
-				showToast('Error fetching symbols: ' + (err?.message || 'Unknown error'), 'error');
+			} catch {
+				showToast('Error fetching symbols. See console for details.', 'error');
 				setSymbols('');
 			}
 		};
 		fetchSymbols();
-	}, [tvWlid, sessionId]);
+	}, [tvWlid, sessionId, showToast]);
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
 		setLoading(true);
-		setResponse('');
 		try {
-			const text = await MIOService.addWatchlist({
+			await MIOService.addWatchlist({
 				aspSessionId,
 				mioWlid,
 				symbols: regroupTVWatchlist(symbols, groupBy),
-				groupBy,
 			});
-			setResponse(text);
 			showToast('Watchlist synced to MarketInOut.', 'success');
-		} catch (err) {
+		} catch {
 			showToast('Network or server error.', 'error');
 		} finally {
 			setLoading(false);
@@ -325,7 +294,6 @@ const MioSyncPage: React.FC = () => {
 												setTvWlid(combo.tvWlid);
 												setMioWlid(combo.mioWlid);
 												setGroupBy(combo.groupBy);
-												setCombination(combo);
 												showToast('Combination applied.', 'success');
 											}}
 											tabIndex={0}
@@ -336,7 +304,6 @@ const MioSyncPage: React.FC = () => {
 													setTvWlid(combo.tvWlid);
 													setMioWlid(combo.mioWlid);
 													setGroupBy(combo.groupBy);
-													setCombination(combo);
 													showToast('Combination applied.', 'success');
 												}
 											}}
@@ -393,7 +360,6 @@ const MioSyncPage: React.FC = () => {
 							];
 							setSavedCombinations(updated);
 							localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
-							setCombination(combo);
 							showToast('Combination saved locally.', 'success');
 						}}
 					>

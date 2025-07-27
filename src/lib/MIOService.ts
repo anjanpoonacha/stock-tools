@@ -4,12 +4,11 @@ type AddWatchlistParams = {
 	aspSessionId: string;
 	mioWlid: string;
 	symbols: string;
-	groupBy: string;
 };
 
 export class MIOService {
-	static async addWatchlist({ aspSessionId, mioWlid, symbols, groupBy }: AddWatchlistParams): Promise<string> {
-		const regroupTVWatchlist = (symbols: string, groupBy: string) => {
+	static async addWatchlist({ aspSessionId, mioWlid, symbols }: AddWatchlistParams): Promise<string> {
+		const regroupTVWatchlist = (symbols: string) => {
 			// This should match the regroupTVWatchlist logic from utils if needed
 			// For now, just return symbols as-is
 			return symbols;
@@ -20,7 +19,7 @@ export class MIOService {
 			wlid: mioWlid,
 			overwrite: '0',
 			name: '',
-			stock_list: regroupTVWatchlist(symbols, groupBy),
+			stock_list: regroupTVWatchlist(symbols),
 		}).toString();
 
 		const res = await fetch('/api/proxy', {

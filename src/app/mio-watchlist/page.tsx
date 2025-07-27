@@ -30,15 +30,18 @@ export default function MioWatchlistPage() {
 		setError(null);
 		setResult(null);
 		try {
-			const res = await MIOService.addWatchlist({
+			await MIOService.addWatchlist({
 				aspSessionId,
 				mioWlid,
 				symbols,
-				groupBy,
 			});
 			setResult('Watchlist updated successfully.');
-		} catch (e: any) {
-			setError(e.message);
+		} catch (e: unknown) {
+			if (e instanceof Error) {
+				setError(e.message);
+			} else {
+				setError('An unknown error occurred.');
+			}
 		}
 		setLoading(false);
 	};
@@ -55,9 +58,20 @@ export default function MioWatchlistPage() {
 			.then((res) => res.json())
 			.then((data) => {
 				if (data.error) throw new Error(data.error);
-				setWatchlists((data.watchlists || []).map((w: any) => ({ id: String(w.id), name: w.name })));
+				setWatchlists(
+					(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
+						id: String(w.id),
+						name: w.name,
+					}))
+				);
 			})
-			.catch((err) => setWatchlistsError(err.message))
+			.catch((err: unknown) => {
+				if (err instanceof Error) {
+					setWatchlistsError(err.message);
+				} else {
+					setWatchlistsError('An unknown error occurred.');
+				}
+			})
 			.finally(() => setWatchlistsLoading(false));
 	}, [aspSessionId]);
 
@@ -70,11 +84,15 @@ export default function MioWatchlistPage() {
 		setError(null);
 		setResult(null);
 		try {
-			const res = await MIOService.createWatchlist(aspSessionId, watchlistName);
+			await MIOService.createWatchlist(aspSessionId, watchlistName);
 			setResult('Watchlist created successfully.');
 			fetchWatchlists();
-		} catch (e: any) {
-			setError(e.message);
+		} catch (e: unknown) {
+			if (e instanceof Error) {
+				setError(e.message);
+			} else {
+				setError('An unknown error occurred.');
+			}
 		}
 		setLoading(false);
 	};
@@ -84,11 +102,15 @@ export default function MioWatchlistPage() {
 		setError(null);
 		setResult(null);
 		try {
-			const res = await MIOService.deleteWatchlists(aspSessionId, deleteIds);
+			await MIOService.deleteWatchlists(aspSessionId, deleteIds);
 			setResult('Watchlists deleted successfully.');
 			fetchWatchlists();
-		} catch (e: any) {
-			setError(e.message);
+		} catch (e: unknown) {
+			if (e instanceof Error) {
+				setError(e.message);
+			} else {
+				setError('An unknown error occurred.');
+			}
 		}
 		setLoading(false);
 	};
