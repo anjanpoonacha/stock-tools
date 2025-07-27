@@ -109,7 +109,7 @@ const MioSyncPage: React.FC = () => {
 				setLoading(false);
 			}
 		})();
-	}, [sessionId, showToast]);
+	}, [sessionId]);
 
 	React.useEffect(() => {
 		if (!tvWlid || !sessionId) return;

@@ -77,7 +77,7 @@ export default function MioWatchlistPage() {
 
 	React.useEffect(() => {
 		fetchWatchlists();
-	}, [fetchWatchlists]);
+	}, [aspSessionId]);
 
 	const handleCreateWatchlist = async () => {
 		setLoading(true);
