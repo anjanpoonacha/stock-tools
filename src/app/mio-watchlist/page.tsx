@@ -7,15 +7,20 @@ import { MIOService } from '@/lib/MIOService';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { MultiSelect } from '@/components/ui/multi-select';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { useSessionId } from '@/lib/useSessionId';
 
 export default function MioWatchlistPage() {
 	const [aspSessionId, setAspSessionId] = useSessionId('marketinout');
 	const [mioWlid, setMioWlid] = useState('');
+	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
+	const [watchlistsLoading, setWatchlistsLoading] = useState(false);
+	const [watchlistsError, setWatchlistsError] = useState<string | null>(null);
 	const [symbols, setSymbols] = useState('');
 	const [groupBy, setGroupBy] = useState('');
 	const [watchlistName, setWatchlistName] = useState('');
-	const [deleteIds, setDeleteIds] = useState('');
+	const [deleteIds, setDeleteIds] = useState<string[]>([]);
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
@@ -38,6 +43,28 @@ export default function MioWatchlistPage() {
 		setLoading(false);
 	};
 
+	const fetchWatchlists = React.useCallback(() => {
+		if (!aspSessionId) return;
+		setWatchlistsLoading(true);
+		setWatchlistsError(null);
+		fetch('/api/mio-watchlists', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ aspSessionId }),
+		})
+			.then((res) => res.json())
+			.then((data) => {
+				if (data.error) throw new Error(data.error);
+				setWatchlists((data.watchlists || []).map((w: any) => ({ id: String(w.id), name: w.name })));
+			})
+			.catch((err) => setWatchlistsError(err.message))
+			.finally(() => setWatchlistsLoading(false));
+	}, [aspSessionId]);
+
+	React.useEffect(() => {
+		fetchWatchlists();
+	}, [fetchWatchlists]);
+
 	const handleCreateWatchlist = async () => {
 		setLoading(true);
 		setError(null);
@@ -45,6 +72,7 @@ export default function MioWatchlistPage() {
 		try {
 			const res = await MIOService.createWatchlist(aspSessionId, watchlistName);
 			setResult('Watchlist created successfully.');
+			fetchWatchlists();
 		} catch (e: any) {
 			setError(e.message);
 		}
@@ -56,12 +84,9 @@ export default function MioWatchlistPage() {
 		setError(null);
 		setResult(null);
 		try {
-			const ids = deleteIds
-				.split(',')
-				.map((id) => id.trim())
-				.filter(Boolean);
-			const res = await MIOService.deleteWatchlists(aspSessionId, ids);
+			const res = await MIOService.deleteWatchlists(aspSessionId, deleteIds);
 			setResult('Watchlists deleted successfully.');
+			fetchWatchlists();
 		} catch (e: any) {
 			setError(e.message);
 		}
@@ -84,12 +109,29 @@ export default function MioWatchlistPage() {
 
 			<div className='mb-6'>
 				<h2 className='font-semibold mb-2'>Add to Watchlist</h2>
-				<Input
-					className='mb-2'
-					value={mioWlid}
-					onChange={(e) => setMioWlid(e.target.value)}
-					placeholder='MIO Watchlist ID'
-				/>
+				{watchlistsLoading ? (
+					<div className='mb-2 text-sm text-gray-500'>Loading watchlists...</div>
+				) : watchlistsError ? (
+					<div className='mb-2 text-sm text-red-600'>Failed to load watchlists: {watchlistsError}</div>
+				) : watchlists.length === 0 ? (
+					<div className='mb-2 text-sm text-gray-500'>No watchlists found.</div>
+				) : (
+					<div className='mb-2'>
+						<label className='block mb-1 font-medium'>MIO Watchlist</label>
+						<Select value={mioWlid} onValueChange={setMioWlid} disabled={watchlists.length === 0}>
+							<SelectTrigger className='w-full'>
+								<SelectValue placeholder='Select a watchlist' />
+							</SelectTrigger>
+							<SelectContent>
+								{watchlists.map((w) => (
+									<SelectItem key={w.id} value={w.id}>
+										{w.name}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				)}
 				<Input
 					className='mb-2'
 					value={symbols}
@@ -121,13 +163,14 @@ export default function MioWatchlistPage() {
 
 			<div className='mb-6'>
 				<h2 className='font-semibold mb-2'>Delete Watchlists</h2>
-				<Input
-					className='mb-2'
+				<MultiSelect
+					options={watchlists.map((w) => ({ label: w.name, value: w.id }))}
+					onValueChange={setDeleteIds}
 					value={deleteIds}
-					onChange={(e) => setDeleteIds(e.target.value)}
-					placeholder='Watchlist IDs to delete (comma separated)'
+					placeholder='Select watchlists to delete'
+					className='mb-2'
 				/>
-				<Button onClick={handleDeleteWatchlists} disabled={loading}>
+				<Button onClick={handleDeleteWatchlists} disabled={loading || deleteIds.length === 0}>
 					Delete Watchlists
 				</Button>
 			</div>

@@ -11,6 +11,8 @@ import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
 import { MIOService } from '@/lib/MIOService';
 import { useSessionId } from '@/lib/useSessionId';
+import { Badge } from '@/components/ui/badge';
+import { XCircle } from 'lucide-react';
 
 const fetchWatchlistSymbols = async (watchlistId: string, sessionId: string) => {
 	const res = await fetch('/api/proxy', {
@@ -44,19 +46,15 @@ const convertToMioFormat = (symbols: string[]) => {
 const MioSyncPage: React.FC = () => {
 	const [tvWlid, setTvWlid] = useState('');
 	const [mioWlid, setMioWlid] = useState('');
-	const [customWlids, setCustomWlids] = useState<{ id: string; name: string }[]>(() => {
-		if (typeof window !== 'undefined') {
-			try {
-				return JSON.parse(localStorage.getItem('mio_customWlids') || '[]');
-			} catch {
-				return [];
-			}
-		}
-		return [];
-	});
-	const [showAddDialog, setShowAddDialog] = useState(false);
-	const [newWlid, setNewWlid] = useState('');
-	const [newWlidName, setNewWlidName] = useState('');
+	const [mioWatchlists, setMioWatchlists] = useState<{ id: string; name: string }[]>([]);
+	const [combination, setCombination] = useState<{ tvWlid: string; mioWlid: string; groupBy: RegroupOption } | null>(
+		null
+	);
+	const [savedCombinations, setSavedCombinations] = useState<
+		{ tvWlid: string; mioWlid: string; groupBy: RegroupOption }[]
+	>([]);
+	const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
+	const [mioWatchlistsError, setMioWatchlistsError] = useState<string | null>(null);
 	const [aspSessionId, setAspSessionId] = useSessionId('marketinout');
 	const [sessionId, setSessionId] = useSessionId('tradingview');
 	const [symbols, setSymbols] = useState('');
@@ -74,10 +72,42 @@ const MioSyncPage: React.FC = () => {
 	/* Session IDs are now managed by useSessionId hook */
 
 	React.useEffect(() => {
-		if (typeof window !== 'undefined') {
-			localStorage.setItem('mio_customWlids', JSON.stringify(customWlids));
+		// Restore all saved combinations from localStorage
+		const stored = localStorage.getItem('mioSyncCombinations');
+		if (stored) {
+			try {
+				const combos = JSON.parse(stored);
+				if (Array.isArray(combos)) {
+					setSavedCombinations(combos);
+					// Optionally, auto-apply the first combination
+					if (combos.length > 0) {
+						setTvWlid(combos[0].tvWlid);
+						setMioWlid(combos[0].mioWlid);
+						setGroupBy(combos[0].groupBy);
+						setCombination(combos[0]);
+					}
+				}
+			} catch {}
 		}
-	}, [customWlids]);
+	}, []);
+
+	React.useEffect(() => {
+		if (!aspSessionId) return;
+		setMioWatchlistsLoading(true);
+		setMioWatchlistsError(null);
+		fetch('/api/mio-watchlists', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ aspSessionId }),
+		})
+			.then((res) => res.json())
+			.then((data) => {
+				if (data.error) throw new Error(data.error);
+				setMioWatchlists((data.watchlists || []).map((w: any) => ({ id: String(w.id), name: w.name })));
+			})
+			.catch((err) => setMioWatchlistsError(err.message))
+			.finally(() => setMioWatchlistsLoading(false));
+	}, [aspSessionId]);
 
 	const fetchWatchlists = async () => {
 		if (!sessionId) {
@@ -187,128 +217,197 @@ const MioSyncPage: React.FC = () => {
 	};
 
 	return (
-		<form onSubmit={handleSubmit} className='space-y-8 max-w-md mx-auto mt-16 p-6 rounded-lg shadow-md'>
-			<div className='space-y-2'>
-				<Label htmlFor='sessionId'>TradingView sessionid</Label>
-				<Input
-					id='sessionId'
-					value={sessionId}
-					onChange={(e) => setSessionId(e.target.value)}
-					required
-					className='w-full'
-				/>
-			</div>
-			<div className='space-y-2'>
-				<Label htmlFor='wlid'>TradingView Watchlist</Label>
-				<Select value={tvWlid} onValueChange={setTvWlid} disabled={!sessionId || loading || watchlists.length === 0}>
-					<SelectTrigger id='wlid' className='w-full'>
-						<SelectValue placeholder='Select a TradingView watchlist' />
-					</SelectTrigger>
-					<SelectContent>
-						{watchlists.map((w) => (
-							<SelectItem key={w.id} value={String(w.id)}>
-								{w.name}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</div>
-			<div className='space-y-2'>
-				<Label htmlFor='mio-wlid'>MIO Watchlist</Label>
-				<div className='flex items-center gap-2'>
-					<Select value={mioWlid} onValueChange={setMioWlid} disabled={customWlids.length === 0}>
-						<SelectTrigger id='mio-wlid' className='w-full'>
-							<SelectValue placeholder='Select a MIO watchlist' />
+		<div>
+			<form onSubmit={handleSubmit} className='space-y-8 max-w-md mx-auto mt-16 p-6 rounded-lg shadow-md'>
+				<div className='space-y-2'>
+					<Label htmlFor='sessionId'>TradingView sessionid</Label>
+					<Input
+						id='sessionId'
+						value={sessionId}
+						onChange={(e) => setSessionId(e.target.value)}
+						required
+						className='w-full'
+					/>
+				</div>
+				<div className='space-y-2'>
+					<Label htmlFor='wlid'>TradingView Watchlist</Label>
+					<Select value={tvWlid} onValueChange={setTvWlid} disabled={!sessionId || loading || watchlists.length === 0}>
+						<SelectTrigger id='wlid' className='w-full'>
+							<SelectValue placeholder='Select a TradingView watchlist' />
 						</SelectTrigger>
 						<SelectContent>
-							{customWlids.map((w) => (
-								<SelectItem key={w.id} value={w.id}>
+							{watchlists.map((w) => (
+								<SelectItem key={w.id} value={String(w.id)}>
 									{w.name}
 								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
-					<Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-						<DialogTrigger asChild>
-							<Button type='button' variant='outline' size='sm' className='ml-2'>
-								+ Add
-							</Button>
-						</DialogTrigger>
-						<DialogContent>
-							<div className='space-y-4'>
-								<Label htmlFor='newWlidName'>Name</Label>
-								<Input id='newWlidName' value={newWlidName} onChange={(e) => setNewWlidName(e.target.value)} />
-								<Label htmlFor='newWlid'>WLID</Label>
-								<Input id='newWlid' value={newWlid} onChange={(e) => setNewWlid(e.target.value)} />
-								<Button
-									type='button'
-									onClick={() => {
-										if (newWlid && newWlidName) {
-											setCustomWlids((prev) => [...prev, { id: newWlid, name: newWlidName }]);
-											setNewWlid('');
-											setNewWlidName('');
-											setShowAddDialog(false);
-										}
-									}}
-									disabled={!newWlid || !newWlidName}
-								>
-									Add
-								</Button>
-							</div>
-						</DialogContent>
-					</Dialog>
 				</div>
-			</div>
-			<div className='space-y-2'>
-				<Label htmlFor='groupBy'>Group by</Label>
-				<Select value={groupBy} onValueChange={(v) => setGroupBy(v as RegroupOption)}>
-					<SelectTrigger id='groupBy' className='w-full'>
-						<SelectValue placeholder='Group by' />
-					</SelectTrigger>
-					<SelectContent>
-						{regroupOptions.map((opt) => (
-							<SelectItem key={opt.value} value={opt.value}>
-								{opt.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</div>
-			<div className='space-y-2'>
-				<Label htmlFor='symbols'>Stock Symbols (MIO format)</Label>
-				<EditorWithClipboard
-					id='symbols-editor'
-					label=''
-					value={regroupTVWatchlist(symbols, groupBy)}
-					onChange={setSymbols}
-					placeholder='Paste or type symbols here...'
-					className='w-full font-mono text-sm p-2 border rounded'
-				/>
-			</div>
-			<div className='space-y-2'>
-				<Label htmlFor='aspSessionId'>MarketInOut ASPSESSIONID Value</Label>
-				<Input
-					id='aspSessionId'
-					value={aspSessionId}
-					onChange={(e) => setAspSessionId(e.target.value)}
-					required
+				<div className='space-y-2'>
+					<Label htmlFor='mio-wlid'>MIO Watchlist</Label>
+					<div className='flex items-center gap-2'>
+						{mioWatchlistsLoading ? (
+							<div className='text-sm text-gray-500'>Loading MIO watchlists...</div>
+						) : mioWatchlistsError ? (
+							<div className='text-sm text-red-600'>Failed to load: {mioWatchlistsError}</div>
+						) : mioWatchlists.length === 0 ? (
+							<div className='text-sm text-gray-500'>No MIO watchlists found.</div>
+						) : (
+							<Select value={mioWlid} onValueChange={setMioWlid} disabled={mioWatchlists.length === 0}>
+								<SelectTrigger id='mio-wlid' className='w-full'>
+									<SelectValue placeholder='Select a MIO watchlist' />
+								</SelectTrigger>
+								<SelectContent>
+									{mioWatchlists.map((w) => (
+										<SelectItem key={w.id} value={w.id}>
+											{w.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						)}
+					</div>
+				</div>
+				<div className='space-y-2'>
+					<Label htmlFor='groupBy'>Group by</Label>
+					<Select value={groupBy} onValueChange={(v) => setGroupBy(v as RegroupOption)}>
+						<SelectTrigger id='groupBy' className='w-full'>
+							<SelectValue placeholder='Group by' />
+						</SelectTrigger>
+						<SelectContent>
+							{regroupOptions.map((opt) => (
+								<SelectItem key={opt.value} value={opt.value}>
+									{opt.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</div>
+				<div className='space-y-2'>
+					<EditorWithClipboard
+						id='symbols-editor'
+						label='Stock Symbols (MIO format)'
+						value={regroupTVWatchlist(symbols, groupBy)}
+						onChange={setSymbols}
+						placeholder='Paste or type symbols here...'
+						className='w-full font-mono text-sm p-2 border rounded'
+					/>
+				</div>
+				<div className='space-y-2'>
+					<Label htmlFor='aspSessionId'>MarketInOut ASPSESSIONID Value</Label>
+					<Input
+						id='aspSessionId'
+						value={aspSessionId}
+						onChange={(e) => setAspSessionId(e.target.value)}
+						required
+						className='w-full'
+					/>
+				</div>
+				<Button
+					type='submit'
+					disabled={loading || !symbols || !aspSessionId || !sessionId || !mioWlid}
 					className='w-full'
-				/>
-			</div>
-			<Button
-				type='submit'
-				disabled={loading || !symbols || !aspSessionId || !sessionId || !mioWlid}
-				className='w-full'
-			>
-				{loading ? 'Syncing...' : 'Sync to MarketInOut'}
-			</Button>
-			{/* {response && (
+				>
+					{loading ? 'Syncing...' : 'Sync to MarketInOut'}
+				</Button>
+				{savedCombinations.length > 0 && (
+					<div className='flex flex-wrap gap-2 mb-4'>
+						{savedCombinations.map((combo, idx) => {
+							const tvName = watchlists.find((w) => w.id === combo.tvWlid)?.name || combo.tvWlid;
+							const mioName = mioWatchlists.find((w) => w.id === combo.mioWlid)?.name || combo.mioWlid;
+							return (
+								<span key={idx} className='flex items-center'>
+									<Badge className='m-1 border-foreground/10 text-foreground bg-card hover:bg-card/80 flex flex-row items-start gap-1 px-2 py-1 rounded-md transition min-w-[0]'>
+										<div
+											className='cursor-pointer w-full break-words'
+											onClick={() => {
+												setTvWlid(combo.tvWlid);
+												setMioWlid(combo.mioWlid);
+												setGroupBy(combo.groupBy);
+												setCombination(combo);
+												showToast('Combination applied.', 'success');
+											}}
+											tabIndex={0}
+											role='button'
+											aria-label='Apply combination'
+											onKeyDown={(e) => {
+												if (e.key === 'Enter' || e.key === ' ') {
+													setTvWlid(combo.tvWlid);
+													setMioWlid(combo.mioWlid);
+													setGroupBy(combo.groupBy);
+													setCombination(combo);
+													showToast('Combination applied.', 'success');
+												}
+											}}
+										>
+											{tvName} / {mioName} / {combo.groupBy}
+										</div>
+										<div className='flex w-full'>
+											<XCircle
+												className='h-4 w-4 cursor-pointer text-muted-foreground hover:text-destructive'
+												onClick={(e) => {
+													e.stopPropagation();
+													const updated = savedCombinations.filter((_, i) => i !== idx);
+													setSavedCombinations(updated);
+													localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
+													showToast('Combination deleted.', 'success');
+												}}
+												tabIndex={0}
+												role='button'
+												aria-label='Delete combination'
+												onKeyDown={(e) => {
+													if (e.key === 'Enter' || e.key === ' ') {
+														e.stopPropagation();
+														const updated = savedCombinations.filter((_, i) => i !== idx);
+														setSavedCombinations(updated);
+														localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
+														showToast('Combination deleted.', 'success');
+													}
+												}}
+											/>
+										</div>
+									</Badge>
+								</span>
+							);
+						})}
+					</div>
+				)}
+				<div className='flex gap-2 mt-2'>
+					<Button
+						type='button'
+						variant='secondary'
+						className='flex-1'
+						onClick={() => {
+							if (!tvWlid || !mioWlid || !groupBy) {
+								showToast('Please select all combination options before saving.', 'error');
+								return;
+							}
+							const combo = { tvWlid, mioWlid, groupBy };
+							// Prevent duplicates
+							const updated = [
+								...savedCombinations.filter(
+									(c) => !(c.tvWlid === combo.tvWlid && c.mioWlid === combo.mioWlid && c.groupBy === combo.groupBy)
+								),
+								combo,
+							];
+							setSavedCombinations(updated);
+							localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
+							setCombination(combo);
+							showToast('Combination saved locally.', 'success');
+						}}
+					>
+						Save Combination
+					</Button>
+				</div>
+				{/* {response && (
 				<div className='mt-8'>
 					<Label>Result</Label>
 					<div className='p-4 border rounded bg-gray-50'>{response}</div>
 				</div>
 			)} */}
-		</form>
+			</form>
+		</div>
 	);
 };
 

@@ -21,6 +21,7 @@ interface EditorWithClipboardProps {
 	disabledCopy?: boolean;
 	disabledPaste?: boolean;
 	className?: string;
+	isCollapsed?: boolean;
 }
 
 export function EditorWithClipboard({
@@ -39,11 +40,12 @@ export function EditorWithClipboard({
 	disabledCopy,
 	disabledPaste,
 	className,
+	isCollapsed,
 }: EditorWithClipboardProps) {
 	const [copyStatus, setCopyStatus] = useState<'idle' | 'copied'>('idle');
 	const [pasteStatus, setPasteStatus] = useState<'idle' | 'pasted'>('idle');
 	const [fileStatus, setFileStatus] = useState<'idle' | 'loaded' | 'error'>('idle');
-	const [collapsed, setCollapsed] = useState(false);
+	const [collapsed, setCollapsed] = useState(isCollapsed ?? true);
 	const fileInputRef = React.useRef<HTMLInputElement>(null);
 
 	const handlePaste = async () => {
