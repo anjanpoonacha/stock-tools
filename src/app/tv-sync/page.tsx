@@ -79,7 +79,7 @@ export default function TvSyncPage() {
 		if (fetchingRef.current) return;
 		fetchingRef.current = true;
 		async function fetchWatchlists() {
-			toast('Fetching TradingView watchlists...');
+			/* Removed toast: Fetching TradingView watchlists... */
 			const res = await fetch('/api/proxy', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
@@ -94,7 +94,8 @@ export default function TvSyncPage() {
 				}),
 			});
 			if (!res.ok) {
-				toast('Failed to fetch watchlists', 'error');
+				console.log(`[TradingView API] Failed to fetch watchlists: ${res.status} ${res.statusText}`);
+
 				return;
 			}
 			type Watchlist = { id: string; name: string };
@@ -131,17 +132,16 @@ export default function TvSyncPage() {
 			}),
 		});
 		if (!res.ok) {
-			toast(`Failed to fetch: ${url}`, 'error');
+			/* Removed toast: Failed to fetch */
 			return [];
 		}
 		const { data } = await res.json();
-		/* Remove noisy toast for raw API response */
-		// toast(`Raw API response from ${url}: ${data}`);
+
 		return parseMioSymbols(data);
 	}
 
 	async function cleanUpWatchlist() {
-		toast('Cleaning up watchlist...');
+		/* Removed toast: Cleaning up watchlist... */
 		const cleanupRes = await fetch('/api/proxy', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -159,7 +159,8 @@ export default function TvSyncPage() {
 		});
 		if (!cleanupRes.ok) {
 			const { error, data } = await cleanupRes.json().catch(() => ({}));
-			toast(`Failed to clean up watchlist: ${error || data || cleanupRes.statusText}`, 'error');
+			/* Removed toast: Failed to clean up watchlist */
+			console.log({ error, data });
 			return;
 		}
 		toast('Watchlist cleaned up.', 'success');
@@ -169,7 +170,7 @@ export default function TvSyncPage() {
 		// Always send a flat array of symbols to TradingView append API
 		console.log({ symbols });
 		const payload = output;
-		toast(`Appending symbols to TradingView: ${JSON.stringify(payload)}`);
+		/* Removed toast: Appending symbols to TradingView */
 		const res = await fetch('/api/proxy', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -186,9 +187,9 @@ export default function TvSyncPage() {
 			}),
 		});
 		const respText = await res.text();
-		toast(`TradingView response: ${respText}`);
+		/* Removed toast: TradingView response */
 		if (!res.ok) {
-			toast(`Failed to append symbols: ${respText}`, 'error');
+			/* Removed toast: Failed to append symbols */
 			return;
 		}
 		toast('Symbols appended successfully.', 'success');
@@ -311,7 +312,6 @@ export default function TvSyncPage() {
 					Clean Up Watchlist
 				</Button>
 			</div>
-			{/* Logs removed */}
 		</div>
 	);
 }
