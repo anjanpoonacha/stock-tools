@@ -2,132 +2,156 @@
 
 'use client';
 
-import React, { useState } from 'react';
-import { MIOService } from '@/lib/MIOService';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
-import { useSessionId } from '@/lib/useSessionId';
+import { getInternalSessionId } from '@/lib/useInternalSessionId';
+
+type Watchlist = { id: string; name: string };
 
 export default function MioWatchlistPage() {
-	const [aspSessionId, setAspSessionId] = useSessionId('marketinout');
-	const [mioWlid, setMioWlid] = useState('');
-	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
+	const [internalSessionId, setInternalSessionId] = useState<string>('');
+
+	useEffect(() => {
+		function updateSessionId() {
+			setInternalSessionId(getInternalSessionId());
+		}
+		updateSessionId();
+		window.addEventListener('focus', updateSessionId);
+		return () => window.removeEventListener('focus', updateSessionId);
+	}, []);
+
+	// Watchlist state
+	const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
 	const [watchlistsLoading, setWatchlistsLoading] = useState(false);
 	const [watchlistsError, setWatchlistsError] = useState<string | null>(null);
+
+	// Form state
+	const [mioWlid, setMioWlid] = useState('');
 	const [symbols, setSymbols] = useState('');
 	const [groupBy, setGroupBy] = useState('');
 	const [watchlistName, setWatchlistName] = useState('');
 	const [deleteIds, setDeleteIds] = useState<string[]>([]);
+
+	// Result and error state
 	const [result, setResult] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(false);
 
+	// Fetch all watchlists
+	const fetchWatchlists = useCallback(async () => {
+		if (!internalSessionId) {
+			setWatchlists([]);
+			setWatchlistsError('No internal session ID found. Please bridge your session first.');
+			return;
+		}
+		setWatchlistsLoading(true);
+		setWatchlistsError(null);
+		try {
+			const res = await fetch('/api/mio-action', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ internalSessionId }),
+			});
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
+			setWatchlists(
+				(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
+					id: String(w.id),
+					name: w.name,
+				}))
+			);
+		} catch (err: any) {
+			setWatchlistsError(err.message || 'Failed to load watchlists.');
+			setWatchlists([]);
+		} finally {
+			setWatchlistsLoading(false);
+		}
+	}, [internalSessionId]);
+
+	// Fetch watchlists when session changes
+	useEffect(() => {
+		if (!internalSessionId) {
+			setWatchlists([]);
+			setWatchlistsError('No internal session ID found. Please bridge your session first.');
+			return;
+		}
+		fetchWatchlists();
+	}, [internalSessionId, fetchWatchlists]);
+
+	// Add to watchlist
 	const handleAddWatchlist = async () => {
 		setLoading(true);
 		setError(null);
 		setResult(null);
 		try {
-			await MIOService.addWatchlist({
-				aspSessionId,
-				mioWlid,
-				symbols,
+			const res = await fetch('/api/mio-action', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ internalSessionId, mioWlid, symbols }),
 			});
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
 			setResult('Watchlist updated successfully.');
-		} catch (e: unknown) {
-			if (e instanceof Error) {
-				setError(e.message);
-			} else {
-				setError('An unknown error occurred.');
-			}
+			fetchWatchlists();
+		} catch (e: any) {
+			setError(e.message || 'Failed to add to watchlist.');
+		} finally {
+			setLoading(false);
 		}
-		setLoading(false);
 	};
 
-	const fetchWatchlists = React.useCallback(() => {
-		if (!aspSessionId) return;
-		setWatchlistsLoading(true);
-		setWatchlistsError(null);
-		fetch('/api/mio-watchlists', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ aspSessionId }),
-		})
-			.then((res) => res.json())
-			.then((data) => {
-				if (data.error) throw new Error(data.error);
-				setWatchlists(
-					(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
-						id: String(w.id),
-						name: w.name,
-					}))
-				);
-			})
-			.catch((err: unknown) => {
-				if (err instanceof Error) {
-					setWatchlistsError(err.message);
-				} else {
-					setWatchlistsError('An unknown error occurred.');
-				}
-			})
-			.finally(() => setWatchlistsLoading(false));
-	}, [aspSessionId]);
-
-	React.useEffect(() => {
-		fetchWatchlists();
-	}, [aspSessionId]);
-
+	// Create new watchlist
 	const handleCreateWatchlist = async () => {
 		setLoading(true);
 		setError(null);
 		setResult(null);
 		try {
-			await MIOService.createWatchlist(aspSessionId, watchlistName);
+			const res = await fetch('/api/mio-action', {
+				method: 'PUT',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ internalSessionId, name: watchlistName }),
+			});
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
 			setResult('Watchlist created successfully.');
 			fetchWatchlists();
-		} catch (e: unknown) {
-			if (e instanceof Error) {
-				setError(e.message);
-			} else {
-				setError('An unknown error occurred.');
-			}
+		} catch (e: any) {
+			setError(e.message || 'Failed to create watchlist.');
+		} finally {
+			setLoading(false);
 		}
-		setLoading(false);
 	};
 
+	// Delete selected watchlists
 	const handleDeleteWatchlists = async () => {
 		setLoading(true);
 		setError(null);
 		setResult(null);
 		try {
-			await MIOService.deleteWatchlists(aspSessionId, deleteIds);
+			const res = await fetch('/api/mio-action', {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ internalSessionId, deleteIds }),
+			});
+			const data = await res.json();
+			if (data.error) throw new Error(data.error);
 			setResult('Watchlists deleted successfully.');
 			fetchWatchlists();
-		} catch (e: unknown) {
-			if (e instanceof Error) {
-				setError(e.message);
-			} else {
-				setError('An unknown error occurred.');
-			}
+		} catch (e: any) {
+			setError(e.message || 'Failed to delete watchlists.');
+		} finally {
+			setLoading(false);
 		}
-		setLoading(false);
 	};
 
 	return (
 		<div className='max-w-xl mx-auto py-8'>
 			<h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
 			<Separator className='mb-4' />
-
-			<div className='mb-6'>
-				<label className='block mb-1 font-medium'>ASP Session ID</label>
-				<Input
-					value={aspSessionId}
-					onChange={(e) => setAspSessionId(e.target.value)}
-					placeholder='Enter ASP Session ID'
-				/>
-			</div>
 
 			<div className='mb-6'>
 				<h2 className='font-semibold mb-2'>Add to Watchlist</h2>
@@ -161,7 +185,7 @@ export default function MioWatchlistPage() {
 					placeholder='Symbols (comma separated)'
 				/>
 				<Input className='mb-2' value={groupBy} onChange={(e) => setGroupBy(e.target.value)} placeholder='Group By' />
-				<Button onClick={handleAddWatchlist} disabled={loading}>
+				<Button onClick={handleAddWatchlist} disabled={loading || !internalSessionId}>
 					Add to Watchlist
 				</Button>
 			</div>
@@ -176,7 +200,7 @@ export default function MioWatchlistPage() {
 					onChange={(e) => setWatchlistName(e.target.value)}
 					placeholder='New Watchlist Name'
 				/>
-				<Button onClick={handleCreateWatchlist} disabled={loading}>
+				<Button onClick={handleCreateWatchlist} disabled={loading || !internalSessionId}>
 					Create Watchlist
 				</Button>
 			</div>
@@ -192,7 +216,7 @@ export default function MioWatchlistPage() {
 					placeholder='Select watchlists to delete'
 					className='mb-2'
 				/>
-				<Button onClick={handleDeleteWatchlists} disabled={loading || deleteIds.length === 0}>
+				<Button onClick={handleDeleteWatchlists} disabled={loading || deleteIds.length === 0 || !internalSessionId}>
 					Delete Watchlists
 				</Button>
 			</div>

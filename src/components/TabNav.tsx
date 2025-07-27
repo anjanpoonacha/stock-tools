@@ -11,6 +11,7 @@ const ROUTES = [
 	{ path: '/tv-sync', label: 'Sync Watchlist', value: 'sync' },
 	{ path: '/mio-sync', label: 'MIO Sync', value: 'mio' },
 	{ path: '/mio-watchlist', label: 'MIO Watchlist', value: 'miowatchlist' },
+	{ path: '/mio-auth', label: 'MIO Auth', value: 'mioauth' },
 ];
 
 export default function TabNav() {

@@ -1,6 +1,11 @@
 // src/lib/useSessionId.ts
 import { useState, useEffect, Dispatch, SetStateAction } from 'react';
 
+/**
+ * Hook to get/set the external session ID for a platform (e.g., ASPSESSIONID for MarketInOut).
+ * Uses localStorage key 'marketinout_sessionid' for MarketInOut.
+ * This is NOT the internal bridged session ID.
+ */
 type Platform = 'tradingview' | 'marketinout';
 
 const SESSION_KEYS: Record<Platform, string> = {
@@ -10,12 +15,15 @@ const SESSION_KEYS: Record<Platform, string> = {
 
 export function useSessionId(platform: Platform): [string, Dispatch<SetStateAction<string>>] {
 	const key = SESSION_KEYS[platform];
-	const [sessionId, setSessionId] = useState<string>(() => {
+	const [sessionId, setSessionId] = useState<string>('');
+
+	useEffect(() => {
 		if (typeof window !== 'undefined') {
-			return localStorage.getItem(key) || '';
+			// Always use localStorage for external sessionId
+			const stored = localStorage.getItem(key) || '';
+			setSessionId(stored);
 		}
-		return '';
-	});
+	}, [key]);
 
 	useEffect(() => {
 		if (sessionId) {

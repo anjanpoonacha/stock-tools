@@ -39,7 +39,9 @@ function normalizeHeaders(headers: Record<string, string>, setJson: boolean): He
 
 export async function POST(req: NextRequest) {
 	try {
-		const { url, method = 'GET', headers = {}, body } = await req.json();
+		const payload = await req.json();
+		console.log('[PROXY] Incoming payload:', payload);
+		const { url, method = 'GET', headers = {}, body } = payload;
 		if (!url) {
 			return NextResponse.json({ error: 'Missing url' }, { status: 400 });
 		}
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
 		}
 		return NextResponse.json({ data, status: res.status });
 	} catch (error) {
+		console.error('[PROXY] Error:', error);
 		const message = error instanceof Error ? error.message : 'An unknown error occurred';
 		return NextResponse.json({ error: message }, { status: 500 });
 	}

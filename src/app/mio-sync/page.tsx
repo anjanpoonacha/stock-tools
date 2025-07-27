@@ -22,7 +22,7 @@ const MioSyncPage: React.FC = () => {
 	>([]);
 	const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
 	const [mioWatchlistsError, setMioWatchlistsError] = useState<string | null>(null);
-	const [aspSessionId, setAspSessionId] = useSessionId('marketinout');
+	const [internalSessionId] = useSessionId('marketinout');
 	const [sessionId, setSessionId] = useSessionId('tradingview');
 	const [symbols, setSymbols] = useState('');
 	const regroupOptions: { value: RegroupOption; label: string }[] = [
@@ -59,27 +59,32 @@ const MioSyncPage: React.FC = () => {
 	}, []);
 
 	React.useEffect(() => {
-		if (!aspSessionId) return;
+		if (!internalSessionId) return;
 		setMioWatchlistsLoading(true);
 		setMioWatchlistsError(null);
-		fetch('/api/mio-watchlists', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ aspSessionId }),
-		})
-			.then((res) => res.json())
-			.then((data: { error?: string; watchlists?: { id: string | number; name: string }[] }) => {
-				if (data.error) throw new Error(data.error);
-				setMioWatchlists(
-					(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
-						id: String(w.id),
-						name: w.name,
-					}))
-				);
+
+		// Only call API if internalSessionId is non-empty
+		if (internalSessionId && internalSessionId.length > 0) {
+			console.log('[SYNC] Fetching watchlists with internalSessionId:', internalSessionId);
+			fetch('/api/mio-action', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ internalSessionId }),
 			})
-			.catch((err) => setMioWatchlistsError(err.message))
-			.finally(() => setMioWatchlistsLoading(false));
-	}, [aspSessionId]);
+				.then((res) => res.json())
+				.then((data: { error?: string; watchlists?: { id: string | number; name: string }[] }) => {
+					if (data.error) throw new Error(data.error);
+					setMioWatchlists(
+						(data.watchlists || []).map((w: { id: string | number; name: string }) => ({
+							id: String(w.id),
+							name: w.name,
+						}))
+					);
+				})
+				.catch((err) => setMioWatchlistsError(err.message))
+				.finally(() => setMioWatchlistsLoading(false));
+		}
+	}, [internalSessionId]);
 
 	/* fetchWatchlists removed: now inlined in useEffect */
 
@@ -172,10 +177,14 @@ const MioSyncPage: React.FC = () => {
 		e.preventDefault();
 		setLoading(true);
 		try {
-			await MIOService.addWatchlist({
-				aspSessionId,
-				mioWlid,
-				symbols: regroupTVWatchlist(symbols, groupBy),
+			await fetch('/api/mio-action', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					internalSessionId,
+					mioWlid,
+					symbols: regroupTVWatchlist(symbols, groupBy),
+				}),
 			});
 			showToast('Watchlist synced to MarketInOut.', 'success');
 		} catch {
@@ -184,6 +193,21 @@ const MioSyncPage: React.FC = () => {
 			setLoading(false);
 		}
 	};
+
+	if (!internalSessionId) {
+		return (
+			<div className='max-w-md mx-auto mt-16 p-6 rounded-lg shadow-md border border-red-400 bg-red-50 text-red-800'>
+				<h2 className='text-xl font-bold mb-4'>MIO Session Required</h2>
+				<p>
+					You must bridge your MarketInOut session before using this tool.
+					<br />
+					<a href='/mio-auth' className='underline text-blue-700'>
+						Go to MIO Auth
+					</a>
+				</p>
+			</div>
+		);
+	}
 
 	return (
 		<div>
@@ -263,19 +287,9 @@ const MioSyncPage: React.FC = () => {
 						className='w-full font-mono text-sm p-2 border rounded'
 					/>
 				</div>
-				<div className='space-y-2'>
-					<Label htmlFor='aspSessionId'>MarketInOut ASPSESSIONID Value</Label>
-					<Input
-						id='aspSessionId'
-						value={aspSessionId}
-						onChange={(e) => setAspSessionId(e.target.value)}
-						required
-						className='w-full'
-					/>
-				</div>
 				<Button
 					type='submit'
-					disabled={loading || !symbols || !aspSessionId || !sessionId || !mioWlid}
+					disabled={loading || !symbols || !internalSessionId || !sessionId || !mioWlid}
 					className='w-full'
 				>
 					{loading ? 'Syncing...' : 'Sync to MarketInOut'}
