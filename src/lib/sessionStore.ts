@@ -1,8 +1,7 @@
 // src/lib/sessionStore.ts
 
 import { randomBytes } from 'crypto';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { join } from 'path';
+import { existsSync, readFileSync, writeFileSync } from 'fs';
 
 export type PlatformSessionData = {
 	sessionId: string;
@@ -14,7 +13,7 @@ export type SessionData = {
 	[platform: string]: PlatformSessionData;
 };
 
-const SESSION_FILE = join(process.cwd(), 'sessions.json');
+const SESSION_FILE = '/tmp/sessions.json'; // Use a temp file for simplicity, adjust as needed
 
 function loadSessions(): Record<string, SessionData> {
 	if (!existsSync(SESSION_FILE)) return {};
