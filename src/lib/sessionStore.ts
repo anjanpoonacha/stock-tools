@@ -7,6 +7,7 @@ import { join } from 'path';
 export type PlatformSessionData = {
 	sessionId: string;
 	// Add more fields as needed per platform
+	[key: string]: string;
 };
 
 export type SessionData = {

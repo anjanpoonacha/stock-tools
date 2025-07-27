@@ -17,7 +17,11 @@ export function useSessionBridge() {
 	 * Bridge an external session ID to an internal session ID.
 	 * Optionally, provide onBridged callback to receive the new internalSessionId immediately.
 	 */
-	async function bridgeSession(externalSessionId: string, onBridged?: (internalSessionId: string) => void) {
+	async function bridgeSession(
+		sessionKey: string,
+		sessionValue: string,
+		onBridged?: (internalSessionId: string) => void
+	) {
 		setLoading(true);
 		setError(null);
 		setSuccess(false);
@@ -28,7 +32,7 @@ export function useSessionBridge() {
 				headers: {
 					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify({ externalSessionId }),
+				body: JSON.stringify({ sessionKey, sessionValue }),
 			});
 			if (!res.ok) {
 				const data = await res.json();

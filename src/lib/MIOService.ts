@@ -18,22 +18,31 @@ export class MIOService {
 	/**
 	 * Retrieve the ASP session ID for MIO from the session store.
 	 */
-	static getAspSessionId(internalSessionId: string): string | undefined {
+	/**
+	 * Retrieve the session key and value for MIO from the session store.
+	 */
+	static getSessionKeyValue(internalSessionId: string): { key: string; value: string } | undefined {
 		const session = getPlatformSession(internalSessionId, 'marketinout');
-		return session?.sessionId;
+		if (!session) return undefined;
+		// Find the first key that is not 'sessionId'
+		const key = Object.keys(session).find((k) => k !== 'sessionId');
+		if (key && session[key]) {
+			return { key, value: session[key] };
+		}
+		return undefined;
 	}
 
 	/**
 	 * Fetch MIO watchlists using internalSessionId (handles session lookup and HTML parsing).
 	 */
 	static async getWatchlistsWithSession(internalSessionId: string): Promise<{ id: string; name: string }[]> {
-		const aspSessionId = MIOService.getAspSessionId(internalSessionId);
-		if (!aspSessionId) throw new Error('No MIO session found for this user.');
+		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
 
 		// Fetch the watchlist page from MIO
 		const res = await fetch('https://www.marketinout.com/wl/watch_list.php?mode=list', {
 			headers: {
-				Cookie: `ASPSESSIONIDCWAACASS=${aspSessionId}`,
+				Cookie: `${sessionKeyValue.key}=${sessionKeyValue.value}`,
 			},
 		});
 		if (!res.ok) throw new Error('Failed to fetch watchlist page');
@@ -66,11 +75,26 @@ export class MIOService {
 		mioWlid,
 		symbols,
 	}: AddWatchlistWithSessionParams): Promise<string> {
-		const aspSessionId = MIOService.getAspSessionId(internalSessionId);
-		if (!aspSessionId) throw new Error('No MIO session found for this user.');
-		return MIOService.addWatchlist({ aspSessionId, mioWlid, symbols });
+		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
+		return MIOService.addWatchlist({
+			sessionKey: sessionKeyValue.key,
+			sessionValue: sessionKeyValue.value,
+			mioWlid,
+			symbols,
+		});
 	}
-	static async addWatchlist({ aspSessionId, mioWlid, symbols }: AddWatchlistParams): Promise<string> {
+	static async addWatchlist({
+		sessionKey,
+		sessionValue,
+		mioWlid,
+		symbols,
+	}: {
+		sessionKey: string;
+		sessionValue: string;
+		mioWlid: string;
+		symbols: string;
+	}): Promise<string> {
 		const regroupTVWatchlist = (symbols: string) => {
 			// This should match the regroupTVWatchlist logic from utils if needed
 			// For now, just return symbols as-is
@@ -89,7 +113,7 @@ export class MIOService {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
-				Cookie: `ASPSESSIONIDCWAACASS=${aspSessionId}`,
+				Cookie: `${sessionKey}=${sessionValue}`,
 			},
 			body: formData,
 		});
@@ -101,12 +125,12 @@ export class MIOService {
 		return text;
 	}
 
-	static async createWatchlist(aspSessionId: string, name: string): Promise<string> {
+	static async createWatchlist(sessionKey: string, sessionValue: string, name: string): Promise<string> {
 		const url = `https://www.marketinout.com/wl/my_watch_lists.php?mode=new&name=${encodeURIComponent(name)}&wlid=`;
 		const res = await fetch(url, {
 			method: 'GET',
 			headers: {
-				Cookie: `ASPSESSIONIDCWAACASS=${aspSessionId}`,
+				Cookie: `${sessionKey}=${sessionValue}`,
 			},
 		});
 		const text = await res.text();
@@ -116,7 +140,7 @@ export class MIOService {
 		return text;
 	}
 
-	static async deleteWatchlists(aspSessionId: string, todeleteIds: string[]): Promise<string> {
+	static async deleteWatchlists(sessionKey: string, sessionValue: string, todeleteIds: string[]): Promise<string> {
 		if (!Array.isArray(todeleteIds) || todeleteIds.length === 0) {
 			throw new Error('No watchlist IDs provided for deletion.');
 		}
@@ -126,7 +150,7 @@ export class MIOService {
 		const res = await fetch(url, {
 			method: 'GET',
 			headers: {
-				Cookie: `ASPSESSIONIDCWAACASS=${aspSessionId}`,
+				Cookie: `${sessionKey}=${sessionValue}`,
 			},
 		});
 		const text = await res.text();
@@ -140,8 +164,8 @@ export class MIOService {
 	 * Delete watchlists using internalSessionId (fetches aspSessionId from session store).
 	 */
 	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[]): Promise<string> {
-		const aspSessionId = MIOService.getAspSessionId(internalSessionId);
-		if (!aspSessionId) throw new Error('No MIO session found for this user.');
-		return MIOService.deleteWatchlists(aspSessionId, deleteIds);
+		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
+		return MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 	}
 }
