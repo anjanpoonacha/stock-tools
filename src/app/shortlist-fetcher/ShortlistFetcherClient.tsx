@@ -9,6 +9,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { useSessionId } from '@/lib/useSessionId';
+import { UsageGuide } from '@/components/UsageGuide';
 
 type Watchlist = {
 	id: number;
@@ -60,6 +61,23 @@ export default function ShortlistFetcherClient() {
 	return (
 		<div className='max-w-md mx-auto p-4 flex flex-col gap-4'>
 			<h2 className='text-xl font-bold text-center'>Fetch TradingView Watchlists</h2>
+			<UsageGuide
+				title="How to fetch your TradingView watchlists"
+				steps={[
+					"Log in to tradingview.com in your browser",
+					"Open DevTools → Application → Cookies → tradingview.com",
+					"Copy the 'sessionid' cookie value and paste it below",
+					"Click 'Fetch Watchlists' to retrieve all your watchlists",
+					"Select which watchlists to combine and copy the symbols"
+				]}
+				tips={[
+					"Keep your session cookie private and secure",
+					"Use the regroup feature to organize symbols by sector/industry",
+					"'Shortlist' watchlist is auto-selected if found",
+					"You can combine multiple watchlists into one symbol list"
+				]}
+				className="mb-4"
+			/>
 			<Label htmlFor='cookie'>Paste your TradingView session cookie</Label>
 			<Textarea
 				id='cookie'

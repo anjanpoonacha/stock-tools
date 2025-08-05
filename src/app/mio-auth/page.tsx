@@ -7,6 +7,7 @@ import { useSessionBridge } from '@/lib/useSessionBridge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { UsageGuide } from '@/components/UsageGuide';
 
 export default function MioAuthPage() {
 	const [sessionKey, setSessionKey] = useState('ASPSESSIONIDCWAACASS');
@@ -16,6 +17,23 @@ export default function MioAuthPage() {
 	return (
 		<div className='max-w-md mx-auto my-8 p-6 border rounded-xl bg-background shadow-md'>
 			<h2 className='font-semibold text-2xl mb-5'>MIO Session Bridge</h2>
+			<UsageGuide
+				title="How to authenticate with MarketInOut"
+				steps={[
+					"Log in to marketinout.com in your browser",
+					"Open DevTools → Application → Cookies → marketinout.com",
+					"Find the session cookie (usually starts with ASPSESSIONID)",
+					"Copy both the cookie name and value",
+					"Paste them below and click 'Bridge Session'"
+				]}
+				tips={[
+					"Session key example: ASPSESSIONIDCWAACASS",
+					"Keep your session credentials private and secure",
+					"This authentication is required for all MIO-related tools",
+					"Session will be stored securely for other tools to use"
+				]}
+				className="mb-5"
+			/>
 			<form
 				onSubmit={(e) => {
 					e.preventDefault();

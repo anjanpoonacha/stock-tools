@@ -5,13 +5,13 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const ROUTES = [
-	{ path: '/', label: 'Stock Format Converter', value: 'converter' },
-	{ path: '/csv-watchlist', label: 'CSV Watchlist', value: 'csv' },
-	{ path: '/shortlist-fetcher', label: 'Fetch Watchlist', value: 'fetch' },
-	{ path: '/tv-sync', label: 'Sync Watchlist', value: 'sync' },
-	{ path: '/mio-sync', label: 'MIO Sync', value: 'mio' },
-	{ path: '/mio-watchlist', label: 'MIO Watchlist', value: 'miowatchlist' },
-	{ path: '/mio-auth', label: 'MIO Auth', value: 'mioauth' },
+	{ path: '/', label: 'Symbol Converter', value: 'converter' },
+	{ path: '/csv-watchlist', label: 'CSV → TradingView', value: 'csv' },
+	{ path: '/shortlist-fetcher', label: 'Fetch TV Watchlists', value: 'fetch' },
+	{ path: '/tv-sync', label: 'Screener → TV', value: 'sync' },
+	{ path: '/mio-sync', label: 'TV → MIO', value: 'mio' },
+	{ path: '/mio-watchlist', label: 'Manage MIO Lists', value: 'miowatchlist' },
+	{ path: '/mio-auth', label: 'MIO Login', value: 'mioauth' },
 ];
 
 export default function TabNav() {

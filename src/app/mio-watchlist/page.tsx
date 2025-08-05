@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { getInternalSessionId } from '@/lib/useInternalSessionId';
+import { UsageGuide } from '@/components/UsageGuide';
 
 type Watchlist = { id: string; name: string };
 
@@ -155,6 +156,23 @@ export default function MioWatchlistPage() {
 	return (
 		<div className='max-w-xl mx-auto py-8'>
 			<h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
+			<UsageGuide
+				title="How to manage your MIO watchlists"
+				steps={[
+					"First, authenticate with MIO using the 'MIO Login' tab",
+					"Use 'Add to Watchlist' to add symbols to existing watchlists",
+					"Use 'Create New Watchlist' to make new watchlists",
+					"Use 'Delete Watchlists' to remove unwanted watchlists",
+					"All operations require MIO authentication to work"
+				]}
+				tips={[
+					"Symbols should be in MIO format (e.g., TCS.NS, INFY.BO)",
+					"Use comma-separated format for multiple symbols",
+					"Group By field helps organize symbols in watchlists",
+					"You can select multiple watchlists for bulk deletion"
+				]}
+				className="mb-4"
+			/>
 			<Separator className='mb-4' />
 
 			<div className='mb-6'>

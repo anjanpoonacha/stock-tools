@@ -9,6 +9,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '.
 import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
 import { useSessionId } from '../../lib/useSessionId';
+import { UsageGuide } from '../../components/UsageGuide';
 
 function parseMioSymbols(raw: string): string[] {
 	return raw
@@ -118,26 +119,38 @@ export default function TvSyncPage() {
 	const addUrl = () => setUrls([...urls, '']);
 	const removeUrl = (i: number) => setUrls(urls.filter((_, idx) => idx !== i));
 
-	async function fetchMioSymbols(url: string): Promise<string[]> {
-		const res = await fetch('/api/proxy', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				url,
-				method: 'GET',
-				headers: {
-					'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-					Accept: 'text/plain',
-				},
-			}),
-		});
-		if (!res.ok) {
-			/* Removed toast: Failed to fetch */
+	async function fetchMioSymbols(url: string, signal?: AbortSignal): Promise<string[]> {
+		try {
+			const res = await fetch('/api/proxy', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				signal,
+				body: JSON.stringify({
+					url,
+					method: 'GET',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+						Accept: 'text/plain',
+					},
+				}),
+			});
+			
+			if (!res.ok) {
+				console.log(`Failed to fetch symbols from ${url}: ${res.status} ${res.statusText}`);
+				return [];
+			}
+			
+			const { data } = await res.json();
+			return parseMioSymbols(data);
+		} catch (error) {
+			// Handle network errors, abort errors, etc.
+			if (error instanceof Error && error.name === 'AbortError') {
+				console.log(`Request aborted for ${url}`);
+			} else {
+				console.log(`Network error fetching symbols from ${url}:`, error);
+			}
 			return [];
 		}
-		const { data } = await res.json();
-
-		return parseMioSymbols(data);
 	}
 
 	async function cleanUpWatchlist() {
@@ -196,22 +209,77 @@ export default function TvSyncPage() {
 
 	// Fetch and group symbols when URLs or grouping changes
 	useEffect(() => {
+		const abortController = new AbortController();
+		let isMounted = true;
+
 		async function updateSymbolsAndOutput() {
-			let allSymbols: string[] = [];
-			for (const url of urls.filter((u) => u.trim())) {
-				const mioSymbols = await fetchMioSymbols(url);
-				allSymbols = allSymbols.concat(mioSymbols);
+			try {
+				let allSymbols: string[] = [];
+				const validUrls = urls.filter((u) => u.trim());
+				
+				// Don't make API calls if no valid URLs
+				if (validUrls.length === 0) {
+					if (isMounted) {
+						setOutput('');
+					}
+					return;
+				}
+
+				for (const url of validUrls) {
+					// Check if component is still mounted and request not aborted
+					if (!isMounted || abortController.signal.aborted) {
+						return;
+					}
+					
+					try {
+						const mioSymbols = await fetchMioSymbols(url, abortController.signal);
+						allSymbols = allSymbols.concat(mioSymbols);
+					} catch (error) {
+						console.log(`Failed to fetch symbols from ${url}:`, error);
+						// Continue with other URLs instead of failing completely
+						continue;
+					}
+				}
+				
+				if (isMounted && !abortController.signal.aborted) {
+					const tvSymbols = allSymbols.map(toTV).filter(Boolean) as string[];
+					setOutput(groupSymbols(tvSymbols, grouping));
+				}
+			} catch (error) {
+				console.log('Error in updateSymbolsAndOutput:', error);
+				// Don't update state on error to prevent infinite loops
 			}
-			const tvSymbols = allSymbols.map(toTV).filter(Boolean) as string[];
-			setOutput(groupSymbols(tvSymbols, grouping));
 		}
+
 		updateSymbolsAndOutput();
-		 
+
+		// Cleanup function
+		return () => {
+			isMounted = false;
+			abortController.abort();
+		};
 	}, [urls, grouping]);
 
 	return (
 		<div className='font-sans max-w-xl mx-auto my-8'>
 			<h2 className='text-xl font-bold mb-4'>TradingView Screener Sync</h2>
+			<UsageGuide
+				title="How to sync MIO screeners to TradingView"
+				steps={[
+					"Enter your TradingView sessionid (get from browser cookies)",
+					"Select a TradingView watchlist to sync to",
+					"Choose screener URLs (or use the default ones provided)",
+					"Select grouping option (Sector, Industry, or None)",
+					"Click 'Sync' to add symbols to your TradingView watchlist"
+				]}
+				tips={[
+					"Screener URLs should be MIO API endpoints that return symbol lists",
+					"Use 'Clean Up Watchlist' to clear existing symbols before syncing",
+					"Grouping creates organized sections in your watchlist",
+					"Multiple screener URLs will be combined into one sync"
+				]}
+				className="mb-4"
+			/>
 			<div className='mb-4'>
 				<Label htmlFor='sessionid'>TradingView sessionid:</Label>
 				<Input

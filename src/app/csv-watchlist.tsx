@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { downloadTextFile } from '@/lib/utils';
 import { useMemo, useState } from 'react';
+import { UsageGuide } from '@/components/UsageGuide';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -94,6 +95,23 @@ export default function CsvWatchlistPage() {
 		<div className='flex items-center justify-center min-h-screen bg-background px-2'>
 			<div className='w-full bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4'>
 				<h1 className='text-2xl font-bold mb-2 text-center'>CSV to TradingView Watchlist</h1>
+				<UsageGuide
+					title="How to convert CSV to TradingView format"
+					steps={[
+						"Paste your CSV data with headers (must include 'Symbol' column)",
+						"Choose how to group symbols (by Sector, Industry, or None)",
+						"Select a column to sort the data by",
+						"Copy or download the TradingView-formatted output",
+						"Import the result directly into TradingView watchlists"
+					]}
+					tips={[
+						"CSV must have headers in the first row",
+						"Symbol column is required (e.g., TCS.NS, INFY.BO)",
+						"Grouping creates sectioned format: ###GroupName,SYMBOL1,SYMBOL2",
+						"Preview table shows your data before conversion"
+					]}
+					className="mb-4"
+				/>
 				{error && <div className='text-red-500 mb-2 text-sm font-mono'>{error}</div>}
 				<EditorWithClipboard
 					id='csv-input'

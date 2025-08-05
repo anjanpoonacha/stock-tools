@@ -11,6 +11,7 @@ import { getInternalSessionId } from '@/lib/useInternalSessionId';
 import { useSessionId } from '@/lib/useSessionId';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
+import { UsageGuide } from '@/components/UsageGuide';
 
 const MioSyncPage: React.FC = () => {
 	const [tvWlid, setTvWlid] = useState('');
@@ -219,6 +220,24 @@ const MioSyncPage: React.FC = () => {
 
 	return (
 		<div>
+			<div className='max-w-md mx-auto mt-8 mb-4'>
+				<UsageGuide
+					title="How to sync TradingView watchlists to MIO"
+					steps={[
+						"First, set up MIO authentication using the 'MIO Login' tab",
+						"Enter your TradingView sessionid",
+						"Select a TradingView watchlist as the source",
+						"Choose a MIO watchlist as the destination",
+						"Select grouping option and click 'Sync to MarketInOut'"
+					]}
+					tips={[
+						"You must authenticate with MIO before using this tool",
+						"Symbols are automatically converted from TradingView to MIO format",
+						"Save combinations for quick reuse of common sync operations",
+						"Grouping organizes symbols by sector/industry in MIO"
+					]}
+				/>
+			</div>
 			<form onSubmit={handleSubmit} className='space-y-8 max-w-md mx-auto mt-16 p-6 rounded-lg shadow-md'>
 				<div className='space-y-2'>
 					<Label htmlFor='sessionId'>TradingView sessionid</Label>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { downloadTextFile } from '@/lib/utils';
 import { useState } from 'react';
 import { RegroupBar } from '@/components/RegroupBar';
+import { UsageGuide } from '@/components/UsageGuide';
 
 const DELIMITERS = [',', ' ', '\n', ';', '|'];
 
@@ -71,6 +72,23 @@ export default function StockFormatConverter() {
 			<div className='flex flex-col items-center justify-center flex-grow w-full'>
 				<div className='w-full bg-card rounded-xl shadow-lg p-4 flex flex-col gap-4 mx-auto'>
 					<h1 className='text-2xl font-bold mb-2 text-center'>Stock Format Converter</h1>
+					<UsageGuide
+						title="How to convert stock symbols"
+						steps={[
+							"Paste your stock symbols in the input area (e.g., TCS.NS, INFY.NS)",
+							"Choose your preferred delimiter (comma, space, newline, etc.)",
+							"Click the conversion button to convert between MIO and TradingView formats",
+							"Use the 'Switch' button to change conversion direction",
+							"Copy or download the converted symbols from the output area"
+						]}
+						tips={[
+							"MIO format: TCS.NS, INFY.BO",
+							"TradingView format: NSE:TCS, BSE:INFY",
+							"Use the regroup feature to organize symbols by sector/industry",
+							"Supports bulk conversion of large symbol lists"
+						]}
+						className="mb-4"
+					/>
 					<EditorWithClipboard
 						id='input'
 						label='Input'
