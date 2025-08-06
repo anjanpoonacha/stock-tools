@@ -24,13 +24,13 @@ let toastId = 0;
 export function ToastProvider({ children }: { children: React.ReactNode }) {
 	const [toasts, setToasts] = React.useState<Toast[]>([]);
 
-	const showToast = (message: string, type: ToastType = 'info') => {
+	const showToast = React.useCallback((message: string, type: ToastType = 'info') => {
 		const id = ++toastId;
 		setToasts((prev) => [...prev, { id, message, type }]);
 		setTimeout(() => {
 			setToasts((prev) => prev.filter((t) => t.id !== id));
 		}, 3500);
-	};
+	}, []);
 
 	return (
 		<ToastContext.Provider value={{ toasts, showToast }}>

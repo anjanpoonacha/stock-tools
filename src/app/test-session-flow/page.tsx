@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +8,6 @@ import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { 
 	CheckCircle, 
@@ -32,7 +31,7 @@ interface TestResult {
 	testName: string;
 	success: boolean;
 	message: string;
-	details?: any;
+	details?: unknown;
 	duration: number;
 	timestamp: string;
 }
@@ -67,9 +66,8 @@ export default function TestSessionFlowPage() {
 		totalTests: 0,
 		isRunning: false
 	});
-	const [selectedSuite, setSelectedSuite] = useState<string>('');
 	const [customSessionId, setCustomSessionId] = useState<string>('');
-	const [healthCheckResults, setHealthCheckResults] = useState<any>(null);
+	const [healthCheckResults, setHealthCheckResults] = useState<Record<string, boolean> | null>(null);
 	const [testReport, setTestReport] = useState<string>('');
 	const [error, setError] = useState<string>('');
 	const [loading, setLoading] = useState<boolean>(false);
@@ -296,12 +294,6 @@ export default function TestSessionFlowPage() {
 		);
 	};
 
-	const calculateOverallProgress = () => {
-		if (testResults.length === 0) return 0;
-		const totalTests = testResults.reduce((sum, suite) => sum + suite.tests.length, 0);
-		const completedTests = testResults.reduce((sum, suite) => sum + suite.tests.length, 0);
-		return totalTests > 0 ? (completedTests / totalTests) * 100 : 0;
-	};
 
 	return (
 		<div className="container mx-auto p-6 space-y-6">
@@ -609,13 +601,16 @@ export default function TestSessionFlowPage() {
 													<p className="text-sm text-muted-foreground mb-2">
 														{test.message}
 													</p>
-													{test.details && (
+													{test.details != null && (
 														<details className="text-xs">
 															<summary className="cursor-pointer text-muted-foreground hover:text-foreground">
 																View Details
 															</summary>
 															<pre className="mt-2 p-2 bg-muted rounded text-xs overflow-auto">
-																{JSON.stringify(test.details, null, 2)}
+																{typeof test.details === 'string'
+																	? test.details
+																	: JSON.stringify(test.details, null, 2)
+																}
 															</pre>
 														</details>
 													)}

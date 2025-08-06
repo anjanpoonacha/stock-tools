@@ -9,7 +9,7 @@
 
 ### UI Framework & Styling
 - **ShadCN UI**: Modern component library built on Radix UI primitives
-- **Radix UI**: Unstyled, accessible UI components
+- **Radix UI**: Unstyled, accessible UI components (Prefer the ShadCN UI)
 - **Tailwind CSS 4**: Utility-first CSS framework with custom design system
 - **Lucide React**: Beautiful & consistent icon library
 - **Next Themes**: Dark/light theme support with system preference detection

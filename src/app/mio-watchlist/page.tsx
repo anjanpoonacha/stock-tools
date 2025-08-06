@@ -11,7 +11,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { getInternalSessionId } from '@/lib/useInternalSessionId';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 type Watchlist = { id: string; name: string };
 
@@ -61,7 +61,7 @@ export default function MioWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'bridge_session',
+						action: RecoveryAction.RE_AUTHENTICATE,
 						description: 'Go to MIO Auth tab to bridge your session',
 						priority: 1,
 						automated: false,
@@ -102,14 +102,14 @@ export default function MioWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'check_session',
+						action: RecoveryAction.REFRESH_SESSION,
 						description: 'Verify your MIO session is still valid',
 						priority: 1,
 						automated: false,
 						estimatedTime: '2 minutes'
 					},
 					{
-						action: 'reauth_mio',
+						action: RecoveryAction.RE_AUTHENTICATE,
 						description: 'Re-authenticate with MarketInOut',
 						priority: 2,
 						automated: false,
@@ -151,7 +151,7 @@ export default function MioWatchlistPage() {
 			fetchWatchlists();
 		} catch (e: unknown) {
 			const sessionError = new SessionError(
-				SessionErrorType.API_ERROR,
+				SessionErrorType.OPERATION_FAILED,
 				'Failed to add symbols to watchlist',
 				e instanceof Error ? e.message : 'Unable to add symbols to MIO watchlist',
 				{
@@ -167,14 +167,14 @@ export default function MioWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'check_symbols',
+						action: RecoveryAction.RETRY,
 						description: 'Verify symbols are in correct MIO format (e.g., TCS.NS)',
 						priority: 1,
 						automated: false,
 						estimatedTime: '2 minutes'
 					},
 					{
-						action: 'check_session',
+						action: RecoveryAction.REFRESH_SESSION,
 						description: 'Verify your MIO session is still active',
 						priority: 2,
 						automated: false,
@@ -205,7 +205,7 @@ export default function MioWatchlistPage() {
 			fetchWatchlists();
 		} catch (e: unknown) {
 			const sessionError = new SessionError(
-				SessionErrorType.API_ERROR,
+				SessionErrorType.OPERATION_FAILED,
 				'Failed to create new watchlist',
 				e instanceof Error ? e.message : 'Unable to create watchlist in MarketInOut',
 				{
@@ -217,14 +217,14 @@ export default function MioWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'check_name',
+						action: RecoveryAction.RETRY,
 						description: 'Ensure watchlist name is unique and valid',
 						priority: 1,
 						automated: false,
 						estimatedTime: '1 minute'
 					},
 					{
-						action: 'check_session',
+						action: RecoveryAction.REFRESH_SESSION,
 						description: 'Verify your MIO session is still active',
 						priority: 2,
 						automated: false,
@@ -255,7 +255,7 @@ export default function MioWatchlistPage() {
 			fetchWatchlists();
 		} catch (e: unknown) {
 			const sessionError = new SessionError(
-				SessionErrorType.API_ERROR,
+				SessionErrorType.OPERATION_FAILED,
 				'Failed to delete watchlists',
 				e instanceof Error ? e.message : 'Unable to delete watchlists from MarketInOut',
 				{
@@ -270,14 +270,14 @@ export default function MioWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'check_permissions',
+						action: RecoveryAction.RETRY,
 						description: 'Verify you have permission to delete these watchlists',
 						priority: 1,
 						automated: false,
 						estimatedTime: '1 minute'
 					},
 					{
-						action: 'check_session',
+						action: RecoveryAction.REFRESH_SESSION,
 						description: 'Verify your MIO session is still active',
 						priority: 2,
 						automated: false,

@@ -8,7 +8,7 @@ import { downloadTextFile } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -96,7 +96,7 @@ export default function CsvWatchlistPage() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'retry_conversion',
+						action: RecoveryAction.RETRY,
 						description: 'Check your CSV format and try again',
 						priority: 1,
 						automated: false,

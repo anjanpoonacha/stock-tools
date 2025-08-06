@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 const MioSyncPage: React.FC = () => {
 	const [tvWlid, setTvWlid] = useState('');
@@ -106,14 +106,14 @@ const MioSyncPage: React.FC = () => {
 						ErrorSeverity.ERROR,
 						[
 							{
-								action: 'check_session',
+								action: RecoveryAction.REFRESH_SESSION,
 								description: 'Verify your MIO session is still valid',
 								priority: 1,
 								automated: false,
 								estimatedTime: '2 minutes'
 							},
 							{
-								action: 'reauth_mio',
+								action: RecoveryAction.RE_AUTHENTICATE,
 								description: 'Re-authenticate with MarketInOut',
 								priority: 2,
 								automated: false,
@@ -163,7 +163,7 @@ const MioSyncPage: React.FC = () => {
 					ErrorSeverity.ERROR,
 					[
 						{
-							action: 'check_tv_session',
+							action: RecoveryAction.REFRESH_SESSION,
 							description: 'Verify your TradingView session ID is correct',
 							priority: 1,
 							automated: false,
@@ -197,7 +197,7 @@ const MioSyncPage: React.FC = () => {
 				});
 				if (!res.ok) {
 					const sessionError = new SessionError(
-						SessionErrorType.API_ERROR,
+						SessionErrorType.SESSION_EXPIRED,
 						'Failed to fetch watchlist symbols',
 						`HTTP ${res.status}: Unable to fetch symbols from TradingView watchlist`,
 						{
@@ -209,14 +209,14 @@ const MioSyncPage: React.FC = () => {
 						ErrorSeverity.ERROR,
 						[
 							{
-								action: 'check_tv_session',
+								action: RecoveryAction.REFRESH_SESSION,
 								description: 'Verify your TradingView session ID is still valid',
 								priority: 1,
 								automated: false,
 								estimatedTime: '2 minutes'
 							},
 							{
-								action: 'check_watchlist_access',
+								action: RecoveryAction.RETRY,
 								description: 'Ensure the watchlist exists and is accessible',
 								priority: 2,
 								automated: false,
@@ -233,7 +233,7 @@ const MioSyncPage: React.FC = () => {
 				if (!data?.symbols || !Array.isArray(data.symbols) || data.symbols.length === 0) {
 					console.error('No symbols returned. Raw response:', data);
 					const sessionError = new SessionError(
-						SessionErrorType.DATA_ERROR,
+						SessionErrorType.SESSION_EXPIRED,
 						'No symbols found in watchlist',
 						'The selected TradingView watchlist appears to be empty or inaccessible',
 						{
@@ -245,14 +245,14 @@ const MioSyncPage: React.FC = () => {
 						ErrorSeverity.WARNING,
 						[
 							{
-								action: 'check_watchlist_content',
+								action: RecoveryAction.RETRY,
 								description: 'Verify the watchlist contains symbols in TradingView',
 								priority: 1,
 								automated: false,
 								estimatedTime: '2 minutes'
 							},
 							{
-								action: 'try_different_watchlist',
+								action: RecoveryAction.RETRY,
 								description: 'Select a different watchlist with symbols',
 								priority: 2,
 								automated: false,
@@ -281,7 +281,7 @@ const MioSyncPage: React.FC = () => {
 					setSymbols(mioSymbols);
 				} catch (err) {
 					const sessionError = new SessionError(
-						SessionErrorType.DATA_ERROR,
+						SessionErrorType.SESSION_EXPIRED,
 						'Error processing symbols',
 						err instanceof Error ? err.message : 'Failed to convert symbols from TradingView to MIO format',
 						{
@@ -293,7 +293,7 @@ const MioSyncPage: React.FC = () => {
 						ErrorSeverity.ERROR,
 						[
 							{
-								action: 'retry_conversion',
+								action: RecoveryAction.RETRY,
 								description: 'Try fetching the watchlist symbols again',
 								priority: 1,
 								automated: false,
@@ -318,14 +318,14 @@ const MioSyncPage: React.FC = () => {
 					ErrorSeverity.ERROR,
 					[
 						{
-							action: 'check_connection',
+							action: RecoveryAction.CHECK_NETWORK,
 							description: 'Check your internet connection',
 							priority: 1,
 							automated: false,
 							estimatedTime: '1 minute'
 						},
 						{
-							action: 'retry_fetch',
+							action: RecoveryAction.WAIT_AND_RETRY,
 							description: 'Try again in a few moments',
 							priority: 2,
 							automated: false,
@@ -357,7 +357,7 @@ const MioSyncPage: React.FC = () => {
 			if (!res.ok) {
 				const errorData = await res.json().catch(() => ({}));
 				const sessionError = new SessionError(
-					res.status === 401 ? SessionErrorType.SESSION_EXPIRED : SessionErrorType.API_ERROR,
+					res.status === 401 ? SessionErrorType.SESSION_EXPIRED : SessionErrorType.OPERATION_FAILED,
 					'Failed to sync watchlist to MIO',
 					errorData.error || `HTTP ${res.status}: Unable to sync watchlist to MarketInOut`,
 					{
@@ -373,14 +373,14 @@ const MioSyncPage: React.FC = () => {
 					ErrorSeverity.ERROR,
 					[
 						{
-							action: 'check_mio_session',
+							action: RecoveryAction.REFRESH_SESSION,
 							description: 'Verify your MIO session is still active',
 							priority: 1,
 							automated: false,
 							estimatedTime: '2 minutes'
 						},
 						{
-							action: 'retry_sync',
+							action: RecoveryAction.RETRY,
 							description: 'Try the sync operation again',
 							priority: 2,
 							automated: false,
@@ -409,14 +409,14 @@ const MioSyncPage: React.FC = () => {
 					ErrorSeverity.ERROR,
 					[
 						{
-							action: 'check_connection',
+							action: RecoveryAction.CHECK_NETWORK,
 							description: 'Check your internet connection',
 							priority: 1,
 							automated: false,
 							estimatedTime: '1 minute'
 						},
 						{
-							action: 'retry_sync',
+							action: RecoveryAction.RETRY,
 							description: 'Try the sync operation again',
 							priority: 2,
 							automated: false,

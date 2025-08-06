@@ -1,14 +1,13 @@
 // src/lib/sessionFlowTester.ts
 
 import { MIOService } from './MIOService';
-import { 
-	savePlatformSession, 
-	getPlatformSession, 
+import {
+	savePlatformSession,
+	getPlatformSession,
 	deletePlatformSession,
-	getAllSessions 
+	getSession
 } from './sessionStore';
-import { 
-	validateAndCleanupMarketinoutSession,
+import {
 	validateAndMonitorAllPlatforms,
 	getHealthAwareSessionData,
 	refreshSessionWithHealthCheck
@@ -26,7 +25,7 @@ export interface TestResult {
 	testName: string;
 	success: boolean;
 	message: string;
-	details?: any;
+	details?: unknown;
 	duration: number;
 	timestamp: string;
 }
@@ -89,7 +88,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'ABCDEFGHIJKLMNOPQRSTUVWX',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -111,7 +110,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'VALIDTESTCOOKIE123456789',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -138,7 +137,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'MIOTESTCOOKIE123456789',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -173,7 +172,7 @@ export class SessionFlowTester {
 				throw new Error('Health monitor initialization failed');
 			}
 			
-			return { initialized: true, isRunning: monitor.isRunning() };
+			return { initialized: true, isRunning: monitor.getMonitoringStats().isGlobalMonitoringActive };
 		}));
 		
 		// Test 2.2: Session health status tracking
@@ -182,7 +181,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'HEALTHTESTCOOKIE123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -192,19 +191,19 @@ export class SessionFlowTester {
 			// Simulate health check (this will likely fail due to invalid session, but that's expected)
 			try {
 				await monitor.checkSessionHealth(testSessionId, 'marketinout');
-			} catch (error) {
+			} catch {
 				// Expected to fail with test data
 			}
 			
-			const status = monitor.getSessionStatus(testSessionId, 'marketinout');
+			const status = monitor.getSessionHealth(testSessionId, 'marketinout');
 			
 			// Cleanup
 			deletePlatformSession(testSessionId, 'marketinout');
 			
 			return { 
 				statusExists: !!status,
-				lastChecked: status?.lastChecked,
-				healthStatus: status?.healthStatus
+				lastChecked: status?.lastSuccessfulCheck,
+				healthStatus: status?.status
 			};
 		}));
 		
@@ -214,7 +213,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'INTEGRATIONTEST123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -222,12 +221,12 @@ export class SessionFlowTester {
 			// Test validation with health monitoring
 			try {
 				await validateAndMonitorAllPlatforms(testSessionId);
-			} catch (error) {
+			} catch {
 				// Expected to fail with test data, but should still update health status
 			}
 			
 			const monitor = SessionHealthMonitor.getInstance();
-			const status = monitor.getSessionStatus(testSessionId, 'marketinout');
+			const status = monitor.getSessionHealth(testSessionId, 'marketinout');
 			
 			// Cleanup
 			deletePlatformSession(testSessionId, 'marketinout');
@@ -235,7 +234,7 @@ export class SessionFlowTester {
 			return { 
 				validationAttempted: true,
 				healthStatusUpdated: !!status,
-				healthStatus: status?.healthStatus
+				healthStatus: status?.status
 			};
 		}));
 		
@@ -259,7 +258,7 @@ export class SessionFlowTester {
 				if (keyValue) {
 					throw new Error('Should not have found session');
 				}
-			} catch (error) {
+			} catch {
 				// Expected behavior
 			}
 			
@@ -272,7 +271,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'NETWORKTESTCOOKIE123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -281,7 +280,7 @@ export class SessionFlowTester {
 			let errorCaught = false;
 			try {
 				await MIOService.validateSessionHealth(testSessionId);
-			} catch (error) {
+			} catch {
 				errorCaught = true;
 			}
 			
@@ -297,7 +296,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'INVALIDCREDENTIALS123',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -330,8 +329,8 @@ export class SessionFlowTester {
 			return { 
 				errorCreated: testError instanceof SessionError,
 				platform: testError.platform,
-				operation: testError.operation,
-				hasRecoveryInstructions: !!testError.recoveryInstructions
+				operation: testError.context.operation,
+				hasRecoveryInstructions: testError.getRecoveryInstructions().length > 0
 			};
 		}));
 		
@@ -413,7 +412,7 @@ export class SessionFlowTester {
 				ASPSESSIONIDCQTQTQTQ: 'EXTRACTIONTEST123456',
 				ASPSESSIONIDABCDEFGH: 'EXTRACTIONTEST789012',
 				otherData: 'not-a-cookie',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			const extracted = CookieParser.extractASPSESSION(testSessionData);
@@ -443,7 +442,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'REFRESHTEST123456789',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -451,9 +450,9 @@ export class SessionFlowTester {
 			// This will likely fail due to invalid session, but should test the refresh mechanism
 			let refreshAttempted = false;
 			try {
-				const refreshResult = await refreshSessionWithHealthCheck(testSessionId, 'marketinout');
+				await refreshSessionWithHealthCheck(testSessionId, 'marketinout');
 				refreshAttempted = true;
-			} catch (error) {
+			} catch {
 				refreshAttempted = true; // Still counts as attempted
 			}
 			
@@ -469,7 +468,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'MIOREFRESHTEST123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -479,7 +478,7 @@ export class SessionFlowTester {
 			try {
 				await MIOService.refreshSession(testSessionId);
 				refreshAttempted = true;
-			} catch (error) {
+			} catch {
 				refreshAttempted = true; // Still counts as attempted
 			}
 			
@@ -495,7 +494,7 @@ export class SessionFlowTester {
 			const mockSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'RETRYTEST123456789',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mockSessionData);
@@ -504,7 +503,7 @@ export class SessionFlowTester {
 			let retryAttempted = false;
 			try {
 				await MIOService.getWatchlistsWithSession(testSessionId);
-			} catch (error) {
+			} catch {
 				retryAttempted = true; // Error expected, but retry should have been attempted
 			}
 			
@@ -531,13 +530,13 @@ export class SessionFlowTester {
 			const mioSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'MIOPLATFORMTEST123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			const tvSessionData = {
 				sessionId: testSessionId,
 				sessionid: 'TVPLATFORMTEST123456',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mioSessionData);
@@ -564,7 +563,7 @@ export class SessionFlowTester {
 			const mioSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'CROSSVALIDATIONMIO123',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', mioSessionData);
@@ -574,7 +573,7 @@ export class SessionFlowTester {
 			try {
 				await validateAndMonitorAllPlatforms(testSessionId);
 				validationAttempted = true;
-			} catch (error) {
+			} catch {
 				validationAttempted = true; // Still counts as attempted
 			}
 			
@@ -588,27 +587,26 @@ export class SessionFlowTester {
 		tests.push(await this.runTest('Session Bridging Functionality', async () => {
 			const testSessionId = 'test-session-bridge-' + Date.now();
 			
-			// Test that sessions can be stored and retrieved across platforms
-			const allSessions = getAllSessions();
-			const initialSessionCount = Object.keys(allSessions).length;
-			
 			const bridgeSessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'BRIDGETEST123456789',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
+			// Test that sessions can be stored and retrieved across platforms
 			savePlatformSession(testSessionId, 'marketinout', bridgeSessionData);
 			
-			const updatedSessions = getAllSessions();
-			const finalSessionCount = Object.keys(updatedSessions).length;
+			// Verify session was stored and can be retrieved
+			const storedSession = getSession(testSessionId);
+			const platformSession = getPlatformSession(testSessionId, 'marketinout');
 			
 			// Cleanup
 			deletePlatformSession(testSessionId, 'marketinout');
 			
 			return {
-				sessionBridged: finalSessionCount > initialSessionCount,
-				sessionRetrievable: !!getPlatformSession(testSessionId, 'marketinout')
+				sessionBridged: !!storedSession && !!storedSession.marketinout,
+				sessionRetrievable: !!platformSession,
+				sessionDataMatches: platformSession?.ASPSESSIONIDCQTQTQTQ === 'BRIDGETEST123456789'
 			};
 		}));
 		
@@ -631,7 +629,7 @@ export class SessionFlowTester {
 			const sessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'FULLLIFECYCLETEST123',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			
 			savePlatformSession(testSessionId, 'marketinout', sessionData);
@@ -654,7 +652,7 @@ export class SessionFlowTester {
 			try {
 				await monitor.checkSessionHealth(testSessionId, 'marketinout');
 				phases.push('monitored');
-			} catch (error) {
+			} catch {
 				phases.push('monitored-with-error');
 			}
 			
@@ -671,13 +669,13 @@ export class SessionFlowTester {
 		// Test 7.2: Integration with all components
 		tests.push(await this.runTest('Integration with All Components', async () => {
 			const testSessionId = 'test-full-integration-' + Date.now();
-			const integrationResults = {};
+			const integrationResults: { [key: string]: boolean } = {};
 			
 			// Component 1: Session Store
 			const sessionData = {
 				sessionId: testSessionId,
 				ASPSESSIONIDCQTQTQTQ: 'INTEGRATIONTEST12345',
-				timestamp: Date.now()
+				timestamp: Date.now().toString()
 			};
 			savePlatformSession(testSessionId, 'marketinout', sessionData);
 			integrationResults['sessionStore'] = !!getPlatformSession(testSessionId, 'marketinout');
@@ -721,7 +719,7 @@ export class SessionFlowTester {
 	/**
 	 * Helper method to run individual tests with timing and error handling
 	 */
-	private async runTest(testName: string, testFunction: () => Promise<any>): Promise<TestResult> {
+	private async runTest(testName: string, testFunction: () => Promise<unknown>): Promise<TestResult> {
 		const startTime = Date.now();
 		const timestamp = new Date().toISOString();
 		
@@ -877,7 +875,6 @@ Generated: ${new Date().toISOString()}
 			results.healthMonitor = !!monitor && typeof monitor.checkSessionHealth === 'function';
 
 			// Test cookie parser
-			const testCookie = 'ASPSESSIONIDTEST=value123';
 			results.cookieParser = CookieParser.isASPSESSIONCookie('ASPSESSIONIDTEST');
 
 			// Test error handler

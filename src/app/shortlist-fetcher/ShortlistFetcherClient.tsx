@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { useSessionId } from '@/lib/useSessionId';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
-import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 type Watchlist = {
 	id: number;
@@ -67,21 +67,21 @@ export default function ShortlistFetcherClient() {
 				ErrorSeverity.ERROR,
 				[
 					{
-						action: 'check_session_cookie',
+						action: RecoveryAction.REFRESH_SESSION,
 						description: 'Verify your TradingView session cookie is correct and not expired',
 						priority: 1,
 						automated: false,
 						estimatedTime: '3 minutes'
 					},
 					{
-						action: 'refresh_session',
+						action: RecoveryAction.RE_AUTHENTICATE,
 						description: 'Log out and log back into TradingView to get a fresh session',
 						priority: 2,
 						automated: false,
 						estimatedTime: '5 minutes'
 					},
 					{
-						action: 'check_api_url',
+						action: RecoveryAction.CHECK_NETWORK,
 						description: 'Verify the API URL is correct and accessible',
 						priority: 3,
 						automated: false,

@@ -187,21 +187,22 @@ export async function POST(request: NextRequest) {
 					try {
 						await monitor.checkSessionHealth(sessionId, 'marketinout');
 						healthCheckResult = true;
-					} catch (error) {
+					} catch {
 						// Expected to fail with test data
 					}
 					
-					const status = monitor.getSessionStatus(sessionId, 'marketinout');
+					const status = monitor.getSessionHealth(sessionId, 'marketinout');
+					const monitoringStats = monitor.getMonitoringStats();
 					
 					return NextResponse.json({
 						success: true,
 						healthMonitoring: {
-							monitorActive: monitor.isRunning(),
+							monitorActive: monitoringStats.isGlobalMonitoringActive,
 							healthCheckAttempted: true,
 							healthCheckSuccess: healthCheckResult,
 							sessionStatus: status ? {
-								healthStatus: status.healthStatus,
-								lastChecked: status.lastChecked,
+								status: status.status,
+								lastSuccessfulCheck: status.lastSuccessfulCheck,
 								consecutiveFailures: status.consecutiveFailures
 							} : null
 						}
