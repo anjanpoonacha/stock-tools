@@ -10,6 +10,8 @@ import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
 import { useSessionId } from '../../lib/useSessionId';
 import { UsageGuide } from '../../components/UsageGuide';
+import { ErrorDisplay } from '../../components/ErrorDisplay';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '../../lib/sessionErrors';
 
 function parseMioSymbols(raw: string): string[] {
 	return raw
@@ -68,6 +70,7 @@ export default function TvSyncPage() {
 	const [watchlistId, setWatchlistId] = useState('');
 	const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
 	const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
+	const [error, setError] = useState<SessionError | Error | string | null>(null);
 	const toast = useToast();
 	// Removed unused symbols state to fix lint error
 
@@ -80,35 +83,103 @@ export default function TvSyncPage() {
 		if (fetchingRef.current) return;
 		fetchingRef.current = true;
 		async function fetchWatchlists() {
-			/* Removed toast: Fetching TradingView watchlists... */
-			const res = await fetch('/api/proxy', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					url: 'https://www.tradingview.com/api/v1/symbols_list/all/',
-					method: 'GET',
-					headers: {
-						'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-						Cookie: `sessionid=${sessionid}`,
-						Accept: 'application/json',
+			try {
+				setError(null);
+				/* Removed toast: Fetching TradingView watchlists... */
+				const res = await fetch('/api/proxy', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						url: 'https://www.tradingview.com/api/v1/symbols_list/all/',
+						method: 'GET',
+						headers: {
+							'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+							Cookie: `sessionid=${sessionid}`,
+							Accept: 'application/json',
+						},
+					}),
+				});
+				if (!res.ok) {
+					const sessionError = new SessionError(
+						SessionErrorType.SESSION_EXPIRED,
+						'Failed to fetch TradingView watchlists',
+						`HTTP ${res.status}: ${res.statusText}`,
+						{
+							operation: 'fetch_tv_watchlists',
+							platform: Platform.TRADINGVIEW,
+							timestamp: new Date(),
+							additionalData: {
+								status: res.status,
+								statusText: res.statusText,
+								hasSessionId: !!sessionid,
+								sessionIdLength: sessionid?.length || 0
+							}
+						},
+						ErrorSeverity.ERROR,
+						[
+							{
+								action: RecoveryAction.UPDATE_CREDENTIALS,
+								description: 'Verify your TradingView session cookie is correct and not expired',
+								priority: 1,
+								automated: false,
+								estimatedTime: '3 minutes'
+							},
+							{
+								action: RecoveryAction.REFRESH_SESSION,
+								description: 'Log out and log back into TradingView to get a fresh session',
+								priority: 2,
+								automated: false,
+								estimatedTime: '5 minutes'
+							}
+						]
+					);
+					setError(sessionError);
+					return;
+				}
+				type Watchlist = { id: string; name: string };
+				const { data } = await res.json();
+				setWatchlists(Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : []);
+				if (fetchedRef.current !== sessionid) {
+					toast('Fetched watchlists.', 'success');
+					fetchedRef.current = sessionid;
+				}
+			} catch (err) {
+				const sessionError = new SessionError(
+					SessionErrorType.NETWORK_ERROR,
+					'Network error fetching TradingView watchlists',
+					err instanceof Error ? err.message : 'Unable to connect to TradingView API',
+					{
+						operation: 'fetch_tv_watchlists',
+						platform: Platform.TRADINGVIEW,
+						timestamp: new Date(),
+						additionalData: {
+							hasSessionId: !!sessionid,
+							sessionIdLength: sessionid?.length || 0
+						}
 					},
-				}),
-			});
-			if (!res.ok) {
-				console.log(`[TradingView API] Failed to fetch watchlists: ${res.status} ${res.statusText}`);
-
-				return;
-			}
-			type Watchlist = { id: string; name: string };
-			const { data } = await res.json();
-			setWatchlists(Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : []);
-			if (fetchedRef.current !== sessionid) {
-				toast('Fetched watchlists.', 'success');
-				fetchedRef.current = sessionid;
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: RecoveryAction.CHECK_NETWORK,
+							description: 'Check your internet connection and try again',
+							priority: 1,
+							automated: false,
+							estimatedTime: '1 minute'
+						},
+						{
+							action: RecoveryAction.RETRY,
+							description: 'Wait a moment and try fetching watchlists again',
+							priority: 2,
+							automated: false,
+							estimatedTime: '30 seconds'
+						}
+					]
+				);
+				setError(sessionError);
 			}
 		}
 		fetchWatchlists();
-	}, [sessionid]);
+	}, [sessionid, toast]);
 
 	const handleUrlChange = (i: number, value: string) => {
 		const next = [...urls];
@@ -154,57 +225,182 @@ export default function TvSyncPage() {
 	}
 
 	async function cleanUpWatchlist() {
-		/* Removed toast: Cleaning up watchlist... */
-		const cleanupRes = await fetch('/api/proxy', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/replace/?unsafe=true`,
+		try {
+			setError(null);
+			/* Removed toast: Cleaning up watchlist... */
+			const cleanupRes = await fetch('/api/proxy', {
 				method: 'POST',
-				headers: {
-					'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-					'Content-Type': 'application/json',
-					Cookie: `sessionid=${sessionid}`,
-					Origin: 'https://www.tradingview.com',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/replace/?unsafe=true`,
+					method: 'POST',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+						'Content-Type': 'application/json',
+						Cookie: `sessionid=${sessionid}`,
+						Origin: 'https://www.tradingview.com',
+					},
+					body: JSON.stringify([]),
+				}),
+			});
+			if (!cleanupRes.ok) {
+				const sessionError = new SessionError(
+					SessionErrorType.OPERATION_FAILED,
+					'Failed to clean up TradingView watchlist',
+					`HTTP ${cleanupRes.status}: ${cleanupRes.statusText}`,
+					{
+						operation: 'cleanup_tv_watchlist',
+						platform: Platform.TRADINGVIEW,
+						timestamp: new Date(),
+						additionalData: {
+							watchlistId,
+							status: cleanupRes.status,
+							statusText: cleanupRes.statusText
+						}
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: RecoveryAction.RE_AUTHENTICATE,
+							description: 'Verify you have permission to modify this watchlist',
+							priority: 1,
+							automated: false,
+							estimatedTime: '1 minute'
+						},
+						{
+							action: RecoveryAction.REFRESH_SESSION,
+							description: 'Your session may have expired - refresh and try again',
+							priority: 2,
+							automated: false,
+							estimatedTime: '3 minutes'
+						}
+					]
+				);
+				setError(sessionError);
+				return;
+			}
+			toast('Watchlist cleaned up.', 'success');
+		} catch (err) {
+			const sessionError = new SessionError(
+				SessionErrorType.NETWORK_ERROR,
+				'Network error cleaning up watchlist',
+				err instanceof Error ? err.message : 'Unable to connect to TradingView API',
+				{
+					operation: 'cleanup_tv_watchlist',
+					platform: Platform.TRADINGVIEW,
+					timestamp: new Date(),
+					additionalData: { watchlistId }
 				},
-				body: JSON.stringify([]),
-			}),
-		});
-		if (!cleanupRes.ok) {
-			const { error, data } = await cleanupRes.json().catch(() => ({}));
-			/* Removed toast: Failed to clean up watchlist */
-			console.log({ error, data });
-			return;
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: RecoveryAction.CHECK_NETWORK,
+						description: 'Check your internet connection and try again',
+						priority: 1,
+						automated: false,
+						estimatedTime: '1 minute'
+					}
+				]
+			);
+			setError(sessionError);
 		}
-		toast('Watchlist cleaned up.', 'success');
 	}
 
 	async function appendToWatchlist(symbols: string[]) {
-		// Always send a flat array of symbols to TradingView append API
-		console.log({ symbols });
-		const payload = output;
-		/* Removed toast: Appending symbols to TradingView */
-		const res = await fetch('/api/proxy', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({
-				url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/append/`,
+		try {
+			setError(null);
+			// Always send a flat array of symbols to TradingView append API
+			console.log({ symbols });
+			const payload = output;
+			/* Removed toast: Appending symbols to TradingView */
+			const res = await fetch('/api/proxy', {
 				method: 'POST',
-				headers: {
-					'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-					'Content-Type': 'application/json',
-					Cookie: `sessionid=${sessionid}`,
-					Origin: 'https://www.tradingview.com',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/append/`,
+					method: 'POST',
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+						'Content-Type': 'application/json',
+						Cookie: `sessionid=${sessionid}`,
+						Origin: 'https://www.tradingview.com',
+					},
+					body: JSON.stringify(payload),
+				}),
+			});
+			/* Removed toast: TradingView response */
+			if (!res.ok) {
+				const sessionError = new SessionError(
+					SessionErrorType.OPERATION_FAILED,
+					'Failed to append symbols to TradingView watchlist',
+					`HTTP ${res.status}: ${res.statusText}`,
+					{
+						operation: 'append_to_tv_watchlist',
+						platform: Platform.TRADINGVIEW,
+						timestamp: new Date(),
+						additionalData: {
+							watchlistId,
+							symbolCount: symbols.length,
+							status: res.status,
+							statusText: res.statusText
+						}
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: RecoveryAction.RE_AUTHENTICATE,
+							description: 'Verify you have permission to modify this watchlist',
+							priority: 1,
+							automated: false,
+							estimatedTime: '1 minute'
+						},
+						{
+							action: RecoveryAction.RETRY,
+							description: 'Ensure symbols are in correct TradingView format (e.g., NSE:RELIANCE)',
+							priority: 2,
+							automated: false,
+							estimatedTime: '2 minutes'
+						},
+						{
+							action: RecoveryAction.REFRESH_SESSION,
+							description: 'Your session may have expired - refresh and try again',
+							priority: 3,
+							automated: false,
+							estimatedTime: '3 minutes'
+						}
+					]
+				);
+				setError(sessionError);
+				return;
+			}
+			toast('Symbols appended successfully.', 'success');
+		} catch (err) {
+			const sessionError = new SessionError(
+				SessionErrorType.NETWORK_ERROR,
+				'Network error appending symbols to watchlist',
+				err instanceof Error ? err.message : 'Unable to connect to TradingView API',
+				{
+					operation: 'append_to_tv_watchlist',
+					platform: Platform.TRADINGVIEW,
+					timestamp: new Date(),
+					additionalData: {
+						watchlistId,
+						symbolCount: symbols.length
+					}
 				},
-				body: JSON.stringify(payload),
-			}),
-		});
-		/* Removed toast: TradingView response */
-		if (!res.ok) {
-			/* Removed toast: Failed to append symbols */
-			return;
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: RecoveryAction.CHECK_NETWORK,
+						description: 'Check your internet connection and try again',
+						priority: 1,
+						automated: false,
+						estimatedTime: '1 minute'
+					}
+				]
+			);
+			setError(sessionError);
 		}
-		toast('Symbols appended successfully.', 'success');
 	}
 
 	// Fetch and group symbols when URLs or grouping changes
@@ -263,6 +459,14 @@ export default function TvSyncPage() {
 	return (
 		<div className='font-sans max-w-xl mx-auto my-8'>
 			<h2 className='text-xl font-bold mb-4'>TradingView Screener Sync</h2>
+			{error && (
+				<div className='mb-4'>
+					<ErrorDisplay
+						error={error}
+						onRetry={() => setError(null)}
+					/>
+				</div>
+			)}
 			<UsageGuide
 				title="How to sync MIO screeners to TradingView"
 				steps={[

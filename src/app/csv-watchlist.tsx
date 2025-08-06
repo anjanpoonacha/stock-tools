@@ -7,6 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { downloadTextFile } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { UsageGuide } from '@/components/UsageGuide';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
 
 // Helper to parse CSV
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -40,7 +42,7 @@ export default function CsvWatchlistPage() {
 	const [csv, setCsv] = useState('');
 	const [groupByCol, setGroupByCol] = useState<string>('Sector');
 	const [sortCol, setSortCol] = useState<string>('Symbol');
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<SessionError | Error | string | null>(null);
 
 	const { headers, rows } = useMemo(() => parseCSV(csv), [csv]);
 	const rowObjs = useMemo(
@@ -81,8 +83,28 @@ export default function CsvWatchlistPage() {
 			// Join with comma, but do not prepend a comma at the start
 			return groupStrings.filter(Boolean).join(',');
 		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : 'Unknown error';
-			setError('Error converting symbols: ' + message);
+			const sessionError = new SessionError(
+				SessionErrorType.UNKNOWN_ERROR,
+				'Failed to convert CSV symbols to TradingView format',
+				e instanceof Error ? e.message : 'Unknown conversion error',
+				{
+					operation: 'csv_symbol_conversion',
+					platform: Platform.UNKNOWN,
+					timestamp: new Date(),
+					additionalData: { groupByCol, symbolCount: rowObjs.length }
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'retry_conversion',
+						description: 'Check your CSV format and try again',
+						priority: 1,
+						automated: false,
+						estimatedTime: '1 minute'
+					}
+				]
+			);
+			setError(sessionError);
 			return '';
 		}
 	}, [grouped, rowObjs, groupByCol]);
@@ -112,7 +134,13 @@ export default function CsvWatchlistPage() {
 					]}
 					className="mb-4"
 				/>
-				{error && <div className='text-red-500 mb-2 text-sm font-mono'>{error}</div>}
+				{error && (
+					<ErrorDisplay
+						error={error}
+						onRetry={() => setError(null)}
+						className="mb-4"
+					/>
+				)}
 				<EditorWithClipboard
 					id='csv-input'
 					label='CSV Input'

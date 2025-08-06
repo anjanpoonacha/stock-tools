@@ -10,6 +10,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { useState } from 'react';
 import { useSessionId } from '@/lib/useSessionId';
 import { UsageGuide } from '@/components/UsageGuide';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
 
 type Watchlist = {
 	id: number;
@@ -22,7 +24,7 @@ export default function ShortlistFetcherClient() {
 	const [loading, setLoading] = useState(false);
 	const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
 	const [selectedIds, setSelectedIds] = useState<number[]>([]);
-	const [error, setError] = useState('');
+	const [error, setError] = useState<SessionError | Error | string | null>(null);
 	const [url, setUrl] = useState('https://www.tradingview.com/api/v1/symbols_list/all/');
 	const [regrouped, setRegrouped] = useState('');
 
@@ -30,7 +32,7 @@ export default function ShortlistFetcherClient() {
 
 	const handleFetch = async () => {
 		setLoading(true);
-		setError('');
+		setError(null);
 		setWatchlists([]);
 		setSelectedIds([]);
 		try {
@@ -48,8 +50,46 @@ export default function ShortlistFetcherClient() {
 			if (shortlist) setSelectedIds([shortlist.id]);
 			else setSelectedIds(lists.map((w) => w.id));
 		} catch (e) {
-			if (e instanceof Error) setError(e.message);
-			else setError('Unknown error');
+			const sessionError = new SessionError(
+				SessionErrorType.SESSION_EXPIRED,
+				'Failed to fetch TradingView watchlists',
+				e instanceof Error ? e.message : 'Unable to connect to TradingView API',
+				{
+					operation: 'fetch_tv_shortlists',
+					platform: Platform.TRADINGVIEW,
+					timestamp: new Date(),
+					additionalData: {
+						url,
+						hasSessionId: !!cookie,
+						sessionIdLength: cookie?.length || 0
+					}
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'check_session_cookie',
+						description: 'Verify your TradingView session cookie is correct and not expired',
+						priority: 1,
+						automated: false,
+						estimatedTime: '3 minutes'
+					},
+					{
+						action: 'refresh_session',
+						description: 'Log out and log back into TradingView to get a fresh session',
+						priority: 2,
+						automated: false,
+						estimatedTime: '5 minutes'
+					},
+					{
+						action: 'check_api_url',
+						description: 'Verify the API URL is correct and accessible',
+						priority: 3,
+						automated: false,
+						estimatedTime: '1 minute'
+					}
+				]
+			);
+			setError(sessionError);
 		} finally {
 			setLoading(false);
 		}
@@ -92,7 +132,11 @@ export default function ShortlistFetcherClient() {
 			<Button onClick={handleFetch} disabled={loading || !cookie} className='w-full'>
 				{loading ? 'Fetching...' : 'Fetch Watchlists'}
 			</Button>
-			{error && <div className='text-red-600 text-sm'>{error}</div>}
+			{error && (
+				<div className='mb-4'>
+					<ErrorDisplay error={error} />
+				</div>
+			)}
 			{watchlists.length > 0 && (
 				<div className='flex flex-col gap-2'>
 					<Label htmlFor='watchlist-multiselect'>Select Watchlists</Label>

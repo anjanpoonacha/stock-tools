@@ -12,6 +12,8 @@ import { useSessionId } from '@/lib/useSessionId';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
 
 const MioSyncPage: React.FC = () => {
 	const [tvWlid, setTvWlid] = useState('');
@@ -22,7 +24,7 @@ const MioSyncPage: React.FC = () => {
 		{ tvWlid: string; mioWlid: string; groupBy: RegroupOption }[]
 	>([]);
 	const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
-	const [mioWatchlistsError, setMioWatchlistsError] = useState<string | null>(null);
+	const [mioWatchlistsError, setMioWatchlistsError] = useState<SessionError | Error | string | null>(null);
 	const [sessionId, setSessionId] = useSessionId('tradingview');
 	const [internalSessionId, setInternalSessionId] = useState('');
 	const [symbols, setSymbols] = useState('');
@@ -90,7 +92,37 @@ const MioSyncPage: React.FC = () => {
 						}))
 					);
 				})
-				.catch((err) => setMioWatchlistsError(err.message))
+				.catch((err) => {
+					const sessionError = new SessionError(
+						SessionErrorType.SESSION_EXPIRED,
+						'Failed to load MIO watchlists',
+						err.message || 'Unable to fetch watchlists from MarketInOut',
+						{
+							operation: 'fetch_mio_watchlists',
+							platform: Platform.MARKETINOUT,
+							timestamp: new Date(),
+							additionalData: { internalSessionId: internalSessionId?.slice(0, 8) + '...' }
+						},
+						ErrorSeverity.ERROR,
+						[
+							{
+								action: 'check_session',
+								description: 'Verify your MIO session is still valid',
+								priority: 1,
+								automated: false,
+								estimatedTime: '2 minutes'
+							},
+							{
+								action: 'reauth_mio',
+								description: 'Re-authenticate with MarketInOut',
+								priority: 2,
+								automated: false,
+								estimatedTime: '3 minutes'
+							}
+						]
+					);
+					setMioWatchlistsError(sessionError);
+				})
 				.finally(() => setMioWatchlistsLoading(false));
 		}
 	}, [internalSessionId]);
@@ -117,13 +149,34 @@ const MioSyncPage: React.FC = () => {
 					}))
 				);
 				showToast('Fetched TradingView watchlists.', 'success');
-			} catch {
-				showToast('Failed to fetch watchlists from TradingView.', 'error');
+			} catch (err) {
+				const sessionError = new SessionError(
+					SessionErrorType.SESSION_EXPIRED,
+					'Failed to fetch TradingView watchlists',
+					err instanceof Error ? err.message : 'Unable to connect to TradingView',
+					{
+						operation: 'fetch_tv_watchlists',
+						platform: Platform.TRADINGVIEW,
+						timestamp: new Date(),
+						additionalData: { sessionId: sessionId?.slice(0, 8) + '...' }
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: 'check_tv_session',
+							description: 'Verify your TradingView session ID is correct',
+							priority: 1,
+							automated: false,
+							estimatedTime: '2 minutes'
+						}
+					]
+				);
+				setMioWatchlistsError(sessionError);
 			} finally {
 				setLoading(false);
 			}
 		})();
-	}, [sessionId]);
+	}, [sessionId, showToast]);
 
 	React.useEffect(() => {
 		if (!tvWlid || !sessionId) return;
@@ -143,7 +196,35 @@ const MioSyncPage: React.FC = () => {
 					}),
 				});
 				if (!res.ok) {
-					showToast('Failed to fetch watchlist symbols. Check session ID.', 'error');
+					const sessionError = new SessionError(
+						SessionErrorType.API_ERROR,
+						'Failed to fetch watchlist symbols',
+						`HTTP ${res.status}: Unable to fetch symbols from TradingView watchlist`,
+						{
+							operation: 'fetch_watchlist_symbols',
+							platform: Platform.TRADINGVIEW,
+							timestamp: new Date(),
+							additionalData: { watchlistId: tvWlid, httpStatus: res.status }
+						},
+						ErrorSeverity.ERROR,
+						[
+							{
+								action: 'check_tv_session',
+								description: 'Verify your TradingView session ID is still valid',
+								priority: 1,
+								automated: false,
+								estimatedTime: '2 minutes'
+							},
+							{
+								action: 'check_watchlist_access',
+								description: 'Ensure the watchlist exists and is accessible',
+								priority: 2,
+								automated: false,
+								estimatedTime: '1 minute'
+							}
+						]
+					);
+					showToast(sessionError.getDisplayMessage(), 'error');
 					setSymbols('');
 					return;
 				}
@@ -151,7 +232,35 @@ const MioSyncPage: React.FC = () => {
 				// Debug: Show raw API response if no symbols
 				if (!data?.symbols || !Array.isArray(data.symbols) || data.symbols.length === 0) {
 					console.error('No symbols returned. Raw response:', data);
-					showToast(`No symbols returned. Raw response: ${JSON.stringify(data).slice(0, 200)}`, 'error');
+					const sessionError = new SessionError(
+						SessionErrorType.DATA_ERROR,
+						'No symbols found in watchlist',
+						'The selected TradingView watchlist appears to be empty or inaccessible',
+						{
+							operation: 'parse_watchlist_symbols',
+							platform: Platform.TRADINGVIEW,
+							timestamp: new Date(),
+							additionalData: { watchlistId: tvWlid, responseData: JSON.stringify(data).slice(0, 200) }
+						},
+						ErrorSeverity.WARNING,
+						[
+							{
+								action: 'check_watchlist_content',
+								description: 'Verify the watchlist contains symbols in TradingView',
+								priority: 1,
+								automated: false,
+								estimatedTime: '2 minutes'
+							},
+							{
+								action: 'try_different_watchlist',
+								description: 'Select a different watchlist with symbols',
+								priority: 2,
+								automated: false,
+								estimatedTime: '1 minute'
+							}
+						]
+					);
+					showToast(sessionError.getDisplayMessage(), 'error');
 					setSymbols('');
 					return;
 				}
@@ -170,12 +279,61 @@ const MioSyncPage: React.FC = () => {
 						.filter(Boolean)
 						.join(',');
 					setSymbols(mioSymbols);
-				} catch {
-					showToast('Error processing symbols. See console for details.', 'error');
+				} catch (err) {
+					const sessionError = new SessionError(
+						SessionErrorType.DATA_ERROR,
+						'Error processing symbols',
+						err instanceof Error ? err.message : 'Failed to convert symbols from TradingView to MIO format',
+						{
+							operation: 'convert_symbols',
+							platform: Platform.TRADINGVIEW,
+							timestamp: new Date(),
+							additionalData: { watchlistId: tvWlid }
+						},
+						ErrorSeverity.ERROR,
+						[
+							{
+								action: 'retry_conversion',
+								description: 'Try fetching the watchlist symbols again',
+								priority: 1,
+								automated: false,
+								estimatedTime: '1 minute'
+							}
+						]
+					);
+					showToast(sessionError.getDisplayMessage(), 'error');
 					setSymbols('');
 				}
-			} catch {
-				showToast('Error fetching symbols. See console for details.', 'error');
+			} catch (err) {
+				const sessionError = new SessionError(
+					SessionErrorType.NETWORK_ERROR,
+					'Network error fetching symbols',
+					err instanceof Error ? err.message : 'Unable to connect to TradingView API',
+					{
+						operation: 'fetch_watchlist_symbols',
+						platform: Platform.TRADINGVIEW,
+						timestamp: new Date(),
+						additionalData: { watchlistId: tvWlid }
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: 'check_connection',
+							description: 'Check your internet connection',
+							priority: 1,
+							automated: false,
+							estimatedTime: '1 minute'
+						},
+						{
+							action: 'retry_fetch',
+							description: 'Try again in a few moments',
+							priority: 2,
+							automated: false,
+							estimatedTime: '2 minutes'
+						}
+					]
+				);
+				showToast(sessionError.getDisplayMessage(), 'error');
 				setSymbols('');
 			}
 		};
@@ -186,7 +344,7 @@ const MioSyncPage: React.FC = () => {
 		e.preventDefault();
 		setLoading(true);
 		try {
-			await fetch('/api/mio-action', {
+			const res = await fetch('/api/mio-action', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
@@ -195,9 +353,79 @@ const MioSyncPage: React.FC = () => {
 					symbols: regroupTVWatchlist(symbols, groupBy),
 				}),
 			});
+			
+			if (!res.ok) {
+				const errorData = await res.json().catch(() => ({}));
+				const sessionError = new SessionError(
+					res.status === 401 ? SessionErrorType.SESSION_EXPIRED : SessionErrorType.API_ERROR,
+					'Failed to sync watchlist to MIO',
+					errorData.error || `HTTP ${res.status}: Unable to sync watchlist to MarketInOut`,
+					{
+						operation: 'sync_to_mio',
+						platform: Platform.MARKETINOUT,
+						timestamp: new Date(),
+						additionalData: {
+							mioWatchlistId: mioWlid,
+							symbolCount: symbols.split(',').length,
+							httpStatus: res.status
+						}
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: 'check_mio_session',
+							description: 'Verify your MIO session is still active',
+							priority: 1,
+							automated: false,
+							estimatedTime: '2 minutes'
+						},
+						{
+							action: 'retry_sync',
+							description: 'Try the sync operation again',
+							priority: 2,
+							automated: false,
+							estimatedTime: '1 minute'
+						}
+					]
+				);
+				throw sessionError;
+			}
+			
 			showToast('Watchlist synced to MarketInOut.', 'success');
-		} catch {
-			showToast('Network or server error.', 'error');
+		} catch (err) {
+			if (err instanceof SessionError) {
+				showToast(err.getDisplayMessage(), 'error');
+			} else {
+				const sessionError = new SessionError(
+					SessionErrorType.NETWORK_ERROR,
+					'Network error during sync',
+					err instanceof Error ? err.message : 'Unable to connect to server',
+					{
+						operation: 'sync_to_mio',
+						platform: Platform.MARKETINOUT,
+						timestamp: new Date(),
+						additionalData: { mioWatchlistId: mioWlid }
+					},
+					ErrorSeverity.ERROR,
+					[
+						{
+							action: 'check_connection',
+							description: 'Check your internet connection',
+							priority: 1,
+							automated: false,
+							estimatedTime: '1 minute'
+						},
+						{
+							action: 'retry_sync',
+							description: 'Try the sync operation again',
+							priority: 2,
+							automated: false,
+							estimatedTime: '2 minutes'
+						}
+					]
+				);
+				showToast(sessionError.getDisplayMessage(), 'error');
+			}
 		} finally {
 			setLoading(false);
 		}
@@ -270,7 +498,7 @@ const MioSyncPage: React.FC = () => {
 						{mioWatchlistsLoading ? (
 							<div className='text-sm text-gray-500'>Loading MIO watchlists...</div>
 						) : mioWatchlistsError ? (
-							<div className='text-sm text-red-600'>Failed to load: {mioWatchlistsError}</div>
+							<ErrorDisplay error={mioWatchlistsError} />
 						) : mioWatchlists.length === 0 ? (
 							<div className='text-sm text-gray-500'>No MIO watchlists found.</div>
 						) : (

@@ -10,6 +10,8 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { getInternalSessionId } from '@/lib/useInternalSessionId';
 import { UsageGuide } from '@/components/UsageGuide';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { SessionError, SessionErrorType, Platform, ErrorSeverity } from '@/lib/sessionErrors';
 
 type Watchlist = { id: string; name: string };
 
@@ -28,7 +30,7 @@ export default function MioWatchlistPage() {
 	// Watchlist state
 	const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
 	const [watchlistsLoading, setWatchlistsLoading] = useState(false);
-	const [watchlistsError, setWatchlistsError] = useState<string | null>(null);
+	const [watchlistsError, setWatchlistsError] = useState<SessionError | Error | string | null>(null);
 
 	// Form state
 	const [mioWlid, setMioWlid] = useState('');
@@ -39,14 +41,35 @@ export default function MioWatchlistPage() {
 
 	// Result and error state
 	const [result, setResult] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
+	const [error, setError] = useState<SessionError | Error | string | null>(null);
 	const [loading, setLoading] = useState(false);
 
 	// Fetch all watchlists
 	const fetchWatchlists = useCallback(async () => {
 		if (!internalSessionId) {
 			setWatchlists([]);
-			setWatchlistsError('No internal session ID found. Please bridge your session first.');
+			const sessionError = new SessionError(
+				SessionErrorType.SESSION_EXPIRED,
+				'No MIO session found',
+				'Internal session ID is missing. Please authenticate with MarketInOut first.',
+				{
+					operation: 'fetch_mio_watchlists',
+					platform: Platform.MARKETINOUT,
+					timestamp: new Date(),
+					additionalData: { hasSessionId: false }
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'bridge_session',
+						description: 'Go to MIO Auth tab to bridge your session',
+						priority: 1,
+						automated: false,
+						estimatedTime: '3 minutes'
+					}
+				]
+			);
+			setWatchlistsError(sessionError);
 			return;
 		}
 		setWatchlistsLoading(true);
@@ -66,8 +89,35 @@ export default function MioWatchlistPage() {
 				}))
 			);
 		} catch (err: unknown) {
-			const message = err instanceof Error ? err.message : String(err);
-			setWatchlistsError(message || 'Failed to load watchlists.');
+			const sessionError = new SessionError(
+				SessionErrorType.SESSION_EXPIRED,
+				'Failed to load MIO watchlists',
+				err instanceof Error ? err.message : 'Unable to fetch watchlists from MarketInOut',
+				{
+					operation: 'fetch_mio_watchlists',
+					platform: Platform.MARKETINOUT,
+					timestamp: new Date(),
+					additionalData: { internalSessionId: internalSessionId?.slice(0, 8) + '...' }
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'check_session',
+						description: 'Verify your MIO session is still valid',
+						priority: 1,
+						automated: false,
+						estimatedTime: '2 minutes'
+					},
+					{
+						action: 'reauth_mio',
+						description: 'Re-authenticate with MarketInOut',
+						priority: 2,
+						automated: false,
+						estimatedTime: '3 minutes'
+					}
+				]
+			);
+			setWatchlistsError(sessionError);
 			setWatchlists([]);
 		} finally {
 			setWatchlistsLoading(false);
@@ -100,8 +150,39 @@ export default function MioWatchlistPage() {
 			setResult('Watchlist updated successfully.');
 			fetchWatchlists();
 		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : String(e);
-			setError(message || 'Failed to add to watchlist.');
+			const sessionError = new SessionError(
+				SessionErrorType.API_ERROR,
+				'Failed to add symbols to watchlist',
+				e instanceof Error ? e.message : 'Unable to add symbols to MIO watchlist',
+				{
+					operation: 'add_to_watchlist',
+					platform: Platform.MARKETINOUT,
+					timestamp: new Date(),
+					additionalData: {
+						watchlistId: mioWlid,
+						symbolCount: symbols.split(',').length,
+						groupBy
+					}
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'check_symbols',
+						description: 'Verify symbols are in correct MIO format (e.g., TCS.NS)',
+						priority: 1,
+						automated: false,
+						estimatedTime: '2 minutes'
+					},
+					{
+						action: 'check_session',
+						description: 'Verify your MIO session is still active',
+						priority: 2,
+						automated: false,
+						estimatedTime: '2 minutes'
+					}
+				]
+			);
+			setError(sessionError);
 		} finally {
 			setLoading(false);
 		}
@@ -123,8 +204,35 @@ export default function MioWatchlistPage() {
 			setResult('Watchlist created successfully.');
 			fetchWatchlists();
 		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : String(e);
-			setError(message || 'Failed to create watchlist.');
+			const sessionError = new SessionError(
+				SessionErrorType.API_ERROR,
+				'Failed to create new watchlist',
+				e instanceof Error ? e.message : 'Unable to create watchlist in MarketInOut',
+				{
+					operation: 'create_watchlist',
+					platform: Platform.MARKETINOUT,
+					timestamp: new Date(),
+					additionalData: { watchlistName }
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'check_name',
+						description: 'Ensure watchlist name is unique and valid',
+						priority: 1,
+						automated: false,
+						estimatedTime: '1 minute'
+					},
+					{
+						action: 'check_session',
+						description: 'Verify your MIO session is still active',
+						priority: 2,
+						automated: false,
+						estimatedTime: '2 minutes'
+					}
+				]
+			);
+			setError(sessionError);
 		} finally {
 			setLoading(false);
 		}
@@ -146,8 +254,38 @@ export default function MioWatchlistPage() {
 			setResult('Watchlists deleted successfully.');
 			fetchWatchlists();
 		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : String(e);
-			setError(message || 'Failed to delete watchlists.');
+			const sessionError = new SessionError(
+				SessionErrorType.API_ERROR,
+				'Failed to delete watchlists',
+				e instanceof Error ? e.message : 'Unable to delete watchlists from MarketInOut',
+				{
+					operation: 'delete_watchlists',
+					platform: Platform.MARKETINOUT,
+					timestamp: new Date(),
+					additionalData: {
+						deleteCount: deleteIds.length,
+						watchlistIds: deleteIds.slice(0, 3).join(', ') + (deleteIds.length > 3 ? '...' : '')
+					}
+				},
+				ErrorSeverity.ERROR,
+				[
+					{
+						action: 'check_permissions',
+						description: 'Verify you have permission to delete these watchlists',
+						priority: 1,
+						automated: false,
+						estimatedTime: '1 minute'
+					},
+					{
+						action: 'check_session',
+						description: 'Verify your MIO session is still active',
+						priority: 2,
+						automated: false,
+						estimatedTime: '2 minutes'
+					}
+				]
+			);
+			setError(sessionError);
 		} finally {
 			setLoading(false);
 		}
@@ -180,7 +318,9 @@ export default function MioWatchlistPage() {
 				{watchlistsLoading ? (
 					<div className='mb-2 text-sm text-gray-500'>Loading watchlists...</div>
 				) : watchlistsError ? (
-					<div className='mb-2 text-sm text-red-600'>Failed to load watchlists: {watchlistsError}</div>
+					<div className='mb-2'>
+						<ErrorDisplay error={watchlistsError} />
+					</div>
 				) : watchlists.length === 0 ? (
 					<div className='mb-2 text-sm text-gray-500'>No watchlists found.</div>
 				) : (
@@ -244,7 +384,11 @@ export default function MioWatchlistPage() {
 			</div>
 
 			{result && <div className='text-green-600 font-medium mb-2'>{result}</div>}
-			{error && <div className='text-red-600 font-medium mb-2'>{error}</div>}
+			{error && (
+				<div className='mb-2'>
+					<ErrorDisplay error={error} />
+				</div>
+			)}
 		</div>
 	);
 }

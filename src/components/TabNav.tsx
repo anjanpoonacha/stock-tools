@@ -12,6 +12,7 @@ const ROUTES = [
 	{ path: '/mio-sync', label: 'TV → MIO', value: 'mio' },
 	{ path: '/mio-watchlist', label: 'Manage MIO Lists', value: 'miowatchlist' },
 	{ path: '/mio-auth', label: 'MIO Login', value: 'mioauth' },
+	{ path: '/test-session-flow', label: 'Session Tests', value: 'sessiontest' },
 ];
 
 export default function TabNav() {

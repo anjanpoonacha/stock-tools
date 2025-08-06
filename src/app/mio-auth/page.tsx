@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { UsageGuide } from '@/components/UsageGuide';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
 
 export default function MioAuthPage() {
 	const [sessionKey, setSessionKey] = useState('ASPSESSIONIDCWAACASS');
@@ -67,7 +68,13 @@ export default function MioAuthPage() {
 					{loading ? 'Bridging...' : 'Bridge Session'}
 				</Button>
 			</form>
-			{error && <div className='text-destructive bg-destructive/10 rounded-md px-3 py-2 mt-4 text-base'>{error}</div>}
+			{error && (
+				<ErrorDisplay
+					error={error}
+					onRetry={() => window.location.reload()}
+					className="mt-4"
+				/>
+			)}
 			{success && (
 				<div className='text-success bg-success/10 rounded-md px-3 py-2 mt-4 text-base'>
 					Session bridged! You are authenticated.

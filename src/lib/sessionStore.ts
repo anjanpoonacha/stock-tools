@@ -79,6 +79,27 @@ export function getSession(internalId: string): SessionData | undefined {
 }
 
 /**
+ * Update specific session data for a platform under an internal session ID.
+ * This merges new data with existing session data.
+ */
+export function updatePlatformSession(internalId: string, platform: string, updates: Partial<PlatformSessionData>) {
+	const sessions = loadSessions();
+	const existing = sessions[internalId] || {};
+	const platformData = existing[platform] || { sessionId: '' };
+	
+	// Merge updates with existing data, ensuring all values are strings
+	const updatedPlatformData: PlatformSessionData = {
+		...platformData,
+		...Object.fromEntries(
+			Object.entries(updates).filter(([, value]) => value !== undefined)
+		) as PlatformSessionData
+	};
+	
+	sessions[internalId] = { ...existing, [platform]: updatedPlatformData };
+	saveSessions(sessions);
+}
+
+/**
  * Generate a secure random internal session ID.
  */
 export function generateSessionId(): string {
