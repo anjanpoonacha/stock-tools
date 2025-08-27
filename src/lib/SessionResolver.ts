@@ -1,0 +1,228 @@
+// src/lib/SessionResolver.ts
+
+import { existsSync, readFileSync } from 'fs';
+import { SESSION_CONFIG, LOG_PREFIXES } from './constants';
+
+export interface SessionData {
+	sessionId: string;
+	extractedAt?: string;
+	extractedFrom?: string;
+	source?: string;
+	[key: string]: string | undefined;
+}
+
+export interface PlatformSessions {
+	[platform: string]: SessionData;
+}
+
+export interface StoredSessions {
+	[internalId: string]: PlatformSessions;
+}
+
+export interface SessionInfo {
+	sessionData: SessionData;
+	internalId: string;
+}
+
+export interface MIOSessionInfo {
+	key: string;
+	value: string;
+	internalId: string;
+}
+
+export interface SessionStats {
+	totalSessions: number;
+	platformCounts: Record<string, number>;
+}
+
+interface PlatformSessionWithTimestamp extends SessionInfo {
+	extractedAt: string;
+}
+
+/**
+ * Service for automatically resolving and managing session data
+ * Provides clean abstraction over session file operations without requiring frontend session management
+ */
+export class SessionResolver {
+	private static readonly SESSION_FILE = process.env.NODE_ENV === 'production' ? '/tmp/sessions.json' : 'sessions.json';
+
+	/**
+	 * Loads all sessions from the sessions.json file
+	 * @returns Parsed session data or empty object if file doesn't exist or is invalid
+	 */
+	private static loadSessions(): StoredSessions {
+		if (!existsSync(this.SESSION_FILE)) {
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No sessions file found`);
+			return {};
+		}
+
+		try {
+			const rawData = readFileSync(this.SESSION_FILE, 'utf-8');
+			return JSON.parse(rawData);
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions:`, error);
+			return {};
+		}
+	}
+
+	/**
+	 * Extracts sessions for a specific platform from all stored sessions
+	 * @param allSessions - All stored session data
+	 * @param platform - Target platform name
+	 * @returns Array of platform sessions with timestamps
+	 */
+	private static extractPlatformSessions(allSessions: StoredSessions, platform: string): PlatformSessionWithTimestamp[] {
+		const platformSessions: PlatformSessionWithTimestamp[] = [];
+
+		for (const [internalId, sessionEntry] of Object.entries(allSessions)) {
+			const platformData = sessionEntry[platform];
+			if (this.isValidSessionData(platformData)) {
+				platformSessions.push({
+					sessionData: platformData,
+					internalId,
+					extractedAt: platformData.extractedAt || SESSION_CONFIG.DEFAULT_EXTRACTED_AT
+				});
+			}
+		}
+
+		return platformSessions;
+	}
+
+	/**
+	 * Validates if session data is complete and usable
+	 * @param sessionData - Session data to validate
+	 * @returns True if session data is valid
+	 */
+	private static isValidSessionData(sessionData: SessionData | undefined): sessionData is SessionData {
+		return Boolean(sessionData?.sessionId);
+	}
+
+	/**
+	 * Sorts sessions by extraction timestamp (most recent first)
+	 * @param sessions - Sessions to sort
+	 * @returns Sorted sessions array
+	 */
+	private static sortSessionsByTimestamp(sessions: PlatformSessionWithTimestamp[]): PlatformSessionWithTimestamp[] {
+		return sessions.sort((a, b) => new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime());
+	}
+
+	/**
+	 * Finds the session cookie key by excluding known metadata keys
+	 * @param sessionData - Session data to search
+	 * @returns Session cookie key or null if not found
+	 */
+	private static findSessionCookieKey(sessionData: SessionData): string | null {
+		const excludedKeys = SESSION_CONFIG.EXCLUDED_SESSION_KEYS as readonly string[];
+		const sessionKey = Object.keys(sessionData).find(key =>
+			!excludedKeys.includes(key)
+		);
+
+		return sessionKey && sessionData[sessionKey] ? sessionKey : null;
+	}
+
+	/**
+	 * Retrieves the most recent valid session for a specific platform
+	 * @param platform - Platform name (e.g., 'marketinout', 'tradingview')
+	 * @returns Session info or null if no valid session found
+	 */
+	static getLatestSession(platform: string): SessionInfo | null {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractPlatformSessions(allSessions, platform);
+
+			if (platformSessions.length === 0) {
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found`);
+				return null;
+			}
+
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+			const latestSession = sortedSessions[0];
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions, using most recent: ${latestSession.internalId}`);
+
+			return {
+				sessionData: latestSession.sessionData,
+				internalId: latestSession.internalId
+			};
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Retrieves the most recent MarketInOut session with cookie data
+	 * @returns MIO session info with key-value pair for cookies, or null if not found
+	 */
+	static getLatestMIOSession(): MIOSessionInfo | null {
+		const sessionInfo = this.getLatestSession(SESSION_CONFIG.PLATFORMS.MARKETINOUT);
+		if (!sessionInfo) {
+			return null;
+		}
+
+		const { sessionData, internalId } = sessionInfo;
+		const sessionKey = this.findSessionCookieKey(sessionData);
+
+		if (!sessionKey) {
+			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data`);
+			return null;
+		}
+
+		return {
+			key: sessionKey,
+			value: sessionData[sessionKey]!,
+			internalId
+		};
+	}
+
+	/**
+	 * Retrieves all available sessions for a platform (for fallback scenarios)
+	 * @param platform - Platform name
+	 * @returns Array of all sessions for the platform, sorted by recency
+	 */
+	static getAllSessions(platform: string): SessionInfo[] {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractPlatformSessions(allSessions, platform);
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+
+			return sortedSessions.map(({ sessionData, internalId }) => ({ sessionData, internalId }));
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting all ${platform} sessions:`, error);
+			return [];
+		}
+	}
+
+	/**
+	 * Checks if any sessions exist for a platform
+	 * @param platform - Platform name to check
+	 * @returns True if sessions exist for the platform
+	 */
+	static hasSessionsForPlatform(platform: string): boolean {
+		return this.getLatestSession(platform) !== null;
+	}
+
+	/**
+	 * Retrieves session statistics for debugging and monitoring
+	 * @returns Object containing total session count and per-platform counts
+	 */
+	static getSessionStats(): SessionStats {
+		try {
+			const allSessions = this.loadSessions();
+			const platformCounts: Record<string, number> = {};
+			let totalSessions = 0;
+
+			for (const sessionEntry of Object.values(allSessions)) {
+				totalSessions++;
+				for (const platform of Object.keys(sessionEntry)) {
+					platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+				}
+			}
+
+			return { totalSessions, platformCounts };
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting session stats:`, error);
+			return { totalSessions: 0, platformCounts: {} };
+		}
+	}
+}

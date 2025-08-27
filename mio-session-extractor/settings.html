@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Multi-Platform Session Extractor - Settings</title>
+        <link rel="stylesheet" href="settings.css" />
+    </head>
+    <body>
+        <div class="settings-container">
+            <!-- Header -->
+            <header class="settings-header">
+                <div class="header-content">
+                    <h1>
+                        <svg class="header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path d="M12 1v6m0 6v6m11-7h-6m-6 0H1"></path>
+                        </svg>
+                        Extension Settings
+                    </h1>
+                    <p class="header-subtitle">Configure your Multi-Platform Session Extractor</p>
+                </div>
+                <div class="header-actions">
+                    <button id="resetBtn" class="btn btn-secondary" title="Reset to defaults">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="1 4 1 10 7 10"></polyline>
+                            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                        </svg>
+                        Reset
+                    </button>
+                    <button id="exportBtn" class="btn btn-secondary" title="Export settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Export
+                    </button>
+                    <button id="importBtn" class="btn btn-secondary" title="Import settings">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        Import
+                    </button>
+                </div>
+            </header>
+
+            <!-- Quick Presets -->
+            <section class="settings-section">
+                <h2>Quick Presets</h2>
+                <div class="presets-grid">
+                    <div class="preset-card" data-preset="performance">
+                        <div class="preset-icon">⚡</div>
+                        <h3>Performance</h3>
+                        <p>Maximum performance and responsiveness</p>
+                    </div>
+                    <div class="preset-card active" data-preset="balanced">
+                        <div class="preset-icon">⚖️</div>
+                        <h3>Balanced</h3>
+                        <p>Good balance between performance and battery</p>
+                    </div>
+                    <div class="preset-card" data-preset="battery">
+                        <div class="preset-icon">🔋</div>
+                        <h3>Battery Saver</h3>
+                        <p>Optimized for minimal battery usage</p>
+                    </div>
+                    <div class="preset-card" data-preset="developer">
+                        <div class="preset-icon">🛠️</div>
+                        <h3>Developer</h3>
+                        <p>Enhanced debugging and monitoring</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Tabs -->
+            <div class="settings-tabs">
+                <nav class="tab-nav">
+                    <button class="tab-btn active" data-tab="general">General</button>
+                    <button class="tab-btn" data-tab="performance">Performance</button>
+                    <button class="tab-btn" data-tab="connection">Connection</button>
+                    <button class="tab-btn" data-tab="platforms">Platforms</button>
+                    <button class="tab-btn" data-tab="advanced">Advanced</button>
+                </nav>
+
+                <!-- General Settings Tab -->
+                <div class="tab-content active" id="general-tab">
+                    <div class="settings-group">
+                        <h3>User Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">User Email</label>
+                            <input
+                                type="email"
+                                id="userEmail"
+                                placeholder="your.email@example.com"
+                                class="setting-input"
+                            />
+                            <p class="setting-description">
+                                Your email address for session identification (required for unique sessions)
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Platform Support</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableMarketInOut" checked />
+                                <span class="checkmark"></span>
+                                Enable MarketInOut Support
+                            </label>
+                            <p class="setting-description">Extract sessions from marketinout.com</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableTradingView" checked />
+                                <span class="checkmark"></span>
+                                Enable TradingView Support
+                            </label>
+                            <p class="setting-description">Extract sessions from tradingview.com</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>User Interface</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="autoRefreshPopup" checked />
+                                <span class="checkmark"></span>
+                                Auto-refresh Popup
+                            </label>
+                            <p class="setting-description">Automatically update popup status</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Theme</label>
+                            <select id="uiTheme" class="setting-select">
+                                <option value="auto">Auto (System)</option>
+                                <option value="light">Light</option>
+                                <option value="dark">Dark</option>
+                            </select>
+                            <p class="setting-description">Choose your preferred theme</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="compactMode" />
+                                <span class="checkmark"></span>
+                                Compact Mode
+                            </label>
+                            <p class="setting-description">Use compact UI layout</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Notifications</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="notificationsEnabled" checked />
+                                <span class="checkmark"></span>
+                                Enable Notifications
+                            </label>
+                            <p class="setting-description">Show success/error notifications</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Settings Tab -->
+                <div class="tab-content" id="performance-tab">
+                    <div class="settings-group">
+                        <h3>Polling Intervals</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Active Polling (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="activePolling"
+                                    min="5"
+                                    max="300"
+                                    value="30"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">30s</span>
+                            </div>
+                            <p class="setting-description">How often to check for sessions when tab is active</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Inactive Polling (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="inactivePolling"
+                                    min="10"
+                                    max="600"
+                                    value="60"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">60s</span>
+                            </div>
+                            <p class="setting-description">How often to check when no session is found</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Background Polling (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="backgroundPolling"
+                                    min="30"
+                                    max="1800"
+                                    value="120"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">120s</span>
+                            </div>
+                            <p class="setting-description">How often to check when tab is hidden</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Popup Refresh (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="popupPolling"
+                                    min="5"
+                                    max="120"
+                                    value="15"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">15s</span>
+                            </div>
+                            <p class="setting-description">How often to refresh popup status</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Request Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Request Timeout (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="requestTimeout"
+                                    min="1"
+                                    max="30"
+                                    value="5"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">5s</span>
+                            </div>
+                            <p class="setting-description">Maximum time to wait for API responses</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Maximum Retries</label>
+                            <div class="slider-container">
+                                <input type="range" id="maxRetries" min="0" max="10" value="2" class="setting-slider" />
+                                <span class="slider-value">2</span>
+                            </div>
+                            <p class="setting-description">How many times to retry failed requests</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Minimum Request Interval (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="minRequestInterval"
+                                    min="1"
+                                    max="60"
+                                    value="10"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">10s</span>
+                            </div>
+                            <p class="setting-description">Minimum time between API requests</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Cache Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Session Cache Duration (minutes)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="sessionCache"
+                                    min="1"
+                                    max="30"
+                                    value="5"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">5min</span>
+                            </div>
+                            <p class="setting-description">How long to cache session data</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Connection Cache Duration (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="connectionCache"
+                                    min="10"
+                                    max="300"
+                                    value="30"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">30s</span>
+                            </div>
+                            <p class="setting-description">How long to cache app connection status</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connection Settings Tab -->
+                <div class="tab-content" id="connection-tab">
+                    <div class="settings-group">
+                        <h3>Application URLs</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Default URLs</label>
+                            <div class="url-list" id="defaultUrls">
+                                <div class="url-item">
+                                    <span class="url-text">http://localhost:3001</span>
+                                    <span class="url-status">Default</span>
+                                </div>
+                                <div class="url-item">
+                                    <span class="url-text">http://localhost:3000</span>
+                                    <span class="url-status">Default</span>
+                                </div>
+                            </div>
+                            <p class="setting-description">Built-in application URLs</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Custom URLs</label>
+                            <div class="url-input-container">
+                                <input
+                                    type="url"
+                                    id="customUrlInput"
+                                    placeholder="https://your-app.com"
+                                    class="setting-input"
+                                />
+                                <button id="addUrlBtn" class="btn btn-primary">Add</button>
+                            </div>
+                            <div class="url-list" id="customUrls">
+                                <!-- Custom URLs will be added here -->
+                            </div>
+                            <p class="setting-description">Add your own application URLs</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Connection Options</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Connection Check Frequency (seconds)</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="connectionCheckFreq"
+                                    min="10"
+                                    max="300"
+                                    value="30"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">30s</span>
+                            </div>
+                            <p class="setting-description">How often to check app connectivity</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enablePostMessage" checked />
+                                <span class="checkmark"></span>
+                                Enable PostMessage
+                            </label>
+                            <p class="setting-description">Send data via window.postMessage</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableStorageSync" checked />
+                                <span class="checkmark"></span>
+                                Enable Storage Sync
+                            </label>
+                            <p class="setting-description">Store sessions in Chrome storage</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Platform Settings Tab -->
+                <div class="tab-content" id="platforms-tab">
+                    <div class="settings-group">
+                        <h3>MarketInOut Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Session Cookie Name</label>
+                            <input type="text" id="mioSessionCookie" value="ASPSESSIONID" class="setting-input" />
+                            <p class="setting-description">Name of the session cookie to extract</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Polling Speed Multiplier</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="mioPollingMultiplier"
+                                    min="0.5"
+                                    max="2.0"
+                                    step="0.1"
+                                    value="1.0"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">1.0x</span>
+                            </div>
+                            <p class="setting-description">Adjust polling speed for this platform</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="mioAdvancedDetection" checked />
+                                <span class="checkmark"></span>
+                                Advanced Login Detection
+                            </label>
+                            <p class="setting-description">Use enhanced methods to detect login status</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>TradingView Settings</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Session Cookie Name</label>
+                            <input type="text" id="tvSessionCookie" value="sessionid" class="setting-input" />
+                            <p class="setting-description">Name of the session cookie to extract</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Polling Speed Multiplier</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="tvPollingMultiplier"
+                                    min="0.5"
+                                    max="2.0"
+                                    step="0.1"
+                                    value="1.2"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">1.2x</span>
+                            </div>
+                            <p class="setting-description">Adjust polling speed for this platform</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="tvAdvancedDetection" checked />
+                                <span class="checkmark"></span>
+                                Advanced Login Detection
+                            </label>
+                            <p class="setting-description">Use enhanced methods to detect login status</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Advanced Settings Tab -->
+                <div class="tab-content" id="advanced-tab">
+                    <div class="settings-group">
+                        <h3>Performance Features</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableWebWorker" checked />
+                                <span class="checkmark"></span>
+                                Enable Web Worker
+                            </label>
+                            <p class="setting-description">Use Web Worker for background processing</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableIntersectionObserver" checked />
+                                <span class="checkmark"></span>
+                                Enable Intersection Observer
+                            </label>
+                            <p class="setting-description">Smart login form detection</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enablePerformanceObserver" checked />
+                                <span class="checkmark"></span>
+                                Enable Performance Observer
+                            </label>
+                            <p class="setting-description">Monitor extension performance</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableAutoRecovery" checked />
+                                <span class="checkmark"></span>
+                                Enable Auto Recovery
+                            </label>
+                            <p class="setting-description">Automatically recover from errors</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Debugging</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="debugMode" />
+                                <span class="checkmark"></span>
+                                Debug Mode
+                            </label>
+                            <p class="setting-description">Enable detailed logging</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">Log Level</label>
+                            <select id="logLevel" class="setting-select">
+                                <option value="error">Error</option>
+                                <option value="warn">Warning</option>
+                                <option value="info" selected>Info</option>
+                                <option value="debug">Debug</option>
+                            </select>
+                            <p class="setting-description">Minimum log level to display</p>
+                        </div>
+                        <div class="setting-item">
+                            <label class="setting-label">
+                                <input type="checkbox" id="enableMetrics" checked />
+                                <span class="checkmark"></span>
+                                Enable Metrics
+                            </label>
+                            <p class="setting-description">Collect performance metrics</p>
+                        </div>
+                    </div>
+
+                    <div class="settings-group">
+                        <h3>Storage Management</h3>
+                        <div class="setting-item">
+                            <label class="setting-label">Storage Quota Warning</label>
+                            <div class="slider-container">
+                                <input
+                                    type="range"
+                                    id="storageQuotaWarning"
+                                    min="0.5"
+                                    max="1.0"
+                                    step="0.1"
+                                    value="0.8"
+                                    class="setting-slider"
+                                />
+                                <span class="slider-value">80%</span>
+                            </div>
+                            <p class="setting-description">Warn when storage usage exceeds this threshold</p>
+                        </div>
+                        <div class="setting-item">
+                            <button id="clearStorageBtn" class="btn btn-warning">Clear Extension Storage</button>
+                            <p class="setting-description">Remove all stored session data</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Status Bar -->
+            <div class="status-bar">
+                <div class="status-info">
+                    <span id="statusText">Settings loaded</span>
+                </div>
+                <div class="status-actions">
+                    <button id="saveBtn" class="btn btn-primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hidden file input for import -->
+        <input type="file" id="importFileInput" accept=".json" style="display: none" />
+
+        <!-- Scripts -->
+        <script src="settings.js"></script>
+        <script src="settings-ui.js"></script>
+    </body>
+</html>

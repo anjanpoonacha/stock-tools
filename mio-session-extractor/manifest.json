@@ -1,0 +1,56 @@
+{
+	"manifest_version": 3,
+	"name": "Multi-Platform Session Extractor",
+	"version": "2.1.0",
+	"description": "Performance-optimized session extractor for MarketInOut and TradingView with adaptive polling and advanced caching",
+	"permissions": [
+		"cookies",
+		"activeTab",
+		"storage",
+		"idle",
+		"tabs"
+	],
+	"host_permissions": [
+		"https://www.marketinout.com/*",
+		"https://www.tradingview.com/*",
+		"http://localhost:3000/*",
+		"http://localhost:3001/*",
+		"https://*.vercel.app/*"
+	],
+	"content_scripts": [
+		{
+			"matches": [
+				"https://www.marketinout.com/*",
+				"https://www.tradingview.com/*"
+			],
+			"js": [
+				"content-script.js"
+			],
+			"run_at": "document_end"
+		}
+	],
+	"action": {
+		"default_popup": "popup.html",
+		"default_title": "Multi-Platform Session Extractor"
+	},
+	"options_page": "settings.html",
+	"background": {
+		"service_worker": "background.js"
+	},
+	"web_accessible_resources": [
+		{
+			"resources": [
+				"performance-worker.js"
+			],
+			"matches": [
+				"https://www.marketinout.com/*",
+				"https://www.tradingview.com/*"
+			]
+		}
+	],
+	"icons": {
+		"16": "icons/icon16.svg",
+		"48": "icons/icon48.svg",
+		"128": "icons/icon128.svg"
+	}
+}

@@ -3,12 +3,55 @@
 import { useState, useEffect } from 'react';
 
 /**
- * Get the internal session ID for MarketInOut (bridged session) from localStorage.
+ * Get the internal session ID for MarketInOut (bridged session) from localStorage or server.
  * Returns an empty string if not set.
+ * Checks localStorage first, then falls back to server API (for extension-bridged sessions with httpOnly cookies).
  */
 export function getInternalSessionId(): string {
 	if (typeof window === 'undefined') return '';
-	return localStorage.getItem('marketinout_internalSessionId') || '';
+
+	// First check localStorage (manual bridge method)
+	const fromLocalStorage = localStorage.getItem('marketinout_internalSessionId');
+	if (fromLocalStorage) {
+		return fromLocalStorage;
+	}
+
+	// Note: myAppToken cookie is httpOnly and cannot be read by client-side JavaScript
+	// The useInternalSessionId hook will handle the async server call
+	return '';
+}
+
+/**
+ * Async function to get the internal session ID from the server API
+ * This is used when the httpOnly cookie needs to be accessed
+ */
+export async function getInternalSessionIdFromServer(): Promise<string> {
+	try {
+		const response = await fetch('/api/session/current', {
+			method: 'GET',
+			credentials: 'include', // Include cookies in the request
+		});
+
+		if (!response.ok) {
+			console.warn('[SESSION] Failed to fetch session from server:', response.status);
+			return '';
+		}
+
+		const data = await response.json();
+
+		if (data.hasSession && data.sessionId) {
+			// Store in localStorage for future synchronous access
+			localStorage.setItem('marketinout_internalSessionId', data.sessionId);
+			// Dispatch custom event to notify other components
+			window.dispatchEvent(new Event('internalSessionIdChanged'));
+			return data.sessionId;
+		}
+
+		return '';
+	} catch (error) {
+		console.error('[SESSION] Error fetching session from server:', error);
+		return '';
+	}
 }
 
 /**
@@ -19,8 +62,19 @@ export function useInternalSessionId() {
 	const [internalSessionId, setInternalSessionId] = useState<string>('');
 
 	useEffect(() => {
-		// Get initial value
-		setInternalSessionId(getInternalSessionId());
+		async function initializeSession() {
+			// Get initial value from localStorage
+			let sessionId = getInternalSessionId();
+
+			// If not found in localStorage, try fetching from server
+			if (!sessionId) {
+				sessionId = await getInternalSessionIdFromServer();
+			}
+
+			setInternalSessionId(sessionId);
+		}
+
+		initializeSession();
 
 		// Listen for storage changes
 		const handleStorageChange = (e: StorageEvent) => {
