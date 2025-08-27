@@ -2,84 +2,32 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useSessionBridge } from '@/lib/useSessionBridge';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
 
 export default function MioAuthPage() {
-	const [sessionKey, setSessionKey] = useState('ASPSESSIONIDCWAACASS');
-	const [sessionValue, setSessionValue] = useState('');
-	const { bridgeSession, loading, error, success } = useSessionBridge();
-
-	return (
-		<div className='max-w-md mx-auto my-8 p-6 border rounded-xl bg-background shadow-md'>
-			<h2 className='font-semibold text-2xl mb-5'>MIO Session Bridge</h2>
-			<UsageGuide
-				title="How to authenticate with MarketInOut"
-				steps={[
-					"Log in to marketinout.com in your browser",
-					"Open DevTools → Application → Cookies → marketinout.com",
-					"Find the session cookie (usually starts with ASPSESSIONID)",
-					"Copy both the cookie name and value",
-					"Paste them below and click 'Bridge Session'"
-				]}
-				tips={[
-					"Session key example: ASPSESSIONIDCWAACASS",
-					"Keep your session credentials private and secure",
-					"This authentication is required for all MIO-related tools",
-					"Session will be stored securely for other tools to use"
-				]}
-				className="mb-5"
-			/>
-			<form
-				onSubmit={(e) => {
-					e.preventDefault();
-					bridgeSession(sessionKey, sessionValue);
-				}}
-				className='flex flex-col gap-4'
-			>
-				<div>
-					<Label htmlFor='sessionKey'>Session Key</Label>
-					<Input
-						id='sessionKey'
-						value={sessionKey}
-						onChange={(e) => setSessionKey(e.target.value)}
-						placeholder='e.g. ASPSESSIONIDCWAACASS'
-						autoComplete='off'
-						className='mt-1'
-					/>
-				</div>
-				<div>
-					<Label htmlFor='sessionValue'>Session Value</Label>
-					<Input
-						id='sessionValue'
-						value={sessionValue}
-						onChange={(e) => setSessionValue(e.target.value)}
-						placeholder='Paste session value'
-						autoComplete='off'
-						className='mt-1'
-					/>
-				</div>
-				<Button type='submit' disabled={loading || !sessionKey || !sessionValue} className='mt-2'>
-					{loading ? 'Bridging...' : 'Bridge Session'}
-				</Button>
-			</form>
-			{error && (
-				<ErrorDisplay
-					error={error}
-					onRetry={() => window.location.reload()}
-					className="mt-4"
-				/>
-			)}
-			{success && (
-				<div className='text-success bg-success/10 rounded-md px-3 py-2 mt-4 text-base'>
-					Session bridged! You are authenticated.
-				</div>
-			)}
-		</div>
-	);
+    return (
+        <div className='max-w-md mx-auto my-8 p-6 border rounded-xl bg-background shadow-md'>
+            <h2 className='font-semibold text-2xl mb-5'>MIO Session Management</h2>
+            <UsageGuide
+                title='Automatic Session Management'
+                steps={[
+                    'Install the browser extension from the mio-session-extractor folder',
+                    'Visit marketinout.com and log in to your account',
+                    'The extension automatically captures your session in the background',
+                    'All MIO tools will work automatically - no manual setup needed!',
+                    'When your session expires, just visit MIO website again',
+                ]}
+                tips={[
+                    'No more manual session bridging required',
+                    'Sessions are automatically managed server-side',
+                    'The extension runs silently in the background',
+                    'Multiple sessions are supported with automatic selection',
+                ]}
+                className='mb-5'
+            />
+            <div className='text-success bg-success/10 rounded-md px-3 py-2 mt-4 text-base'>
+                ✅ Session management is now fully automatic! Just install the extension and visit MIO.
+            </div>
+        </div>
+    );
 }

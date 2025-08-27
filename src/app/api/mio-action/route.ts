@@ -2,134 +2,214 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { MIOService } from '@/lib/MIOService';
-import { validateAndStartMonitoring, getHealthAwareSessionData } from '@/lib/sessionValidation';
+import { SessionResolver } from '@/lib/SessionResolver';
+import { HTTP_STATUS, ERROR_MESSAGES, LOG_PREFIXES } from '@/lib/constants';
 
-export async function POST(req: NextRequest) {
+interface MIOActionRequest {
+	mioWlid?: string;
+	symbols?: string[];
+}
+
+interface CreateWatchlistRequest {
+	name: string;
+}
+
+interface DeleteWatchlistRequest {
+	deleteIds: string[];
+}
+
+interface APIResponse<T = unknown> {
+	result?: T;
+	watchlists?: T;
+	sessionUsed?: string;
+	error?: string;
+	needsSession?: boolean;
+}
+
+/**
+ * Validates and retrieves MIO session information
+ * @returns Session info or null if not found
+ */
+function validateMIOSession() {
+	const sessionInfo = SessionResolver.getLatestMIOSession();
+	if (!sessionInfo) {
+		console.error(`${LOG_PREFIXES.API} No MIO session available`);
+		return null;
+	}
+	console.log(`${LOG_PREFIXES.API} Using MIO session: ${sessionInfo.internalId}`);
+	return sessionInfo;
+}
+
+/**
+ * Creates standardized error response
+ */
+function createErrorResponse(message: string, status: number, needsSession = false): NextResponse<APIResponse> {
+	return NextResponse.json({
+		error: message,
+		...(needsSession && { needsSession: true })
+	}, { status });
+}
+
+/**
+ * Creates standardized success response
+ */
+function createSuccessResponse<T>(data: T, sessionId?: string): NextResponse<APIResponse<T>> {
+	return NextResponse.json({
+		...data,
+		...(sessionId && { sessionUsed: sessionId })
+	});
+}
+
+/**
+ * Extracts error message from unknown error type
+ */
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Handles MIO watchlist retrieval
+ */
+async function handleGetWatchlists(sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>): Promise<NextResponse<APIResponse>> {
 	try {
-		const body = await req.json();
-		const { internalSessionId, mioWlid, symbols } = body;
+		const watchlists = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
+		console.log(`${LOG_PREFIXES.API} Retrieved ${watchlists.length} watchlists`);
 
-		console.log('[API] /api/mio-action POST body:', body);
+		return createSuccessResponse({ watchlists }, sessionInfo.internalId);
+	} catch (error) {
+		const message = getErrorMessage(error);
+		console.error(`${LOG_PREFIXES.API} Failed to get watchlists:`, message);
+		return createErrorResponse(
+			message || ERROR_MESSAGES.WATCHLIST_LOAD_FAILED,
+			HTTP_STATUS.UNAUTHORIZED,
+			true
+		);
+	}
+}
 
-		if (!internalSessionId) {
-			console.log('[API] Missing internalSessionId');
-			return NextResponse.json({ error: 'internalSessionId is required.' }, { status: 400 });
-		}
+/**
+ * Handles adding symbols to MIO watchlist
+ */
+async function handleAddToWatchlist(
+	sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>,
+	mioWlid: string,
+	symbols: string[]
+): Promise<NextResponse<APIResponse>> {
+	try {
+		// Convert symbols array to comma-separated string as expected by MIOService
+		const symbolsString = Array.isArray(symbols) ? symbols.join(',') : symbols;
 
-		// Use health-aware session validation
-		const healthStatus = getHealthAwareSessionData(internalSessionId);
-		console.log('[API] Health-aware session check for', internalSessionId, '=>', {
-			sessionExists: healthStatus.sessionExists,
-			overallStatus: healthStatus.overallStatus,
-			platforms: healthStatus.platforms
+		const result = await MIOService.addWatchlist({
+			sessionKey: sessionInfo.key,
+			sessionValue: sessionInfo.value,
+			mioWlid,
+			symbols: symbolsString,
 		});
 
-		if (!healthStatus.sessionExists || !healthStatus.platforms.includes('marketinout')) {
-			return NextResponse.json({
-				error: 'No MIO session found.',
-				healthStatus: healthStatus.overallStatus,
-				recommendations: healthStatus.recommendations
-			}, { status: 401 });
+		return createSuccessResponse({ result }, sessionInfo.internalId);
+	} catch (error) {
+		const message = getErrorMessage(error);
+		console.error(`${LOG_PREFIXES.API} Failed to add to watchlist:`, message);
+		return createErrorResponse(
+			message || ERROR_MESSAGES.WATCHLIST_ADD_FAILED,
+			HTTP_STATUS.INTERNAL_SERVER_ERROR,
+			true
+		);
+	}
+}
+
+export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>> {
+	try {
+		const body: MIOActionRequest = await req.json();
+		const { mioWlid, symbols } = body;
+
+		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, body);
+
+		const sessionInfo = validateMIOSession();
+		if (!sessionInfo) {
+			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
 		}
 
-		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
-		if (!sessionKeyValue) {
-			return NextResponse.json({ error: 'No MIO session found.' }, { status: 401 });
-		}
-
-		// If only sessionId is provided, treat as "get watchlists"
+		// If no specific action requested, treat as "get watchlists"
 		if (!mioWlid && !symbols) {
-			try {
-				// Use health-integrated validation that automatically starts monitoring
-				const validationResult = await validateAndStartMonitoring(internalSessionId, 'marketinout');
-				
-				if (validationResult.isValid && validationResult.watchlists) {
-					console.log('[API] Session validated and monitoring started:', {
-						healthStatus: validationResult.healthStatus,
-						monitoringStarted: validationResult.monitoringStarted,
-						watchlistCount: validationResult.watchlists.length
-					});
-					
-					return NextResponse.json({
-						watchlists: validationResult.watchlists,
-						healthStatus: validationResult.healthStatus,
-						monitoringActive: validationResult.monitoringStarted
-					});
-				} else {
-					console.log('[API] Session validation failed:', validationResult.error?.message);
-					return NextResponse.json({
-						error: validationResult.error?.message || 'Session expired. Please re-authenticate.',
-						canAutoRecover: validationResult.error?.canAutoRecover() || false,
-						recoveryInstructions: validationResult.error?.getRecoveryInstructions() || []
-					}, { status: 401 });
-				}
-			} catch (err: unknown) {
-				const message = err instanceof Error ? err.message : String(err);
-				return NextResponse.json({ error: message || 'Session expired. Please re-authenticate.' }, { status: 401 });
-			}
+			return handleGetWatchlists(sessionInfo);
 		}
 
 		// Otherwise, treat as "add to watchlist"
-		const result = await MIOService.addWatchlist({
-			sessionKey: sessionKeyValue.key,
-			sessionValue: sessionKeyValue.value,
-			mioWlid,
-			symbols,
-		});
-		return NextResponse.json({ result });
-	} catch (e: unknown) {
-		const message = e instanceof Error ? e.message : String(e);
-		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
+		return handleAddToWatchlist(sessionInfo, mioWlid!, symbols!);
+	} catch (error) {
+		const message = getErrorMessage(error);
+		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }
 
-export async function PUT(req: NextRequest) {
+export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body = await req.json();
-		const { internalSessionId, name } = body;
+		const body: CreateWatchlistRequest = await req.json();
+		const { name } = body;
 
-		if (!internalSessionId || !name) {
-			return NextResponse.json({ error: 'internalSessionId and name are required.' }, { status: 400 });
+		if (!name) {
+			return createErrorResponse(ERROR_MESSAGES.NAME_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		// Use health-aware session validation
-		const healthStatus = getHealthAwareSessionData(internalSessionId);
-		if (!healthStatus.sessionExists || !healthStatus.platforms.includes('marketinout')) {
-			return NextResponse.json({
-				error: 'No MIO session found.',
-				healthStatus: healthStatus.overallStatus,
-				recommendations: healthStatus.recommendations
-			}, { status: 401 });
+		const sessionInfo = validateMIOSession();
+		if (!sessionInfo) {
+			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
 		}
 
-		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
-		if (!sessionKeyValue) {
-			return NextResponse.json({ error: 'No MIO session found.' }, { status: 401 });
+		console.log(`${LOG_PREFIXES.API} Creating watchlist with session: ${sessionInfo.internalId}`);
+
+		try {
+			const result = await MIOService.createWatchlist(sessionInfo.key, sessionInfo.value, name);
+			return createSuccessResponse({ result }, sessionInfo.internalId);
+		} catch (error) {
+			const message = getErrorMessage(error);
+			console.error(`${LOG_PREFIXES.API} Failed to create watchlist:`, message);
+			return createErrorResponse(
+				message || ERROR_MESSAGES.WATCHLIST_CREATE_FAILED,
+				HTTP_STATUS.INTERNAL_SERVER_ERROR,
+				true
+			);
 		}
-		const result = await MIOService.createWatchlist(sessionKeyValue.key, sessionKeyValue.value, name);
-		return NextResponse.json({ result });
-	} catch (e: unknown) {
-		const message = e instanceof Error ? e.message : String(e);
-		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
+	} catch (error) {
+		const message = getErrorMessage(error);
+		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }
 
-export async function DELETE(req: NextRequest) {
+export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body = await req.json();
-		const { internalSessionId, deleteIds } = body;
+		const body: DeleteWatchlistRequest = await req.json();
+		const { deleteIds } = body;
 
-		if (!internalSessionId || !Array.isArray(deleteIds)) {
-			return NextResponse.json({ error: 'internalSessionId and deleteIds are required.' }, { status: 400 });
+		if (!Array.isArray(deleteIds)) {
+			return createErrorResponse(ERROR_MESSAGES.DELETE_IDS_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
-		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
-		if (!sessionKeyValue) {
-			return NextResponse.json({ error: 'No MIO session found.' }, { status: 401 });
+
+		const sessionInfo = validateMIOSession();
+		if (!sessionInfo) {
+			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
 		}
-		const result = await MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
-		return NextResponse.json({ result });
-	} catch (e: unknown) {
-		const message = e instanceof Error ? e.message : String(e);
-		return NextResponse.json({ error: message || 'Unknown error' }, { status: 500 });
+
+		console.log(`${LOG_PREFIXES.API} Deleting watchlists with session: ${sessionInfo.internalId}`);
+
+		try {
+			const result = await MIOService.deleteWatchlists(sessionInfo.key, sessionInfo.value, deleteIds);
+			return createSuccessResponse({ result }, sessionInfo.internalId);
+		} catch (error) {
+			const message = getErrorMessage(error);
+			console.error(`${LOG_PREFIXES.API} Failed to delete watchlists:`, message);
+			return createErrorResponse(
+				message || ERROR_MESSAGES.WATCHLIST_DELETE_FAILED,
+				HTTP_STATUS.INTERNAL_SERVER_ERROR,
+				true
+			);
+		}
+	} catch (error) {
+		const message = getErrorMessage(error);
+		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }
