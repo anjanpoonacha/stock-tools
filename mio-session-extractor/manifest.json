@@ -1,16 +1,19 @@
 {
 	"manifest_version": 3,
 	"name": "MIO Session Extractor",
-	"version": "1.0.0",
-	"description": "Automatically extract MarketInOut session cookies for your trading tools",
+	"version": "2.0.0",
+	"description": "Performance-optimized MarketInOut session extractor with adaptive polling and advanced caching",
 	"permissions": [
 		"cookies",
 		"activeTab",
-		"storage"
+		"storage",
+		"idle",
+		"tabs"
 	],
 	"host_permissions": [
 		"https://www.marketinout.com/*",
 		"http://localhost:3000/*",
+		"http://localhost:3001/*",
 		"https://*.vercel.app/*"
 	],
 	"content_scripts": [
@@ -26,11 +29,21 @@
 	],
 	"action": {
 		"default_popup": "popup.html",
-		"default_title": "MIO Session Extractor"
+		"default_title": "MIO Session Extractor (Performance Optimized)"
 	},
 	"background": {
 		"service_worker": "background.js"
 	},
+	"web_accessible_resources": [
+		{
+			"resources": [
+				"performance-worker.js"
+			],
+			"matches": [
+				"https://www.marketinout.com/*"
+			]
+		}
+	],
 	"icons": {
 		"16": "icons/icon16.svg",
 		"48": "icons/icon48.svg",

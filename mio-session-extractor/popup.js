@@ -1,8 +1,17 @@
-// MIO Session Extractor - Popup JavaScript
+// MIO Session Extractor - Popup JavaScript (Performance Optimized)
 // Handles popup UI interactions and communication with content script
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[MIO-EXTRACTOR] Popup loaded');
+    console.log('[MIO-EXTRACTOR] Performance-optimized popup loaded');
+
+    // Performance Configuration
+    const POPUP_CONFIG = {
+        AUTO_REFRESH_INTERVAL: 15000, // Reduced from 5s to 15s
+        APP_CONNECTION_CACHE_TTL: 30000, // Cache app connection status for 30s
+        SESSION_CACHE_TTL: 60000, // Cache session data for 60s
+        MAX_RETRIES: 2,
+        REQUEST_TIMEOUT: 3000, // 3 second timeout for requests
+    };
 
     // DOM elements
     const elements = {
@@ -20,9 +29,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         settingsLink: document.getElementById('settingsLink'),
     };
 
-    // State
+    // State with caching
     let currentTab = null;
     let sessionData = null;
+    let lastAppConnectionCheck = 0;
+    let appConnectionStatus = null;
+    let lastStatusUpdate = 0;
+    let autoRefreshTimer = null;
+    let isUpdating = false;
 
     /**
      * Update status display
@@ -176,33 +190,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Check app connection
+     * Check app connection with caching and timeout
      */
-    async function checkAppConnection() {
+    async function checkAppConnection(forceRefresh = false) {
+        const now = Date.now();
+
+        // Use cached result if available and not expired
+        if (
+            !forceRefresh &&
+            appConnectionStatus &&
+            now - lastAppConnectionCheck < POPUP_CONFIG.APP_CONNECTION_CACHE_TTL
+        ) {
+            updateStatus(elements.appStatus, appConnectionStatus.text, appConnectionStatus.type);
+            return;
+        }
+
         try {
             const appUrls = [
+                'http://localhost:3001',
                 'http://localhost:3000',
-                'https://your-app-domain.com', // Replace with actual domain
+                // 'https://your-app-domain.com', // Replace with actual domain
             ];
+
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), POPUP_CONFIG.REQUEST_TIMEOUT);
 
             for (const url of appUrls) {
                 try {
                     const response = await fetch(`${url}/api/extension/ping`, {
                         method: 'GET',
                         mode: 'cors',
+                        signal: controller.signal,
                     });
 
+                    clearTimeout(timeoutId);
+
                     if (response.ok) {
+                        appConnectionStatus = { text: 'Connected', type: 'success' };
+                        lastAppConnectionCheck = now;
                         updateStatus(elements.appStatus, 'Connected', 'success');
                         return;
                     }
                 } catch (e) {
+                    if (e.name === 'AbortError') {
+                        console.log('[MIO-EXTRACTOR] App connection check timed out for:', url);
+                    }
                     // Continue to next URL
                 }
             }
 
+            clearTimeout(timeoutId);
+            appConnectionStatus = { text: 'Disconnected', type: 'warning' };
+            lastAppConnectionCheck = now;
             updateStatus(elements.appStatus, 'Disconnected', 'warning');
         } catch (error) {
+            console.error('[MIO-EXTRACTOR] Error checking app connection:', error);
+            appConnectionStatus = { text: 'Error', type: 'error' };
+            lastAppConnectionCheck = now;
             updateStatus(elements.appStatus, 'Error', 'error');
         }
     }
@@ -314,11 +358,85 @@ For more help, check the extension documentation.
         showSettings();
     });
 
-    // Initialize popup
-    await getStatus();
+    /**
+     * Optimized status update with throttling
+     */
+    async function updateStatusOptimized(forceRefresh = false) {
+        const now = Date.now();
 
-    // Auto-refresh status every 5 seconds
-    setInterval(getStatus, 5000);
+        // Prevent concurrent updates
+        if (isUpdating && !forceRefresh) {
+            console.log('[MIO-EXTRACTOR] Status update already in progress, skipping');
+            return;
+        }
 
-    console.log('[MIO-EXTRACTOR] Popup initialized');
+        // Throttle updates (minimum interval between updates)
+        if (!forceRefresh && now - lastStatusUpdate < 5000) {
+            console.log('[MIO-EXTRACTOR] Status update throttled');
+            return;
+        }
+
+        isUpdating = true;
+        lastStatusUpdate = now;
+
+        try {
+            await getStatus();
+        } catch (error) {
+            console.error('[MIO-EXTRACTOR] Error in optimized status update:', error);
+        } finally {
+            isUpdating = false;
+        }
+    }
+
+    /**
+     * Start adaptive auto-refresh with performance monitoring
+     */
+    function startAdaptiveRefresh() {
+        // Clear any existing timer
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+        }
+
+        // Set up adaptive refresh interval
+        autoRefreshTimer = setInterval(() => {
+            updateStatusOptimized(false);
+        }, POPUP_CONFIG.AUTO_REFRESH_INTERVAL);
+
+        console.log(
+            '[MIO-EXTRACTOR] Adaptive refresh started with',
+            POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000,
+            'second interval'
+        );
+    }
+
+    /**
+     * Cleanup function for popup
+     */
+    function cleanup() {
+        if (autoRefreshTimer) {
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = null;
+        }
+        console.log('[MIO-EXTRACTOR] Popup cleanup completed');
+    }
+
+    // Initialize popup with performance optimizations
+    console.log('[MIO-EXTRACTOR] Initializing performance-optimized popup...');
+
+    // Initial status check
+    await updateStatusOptimized(true);
+
+    // Start adaptive refresh
+    startAdaptiveRefresh();
+
+    // Cleanup on popup close
+    window.addEventListener('beforeunload', cleanup);
+    window.addEventListener('unload', cleanup);
+
+    console.log('[MIO-EXTRACTOR] Performance-optimized popup initialized successfully');
+    console.log('[MIO-EXTRACTOR] Configuration:', {
+        autoRefreshInterval: POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000 + 's',
+        appConnectionCacheTTL: POPUP_CONFIG.APP_CONNECTION_CACHE_TTL / 1000 + 's',
+        requestTimeout: POPUP_CONFIG.REQUEST_TIMEOUT / 1000 + 's',
+    });
 });
