@@ -1,17 +1,17 @@
 'use client';
 import React, { useState } from 'react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/toast';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
-import { useSessionId } from '@/lib/useSessionId';
+import { useSessionBridge } from '@/lib/useSessionBridge';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { SessionStatus } from '@/components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 const MioSyncPage: React.FC = () => {
@@ -24,7 +24,7 @@ const MioSyncPage: React.FC = () => {
     >([]);
     const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
     const [mioWatchlistsError, setMioWatchlistsError] = useState<Error | string | null>(null);
-    const [sessionId, setSessionId] = useSessionId('tradingview');
+    const [sessionId, sessionLoading, sessionError] = useSessionBridge('tradingview');
     const [symbols, setSymbols] = useState('');
     const regroupOptions: { value: RegroupOption; label: string }[] = [
         { value: 'Industry', label: 'Industry' },
@@ -391,44 +391,48 @@ const MioSyncPage: React.FC = () => {
     };
 
     return (
-        <div>
-            <div className='max-w-md mx-auto mt-8 mb-4'>
-                <UsageGuide
-                    title='How to sync TradingView watchlists to MIO'
-                    steps={[
-                        'Install the browser extension and visit marketinout.com to capture session',
-                        'Enter your TradingView sessionid',
-                        'Select a TradingView watchlist as the source',
-                        'Choose a MIO watchlist as the destination',
-                        "Select grouping option and click 'Sync to MarketInOut'",
-                    ]}
-                    tips={[
-                        'MIO session is handled automatically by the server',
-                        'Symbols are automatically converted from TradingView to MIO format',
-                        'Save combinations for quick reuse of common sync operations',
-                        'Grouping organizes symbols by sector/industry in MIO',
-                    ]}
-                />
-            </div>
-            <form onSubmit={handleSubmit} className='space-y-8 max-w-md mx-auto mt-16 p-6 rounded-lg shadow-md'>
-                <div className='space-y-2'>
-                    <Label htmlFor='sessionId'>TradingView sessionid</Label>
-                    <Input
-                        id='sessionId'
-                        value={sessionId}
-                        onChange={(e) => setSessionId(e.target.value)}
-                        required
-                        className='w-full'
-                    />
-                </div>
-                <div className='space-y-2'>
-                    <Label htmlFor='wlid'>TradingView Watchlist</Label>
+        <div className='max-w-xl mx-auto py-8'>
+            <h1 className='text-2xl font-bold mb-4'>MIO Sync</h1>
+
+            <UsageGuide
+                title='How to sync TradingView watchlists to MIO'
+                steps={[
+                    'Install the browser extension from the extension folder',
+                    'Visit marketinout.com and log in to capture your MIO session',
+                    'Visit TradingView and log in to automatically capture your session',
+                    'Return to this page and select a TradingView watchlist as the source',
+                    'Choose a MIO watchlist as the destination',
+                    "Select grouping option and click 'Sync to MarketInOut'",
+                ]}
+                tips={[
+                    'Both MIO and TradingView sessions are handled automatically',
+                    'Symbols are automatically converted from TradingView to MIO format',
+                    'Save combinations for quick reuse of common sync operations',
+                    'Grouping organizes symbols by sector/industry in MIO',
+                    'If you get session errors, just visit the respective websites again',
+                ]}
+                className='mb-6'
+            />
+
+            <SessionStatus
+                platform='TradingView'
+                sessionId={sessionId}
+                loading={sessionLoading}
+                error={sessionError}
+                className='mb-6'
+            />
+
+            <form onSubmit={handleSubmit} className='space-y-6'>
+                <div>
+                    <Label htmlFor='wlid' className='text-sm font-medium'>
+                        TradingView Watchlist
+                    </Label>
                     <Select
                         value={tvWlid}
                         onValueChange={setTvWlid}
                         disabled={!sessionId || loading || watchlists.length === 0}
                     >
-                        <SelectTrigger id='wlid' className='w-full'>
+                        <SelectTrigger id='wlid' className='w-full mt-2'>
                             <SelectValue placeholder='Select a TradingView watchlist' />
                         </SelectTrigger>
                         <SelectContent>
@@ -440,15 +444,24 @@ const MioSyncPage: React.FC = () => {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className='space-y-2'>
-                    <Label htmlFor='mio-wlid'>MIO Watchlist</Label>
-                    <div className='flex items-center gap-2'>
+
+                <div>
+                    <Label htmlFor='mio-wlid' className='text-sm font-medium'>
+                        MIO Watchlist
+                    </Label>
+                    <div className='mt-2'>
                         {mioWatchlistsLoading ? (
-                            <div className='text-sm text-gray-500'>Loading MIO watchlists...</div>
+                            <div className='flex items-center justify-center py-4'>
+                                <div className='text-sm text-gray-500'>Loading MIO watchlists...</div>
+                            </div>
                         ) : mioWatchlistsError ? (
-                            <ErrorDisplay error={mioWatchlistsError} />
+                            <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
+                                <ErrorDisplay error={mioWatchlistsError} />
+                            </div>
                         ) : mioWatchlists.length === 0 ? (
-                            <div className='text-sm text-gray-500'>No MIO watchlists found.</div>
+                            <div className='flex items-center justify-center py-4'>
+                                <div className='text-sm text-gray-500'>No MIO watchlists found.</div>
+                            </div>
                         ) : (
                             <Select value={mioWlid} onValueChange={setMioWlid} disabled={mioWatchlists.length === 0}>
                                 <SelectTrigger id='mio-wlid' className='w-full'>
@@ -465,11 +478,14 @@ const MioSyncPage: React.FC = () => {
                         )}
                     </div>
                 </div>
-                <div className='space-y-2'>
-                    <Label htmlFor='groupBy'>Group by</Label>
+
+                <div>
+                    <Label htmlFor='groupBy' className='text-sm font-medium'>
+                        Group by
+                    </Label>
                     <Select value={groupBy} onValueChange={(v) => setGroupBy(v as RegroupOption)}>
-                        <SelectTrigger id='groupBy' className='w-full'>
-                            <SelectValue placeholder='Group by' />
+                        <SelectTrigger id='groupBy' className='w-full mt-2'>
+                            <SelectValue placeholder='Select grouping option' />
                         </SelectTrigger>
                         <SelectContent>
                             {regroupOptions.map((opt) => (
@@ -480,122 +496,89 @@ const MioSyncPage: React.FC = () => {
                         </SelectContent>
                     </Select>
                 </div>
-                <div className='space-y-2'>
+
+                <div>
                     <EditorWithClipboard
                         id='symbols-editor'
                         label='Stock Symbols (MIO format)'
                         value={regroupTVWatchlist(symbols, groupBy)}
                         onChange={setSymbols}
                         placeholder='Paste or type symbols here...'
-                        className='w-full font-mono text-sm p-2 border rounded'
+                        className='w-full font-mono text-sm'
                     />
                 </div>
+
                 <Button type='submit' disabled={loading || !symbols || !sessionId || !mioWlid} className='w-full'>
                     {loading ? 'Syncing...' : 'Sync to MarketInOut'}
                 </Button>
+                <Button
+                    type='button'
+                    variant='outline'
+                    className='w-full'
+                    onClick={() => {
+                        if (!tvWlid || !mioWlid || !groupBy) {
+                            showToast('Please select all combination options before saving.', 'error');
+                            return;
+                        }
+                        const combo = { tvWlid, mioWlid, groupBy };
+                        // Prevent duplicates
+                        const updated = [
+                            ...savedCombinations.filter(
+                                (c) =>
+                                    !(
+                                        c.tvWlid === combo.tvWlid &&
+                                        c.mioWlid === combo.mioWlid &&
+                                        c.groupBy === combo.groupBy
+                                    )
+                            ),
+                            combo,
+                        ];
+                        setSavedCombinations(updated);
+                        localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
+                        showToast('Combination saved locally.', 'success');
+                    }}
+                >
+                    Save Combination
+                </Button>
+
                 {savedCombinations.length > 0 && (
-                    <div className='flex flex-wrap gap-2 mb-4'>
-                        {savedCombinations.map((combo, idx) => {
-                            const tvName = watchlists.find((w) => w.id === combo.tvWlid)?.name || combo.tvWlid;
-                            const mioName = mioWatchlists.find((w) => w.id === combo.mioWlid)?.name || combo.mioWlid;
-                            return (
-                                <span key={idx} className='flex items-center'>
-                                    <Badge className='m-1 border-foreground/10 text-foreground bg-card hover:bg-card/80 flex flex-row items-start gap-1 px-2 py-1 rounded-md transition min-w-[0]'>
-                                        <div
-                                            className='cursor-pointer w-full break-words'
-                                            onClick={() => {
-                                                setTvWlid(combo.tvWlid);
-                                                setMioWlid(combo.mioWlid);
-                                                setGroupBy(combo.groupBy);
-                                                showToast('Combination applied.', 'success');
+                    <div>
+                        <Label className='text-sm font-medium'>Saved Combinations</Label>
+                        <div className='flex flex-wrap gap-2 mt-2'>
+                            {savedCombinations.map((combo, idx) => {
+                                const tvName = watchlists.find((w) => w.id === combo.tvWlid)?.name || combo.tvWlid;
+                                const mioName =
+                                    mioWatchlists.find((w) => w.id === combo.mioWlid)?.name || combo.mioWlid;
+                                return (
+                                    <Badge
+                                        key={idx}
+                                        className='cursor-pointer hover:bg-gray-100 flex items-center gap-2 px-3 py-1'
+                                        onClick={() => {
+                                            setTvWlid(combo.tvWlid);
+                                            setMioWlid(combo.mioWlid);
+                                            setGroupBy(combo.groupBy);
+                                            showToast('Combination applied.', 'success');
+                                        }}
+                                    >
+                                        <span className='text-xs'>
+                                            {tvName} → {mioName} ({combo.groupBy})
+                                        </span>
+                                        <XCircle
+                                            className='h-3 w-3 cursor-pointer hover:text-red-500'
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                const updated = savedCombinations.filter((_, i) => i !== idx);
+                                                setSavedCombinations(updated);
+                                                localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
+                                                showToast('Combination deleted.', 'success');
                                             }}
-                                            tabIndex={0}
-                                            role='button'
-                                            aria-label='Apply combination'
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' || e.key === ' ') {
-                                                    setTvWlid(combo.tvWlid);
-                                                    setMioWlid(combo.mioWlid);
-                                                    setGroupBy(combo.groupBy);
-                                                    showToast('Combination applied.', 'success');
-                                                }
-                                            }}
-                                        >
-                                            {tvName} / {mioName} / {combo.groupBy}
-                                        </div>
-                                        <div className='flex w-full'>
-                                            <XCircle
-                                                className='h-4 w-4 cursor-pointer text-muted-foreground hover:text-destructive'
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const updated = savedCombinations.filter((_, i) => i !== idx);
-                                                    setSavedCombinations(updated);
-                                                    localStorage.setItem(
-                                                        'mioSyncCombinations',
-                                                        JSON.stringify(updated)
-                                                    );
-                                                    showToast('Combination deleted.', 'success');
-                                                }}
-                                                tabIndex={0}
-                                                role='button'
-                                                aria-label='Delete combination'
-                                                onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
-                                                        e.stopPropagation();
-                                                        const updated = savedCombinations.filter((_, i) => i !== idx);
-                                                        setSavedCombinations(updated);
-                                                        localStorage.setItem(
-                                                            'mioSyncCombinations',
-                                                            JSON.stringify(updated)
-                                                        );
-                                                        showToast('Combination deleted.', 'success');
-                                                    }
-                                                }}
-                                            />
-                                        </div>
+                                        />
                                     </Badge>
-                                </span>
-                            );
-                        })}
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
-                <div className='flex gap-2 mt-2'>
-                    <Button
-                        type='button'
-                        variant='secondary'
-                        className='flex-1'
-                        onClick={() => {
-                            if (!tvWlid || !mioWlid || !groupBy) {
-                                showToast('Please select all combination options before saving.', 'error');
-                                return;
-                            }
-                            const combo = { tvWlid, mioWlid, groupBy };
-                            // Prevent duplicates
-                            const updated = [
-                                ...savedCombinations.filter(
-                                    (c) =>
-                                        !(
-                                            c.tvWlid === combo.tvWlid &&
-                                            c.mioWlid === combo.mioWlid &&
-                                            c.groupBy === combo.groupBy
-                                        )
-                                ),
-                                combo,
-                            ];
-                            setSavedCombinations(updated);
-                            localStorage.setItem('mioSyncCombinations', JSON.stringify(updated));
-                            showToast('Combination saved locally.', 'success');
-                        }}
-                    >
-                        Save Combination
-                    </Button>
-                </div>
-                {/* {response && (
-				<div className='mt-8'>
-					<Label>Result</Label>
-					<div className='p-4 border rounded bg-gray-50'>{response}</div>
-				</div>
-			)} */}
             </form>
         </div>
     );

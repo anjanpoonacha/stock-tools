@@ -5,8 +5,9 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 
 export type PlatformSessionData = {
 	sessionId: string;
+	userEmail?: string; // User email for session scoping
 	// Add more fields as needed per platform
-	[key: string]: string;
+	[key: string]: string | undefined;
 };
 
 export type SessionData = {
@@ -104,40 +105,26 @@ export function updatePlatformSession(internalId: string, platform: string, upda
 }
 
 /**
- * Find existing sessions for a platform that match the given session data
- * Used for deduplication to avoid storing multiple sessions with the same credentials
- */
-export function findDuplicateSessions(platform: string, sessionData: PlatformSessionData): string[] {
-	const sessions = loadSessions();
-	const duplicateIds: string[] = [];
-
-	for (const [internalId, sessionEntry] of Object.entries(sessions)) {
-		const platformData = sessionEntry[platform];
-		if (platformData && platformData.sessionId === sessionData.sessionId) {
-			// Check if the main session identifier matches
-			duplicateIds.push(internalId);
-		}
-	}
-
-	return duplicateIds;
-}
-
-/**
  * Clean up duplicate sessions for a platform, keeping only the most recent one
  * Returns the internal session ID that was kept (most recent)
+ * Now considers user email for proper scoping
  */
 export function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): string {
 	const sessions = loadSessions();
 	const duplicates: Array<{ id: string; extractedAt: string }> = [];
 
-	// Find all sessions with the same session data
+	// Find all sessions with the same session data and user email
 	for (const [internalId, sessionEntry] of Object.entries(sessions)) {
 		const platformData = sessionEntry[platform];
 		if (platformData && platformData.sessionId === sessionData.sessionId) {
-			duplicates.push({
-				id: internalId,
-				extractedAt: platformData.extractedAt || '1970-01-01T00:00:00.000Z'
-			});
+			// Check if user email matches (both must be defined or both undefined for a match)
+			const emailsMatch = platformData.userEmail === sessionData.userEmail;
+			if (emailsMatch) {
+				duplicates.push({
+					id: internalId,
+					extractedAt: platformData.extractedAt || '1970-01-01T00:00:00.000Z'
+				});
+			}
 		}
 	}
 
@@ -155,7 +142,8 @@ export function cleanupDuplicateSessions(platform: string, sessionData: Platform
 	// Delete all other duplicate sessions
 	const toDelete = duplicates.filter(d => d.id !== keepId);
 
-	console.log(`[SessionStore] Cleaning up ${toDelete.length} duplicate ${platform} sessions, keeping: ${keepId}`);
+	const userEmailInfo = sessionData.userEmail ? ` for user ${sessionData.userEmail}` : ' (no user email)';
+	console.log(`[SessionStore] Cleaning up ${toDelete.length} duplicate ${platform} sessions${userEmailInfo}, keeping: ${keepId}`);
 
 	for (const duplicate of toDelete) {
 		delete sessions[duplicate.id];

@@ -8,7 +8,6 @@ import { useState, useEffect } from 'react';
  * Checks localStorage first, then falls back to server API (for extension-bridged sessions with httpOnly cookies).
  */
 export function getInternalSessionId(): string {
-	debugger;
 	if (typeof window === 'undefined') return '';
 
 	// First check localStorage (manual bridge method)

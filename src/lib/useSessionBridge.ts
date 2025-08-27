@@ -1,57 +1,69 @@
 // src/lib/useSessionBridge.ts
-
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 /**
- * Hook to bridge an external session ID (e.g., MIO ASPSESSIONID) to the backend.
- * On success, the backend sets the myAppToken cookie.
- * The returned internalSessionId is stored in localStorage under 'marketinout_internalSessionId'.
- * This is distinct from the external session ID ('marketinout_sessionid').
+ * Hook to get session data from the browser extension via API
+ * This replaces the old localStorage-based approach with server-side session resolution
  */
-export function useSessionBridge() {
-	const [loading, setLoading] = useState(false);
+type Platform = 'tradingview' | 'marketinout';
+
+interface SessionResponse {
+	platform: string;
+	hasSession: boolean;
+	sessionAvailable: boolean;
+	sessionId?: string | null;
+	currentSessionId?: string | null;
+	message: string;
+}
+
+export function useSessionBridge(platform: Platform): [string | null, boolean, string | null] {
+	const [sessionId, setSessionId] = useState<string | null>(null);
+	const [loading, setLoading] = useState<boolean>(true);
 	const [error, setError] = useState<string | null>(null);
-	const [success, setSuccess] = useState(false);
 
-	/**
-	 * Bridge an external session ID to an internal session ID.
-	 * Optionally, provide onBridged callback to receive the new internalSessionId immediately.
-	 */
-	async function bridgeSession(
-		sessionKey: string,
-		sessionValue: string,
-		onBridged?: (internalSessionId: string) => void
-	) {
-		setLoading(true);
-		setError(null);
-		setSuccess(false);
-		try {
-			const res = await fetch('/api/auth/session-bridge', {
-				method: 'POST',
-				credentials: 'include',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ sessionKey, sessionValue }),
-			});
-			if (!res.ok) {
-				const data = await res.json();
-				setError(data.error || 'Failed to bridge session');
-			} else {
-				const data = await res.json();
-				if (data.internalSessionId) {
-					localStorage.setItem('marketinout_internalSessionId', data.internalSessionId);
-					if (onBridged) onBridged(data.internalSessionId);
+	useEffect(() => {
+		let isMounted = true;
+
+		async function fetchSessionData() {
+			try {
+				setLoading(true);
+				setError(null);
+
+				const response = await fetch(`/api/session/current?platform=${platform}`);
+
+				if (!response.ok) {
+					throw new Error(`Failed to fetch session: ${response.status}`);
 				}
-				setSuccess(true);
-			}
-		} catch (e: unknown) {
-			const message = e instanceof Error ? e.message : String(e);
-			setError(message || 'Unknown error');
-		} finally {
-			setLoading(false);
-		}
-	}
 
-	return { bridgeSession, loading, error, success };
+				const data: SessionResponse = await response.json();
+
+				if (isMounted) {
+					if (data.hasSession && data.sessionId) {
+						setSessionId(data.sessionId);
+					} else {
+						setSessionId(null);
+					}
+				}
+			} catch (err) {
+				if (isMounted) {
+					const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+					setError(errorMessage);
+					setSessionId(null);
+				}
+			} finally {
+				if (isMounted) {
+					setLoading(false);
+				}
+			}
+		}
+
+		fetchSessionData();
+
+		// Cleanup function
+		return () => {
+			isMounted = false;
+		};
+	}, [platform]);
+
+	return [sessionId, loading, error];
 }

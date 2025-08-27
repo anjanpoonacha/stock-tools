@@ -152,7 +152,7 @@ async function validateTradingViewSession(sessionKey: string, sessionValue: stri
 				console.log('[EXTENSION-API] TradingView session validation successful - user data received');
 				return { valid: true };
 			}
-		} catch (jsonError) {
+		} catch {
 			// If JSON parsing fails, check response text
 			const text = await response.text();
 			if (text.includes('login') || text.includes('signin')) {
@@ -265,7 +265,9 @@ export async function POST(req: NextRequest) {
 			extractedAt: extractedAt || new Date().toISOString(),
 			extractedFrom: url || 'browser-extension',
 			source: 'extension',
-			platform
+			platform,
+			// User email from extension settings (if provided)
+			userEmail: body.userEmail || undefined
 		};
 
 		// Platform-specific session data validation

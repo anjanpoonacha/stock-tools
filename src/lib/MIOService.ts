@@ -7,7 +7,7 @@ import {
 	ErrorLogger
 } from './sessionErrors';
 import { SessionHealthMonitor } from './sessionHealthMonitor';
-import { getHealthAwareSessionData, refreshSessionWithHealthCheck } from './sessionValidation';
+import { getHealthAwareSessionData } from './sessionValidation';
 
 // src/lib/MIOService.ts
 
@@ -29,7 +29,7 @@ export class MIOService {
 		try {
 			// Use health-aware session data retrieval
 			const healthAwareResult = getHealthAwareSessionData(internalSessionId);
-			
+
 			if (!healthAwareResult.sessionExists) {
 				console.warn(`[MIOService] No valid session found for ID: ${internalSessionId}`, {
 					overallStatus: healthAwareResult.overallStatus,
@@ -37,28 +37,28 @@ export class MIOService {
 				});
 				return undefined;
 			}
-			
+
 			// Get the actual session data from session store
 			const session = getPlatformSession(internalSessionId, 'marketinout');
 			if (!session) {
 				console.warn(`[MIOService] No MarketInOut session found for ID: ${internalSessionId}`);
 				return undefined;
 			}
-			
+
 			// Use CookieParser to extract ASPSESSION cookies
-			const aspSessions = CookieParser.extractASPSESSION(session);
+			const aspSessions = session.session ? CookieParser.extractASPSESSION(session.session) : {};
 			const primaryASPSession = CookieParser.getPrimaryASPSESSION(aspSessions);
-			
+
 			if (primaryASPSession) {
 				return primaryASPSession;
 			}
-			
+
 			// Fallback to any key that is not 'sessionId'
 			const key = Object.keys(session).find((k) => k !== 'sessionId');
 			if (key && session[key]) {
 				return { key, value: session[key] };
 			}
-			
+
 			console.warn(`[MIOService] No valid session cookies found for ID: ${internalSessionId}`);
 			return undefined;
 		} catch (error) {
@@ -88,14 +88,14 @@ export class MIOService {
 
 			// Use CookieParser for robust parsing
 			const parseResult = CookieParser.parseSetCookieHeader(setCookieHeaders);
-			
+
 			if (parseResult.errors.length > 0) {
 				console.warn('[MIOService] Cookie parsing errors:', parseResult.errors);
 			}
 
 			// Extract all ASPSESSION cookies
 			const aspSessionCookies = CookieParser.extractASPSESSION(parseResult.aspSessionCookies);
-			
+
 			if (Object.keys(aspSessionCookies).length > 0) {
 				console.log(`[MIOService] Extracted ${Object.keys(aspSessionCookies).length} ASPSESSION cookies:`, Object.keys(aspSessionCookies));
 				return aspSessionCookies;
@@ -158,7 +158,7 @@ export class MIOService {
 
 			// Check if we get a successful response or redirect (both indicate valid session)
 			const isHealthy = res.ok || res.status === 302;
-			
+
 			if (!isHealthy) {
 				const error = ErrorHandler.parseError(
 					`Session health check failed with status ${res.status}`,
@@ -169,7 +169,7 @@ export class MIOService {
 				);
 				ErrorLogger.logError(error);
 			}
-			
+
 			return isHealthy;
 		} catch (error) {
 			const sessionError = ErrorHandler.createNetworkError(
@@ -191,26 +191,39 @@ export class MIOService {
 	 */
 	static async refreshSession(internalSessionId: string): Promise<boolean> {
 		try {
-			console.log(`[MIOService] Refreshing session for ${internalSessionId} with health integration`);
-			
-			// Use health-integrated session refresh
-			const refreshResult = await refreshSessionWithHealthCheck(internalSessionId, 'marketinout');
-			
-			if (refreshResult.refreshSuccess) {
-				console.log('[MIOService] Session refreshed successfully with health integration:', {
-					healthStatus: refreshResult.healthStatus,
-					monitoringActive: refreshResult.monitoringActive
-				});
-				return true;
-			} else {
-				console.log('[MIOService] Session refresh failed:', {
-					error: refreshResult.error?.message,
-					healthStatus: refreshResult.healthStatus
-				});
+			console.log(`[MIOService] Refreshing session for ${internalSessionId}`);
+
+			const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+			if (!sessionKeyValue) {
+				console.warn(`[MIOService] No valid session to refresh for ID: ${internalSessionId}`);
 				return false;
 			}
+
+			// Directly perform the refresh logic without circular dependency
+			const res = await fetch('https://www.marketinout.com/wl/watch_list.php?mode=list', {
+				method: 'HEAD',
+				headers: {
+					Cookie: `${sessionKeyValue.key}=${sessionKeyValue.value}`,
+				},
+			});
+
+			const isRefreshed = res.ok || res.status === 302;
+			if (isRefreshed) {
+				console.log(`[MIOService] Session refreshed successfully for ID: ${internalSessionId}`);
+			} else {
+				console.warn(`[MIOService] Session refresh failed for ID: ${internalSessionId} with status: ${res.status}`);
+			}
+
+			return isRefreshed;
 		} catch (error) {
-			console.error('[MIOService] Session refresh failed:', error);
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'refreshSession',
+				undefined,
+				undefined
+			);
+			ErrorLogger.logError(sessionError);
 			return false;
 		}
 	}
@@ -273,7 +286,7 @@ export class MIOService {
 			}
 
 			const html = await res.text();
-			
+
 			// Check if we got a login page instead of watchlist page (indicates session expired)
 			if (html.includes('login') || html.includes('signin') || html.includes('password')) {
 				if (retryCount === 0) {
@@ -315,7 +328,7 @@ export class MIOService {
 			if (error instanceof SessionError) {
 				throw error;
 			}
-			
+
 			// Otherwise, parse and wrap the error
 			const sessionError = ErrorHandler.parseError(
 				error,
@@ -340,7 +353,7 @@ export class MIOService {
 	}: AddWatchlistWithSessionParams, retryCount = 0): Promise<string> {
 		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
-		
+
 		try {
 			const result = await MIOService.addWatchlist({
 				sessionKey: sessionKeyValue.key,
@@ -348,7 +361,7 @@ export class MIOService {
 				mioWlid,
 				symbols,
 			});
-			
+
 			// Update health monitor with successful operation by performing a health check
 			const monitor = SessionHealthMonitor.getInstance();
 			try {
@@ -356,13 +369,13 @@ export class MIOService {
 			} catch (error) {
 				console.warn('[MIOService] Failed to update health status after successful operation:', error);
 			}
-			
+
 			return result;
 		} catch (error) {
 			// Health status will be updated automatically during next scheduled check
 			// or when validation is called again
 			console.warn('[MIOService] Operation failed, health status will be updated on next check');
-			
+
 			// Check if it's an authentication error and we haven't retried yet
 			if (retryCount === 0 && error instanceof Error &&
 				(error.message.includes('credentials') || error.message.includes('Failed to sync'))) {
@@ -414,12 +427,12 @@ export class MIOService {
 		if (!res.ok) {
 			throw new Error(`Failed to sync. Status: ${res.status}. Please check your credentials.`);
 		}
-		
+
 		// Check if response indicates session expired
 		if (text.includes('login') || text.includes('signin') || text.includes('password')) {
 			throw new Error('Session expired. Please re-authenticate with MIO.');
 		}
-		
+
 		return text;
 	}
 
@@ -443,7 +456,7 @@ export class MIOService {
 					Cookie: `${sessionKey}=${sessionValue}`,
 				},
 			});
-			
+
 			const text = await res.text();
 			if (!res.ok) {
 				const error = ErrorHandler.parseError(
@@ -474,7 +487,7 @@ export class MIOService {
 			if (error instanceof SessionError) {
 				throw error;
 			}
-			
+
 			// Otherwise, parse and wrap the error
 			const sessionError = ErrorHandler.parseError(
 				error,
@@ -515,7 +528,7 @@ export class MIOService {
 	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[], retryCount = 0): Promise<string> {
 		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
-		
+
 		try {
 			return await MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 		} catch (error) {
