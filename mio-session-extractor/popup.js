@@ -1,8 +1,15 @@
-// MIO Session Extractor - Popup JavaScript (Performance Optimized)
-// Handles popup UI interactions and communication with content script
+// Multi-Platform Session Extractor - Popup JavaScript (Performance Optimized)
+// Handles popup UI interactions and communication with content script for MarketInOut and TradingView
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[MIO-EXTRACTOR] Performance-optimized popup loaded');
+    console.log('[MULTI-EXTRACTOR] Performance-optimized multi-platform popup loaded');
+
+    // Platform Detection
+    const PLATFORMS = {
+        MARKETINOUT: 'marketinout',
+        TRADINGVIEW: 'tradingview',
+        UNKNOWN: 'unknown',
+    };
 
     // Performance Configuration
     const POPUP_CONFIG = {
@@ -83,54 +90,102 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Check if current tab is MarketInOut
+     * Get stored session from Chrome storage for specific platform
      */
-    function isMarketInOutTab(tab) {
-        return tab && tab.url && tab.url.includes('marketinout.com');
-    }
-
-    /**
-     * Get stored session from Chrome storage
-     */
-    async function getStoredSession() {
+    async function getStoredSession(platform = null) {
         try {
-            const result = await chrome.storage.local.get(['mioSession', 'lastUpdated']);
-            if (result.mioSession && result.lastUpdated) {
+            const storageKeys = ['mioSession', 'tvSession', 'lastUpdated'];
+            const result = await chrome.storage.local.get(storageKeys);
+
+            // Determine which session to use based on platform
+            let sessionData = null;
+            if (platform === PLATFORMS.TRADINGVIEW && result.tvSession) {
+                sessionData = result.tvSession;
+            } else if (platform === PLATFORMS.MARKETINOUT && result.mioSession) {
+                sessionData = result.mioSession;
+            } else {
+                // Fallback to any available session
+                sessionData = result.mioSession || result.tvSession;
+            }
+
+            if (sessionData && result.lastUpdated) {
                 // Check if session is recent (within last 30 minutes)
                 const sessionAge = Date.now() - result.lastUpdated;
                 const maxAge = 30 * 60 * 1000; // 30 minutes
 
                 if (sessionAge < maxAge) {
-                    console.log('[MIO-EXTRACTOR] Found stored session:', result.mioSession.sessionKey);
-                    return result.mioSession;
+                    console.log('[MULTI-EXTRACTOR] Found stored session for platform:', platform || 'any');
+                    return sessionData;
                 } else {
-                    console.log('[MIO-EXTRACTOR] Stored session is too old, ignoring');
+                    console.log('[MULTI-EXTRACTOR] Stored session is too old, ignoring');
                 }
             }
             return null;
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error reading stored session:', error);
+            console.error('[MULTI-EXTRACTOR] Error reading stored session:', error);
             return null;
         }
     }
 
     /**
-     * Get status from content script and storage
+     * Detect current platform from tab URL
+     */
+    function detectPlatform(tab) {
+        if (!tab || !tab.url) return PLATFORMS.UNKNOWN;
+
+        if (tab.url.includes('marketinout.com')) {
+            return PLATFORMS.MARKETINOUT;
+        } else if (tab.url.includes('tradingview.com')) {
+            return PLATFORMS.TRADINGVIEW;
+        }
+
+        return PLATFORMS.UNKNOWN;
+    }
+
+    /**
+     * Check if current tab is a supported platform
+     */
+    function isSupportedPlatform(tab) {
+        const platform = detectPlatform(tab);
+        return platform !== PLATFORMS.UNKNOWN;
+    }
+
+    /**
+     * Get platform display name
+     */
+    function getPlatformDisplayName(platform) {
+        switch (platform) {
+            case PLATFORMS.MARKETINOUT:
+                return 'MarketInOut';
+            case PLATFORMS.TRADINGVIEW:
+                return 'TradingView';
+            default:
+                return 'Unknown';
+        }
+    }
+
+    /**
+     * Multi-platform status retrieval
      */
     async function getStatus() {
         try {
             currentTab = await getCurrentTab();
+            const currentPlatform = detectPlatform(currentTab);
 
-            if (!isMarketInOutTab(currentTab)) {
-                updateStatus(elements.loginStatus, 'Not on MIO', 'error');
+            if (!isSupportedPlatform(currentTab)) {
+                const platformName = getPlatformDisplayName(currentPlatform);
+                updateStatus(elements.loginStatus, `Not on supported platform`, 'error');
                 updateStatus(elements.sessionStatus, 'N/A', 'error');
                 updateStatus(elements.appStatus, 'N/A', 'error');
                 elements.extractBtn.disabled = true;
                 return;
             }
 
-            // First, check stored session data
-            const storedSession = await getStoredSession();
+            const platformName = getPlatformDisplayName(currentPlatform);
+            console.log(`[MULTI-EXTRACTOR] Checking status for ${platformName}`);
+
+            // First, check stored session data for current platform
+            const storedSession = await getStoredSession(currentPlatform);
 
             // Send message to content script
             let response = null;
@@ -139,14 +194,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     action: 'getStatus',
                 });
             } catch (error) {
-                console.log('[MIO-EXTRACTOR] Could not reach content script:', error.message);
+                console.log(`[MULTI-EXTRACTOR] Could not reach ${platformName} content script:`, error.message);
             }
 
             if (response) {
-                // Update login status
+                // Update login status with platform info
                 updateStatus(
                     elements.loginStatus,
-                    response.isLoggedIn ? 'Logged In' : 'Not Logged In',
+                    response.isLoggedIn ? `${platformName}: Logged In` : `${platformName}: Not Logged In`,
                     response.isLoggedIn ? 'success' : 'error'
                 );
 
@@ -154,25 +209,25 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const sessionToUse = response.lastSession || storedSession;
                 if (sessionToUse) {
                     sessionData = sessionToUse;
-                    updateStatus(elements.sessionStatus, 'Available', 'success');
+                    updateStatus(elements.sessionStatus, `${platformName}: Available`, 'success');
                     updateSessionInfo(sessionData);
                 } else {
-                    updateStatus(elements.sessionStatus, 'None', 'warning');
+                    updateStatus(elements.sessionStatus, `${platformName}: None`, 'warning');
                     updateSessionInfo(null);
                 }
 
                 elements.extractBtn.disabled = !response.isLoggedIn;
             } else {
                 // Content script not responding, use stored data only
-                updateStatus(elements.loginStatus, 'Unknown', 'warning');
+                updateStatus(elements.loginStatus, `${platformName}: Unknown`, 'warning');
 
                 if (storedSession) {
                     sessionData = storedSession;
-                    updateStatus(elements.sessionStatus, 'Stored', 'success');
+                    updateStatus(elements.sessionStatus, `${platformName}: Stored`, 'success');
                     updateSessionInfo(sessionData);
                     elements.extractBtn.disabled = false;
                 } else {
-                    updateStatus(elements.sessionStatus, 'None', 'warning');
+                    updateStatus(elements.sessionStatus, `${platformName}: None`, 'warning');
                     updateSessionInfo(null);
                     elements.extractBtn.disabled = true;
                 }
@@ -181,7 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Check app connection by trying to reach it
             await checkAppConnection();
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error getting status:', error);
+            console.error('[MULTI-EXTRACTOR] Error getting status:', error);
             updateStatus(elements.loginStatus, 'Error', 'error');
             updateStatus(elements.sessionStatus, 'Error', 'error');
             updateStatus(elements.appStatus, 'Error', 'error');
@@ -252,15 +307,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /**
-     * Extract session manually
+     * Extract session manually for current platform
      */
     async function extractSession() {
         try {
             setLoading(true);
 
-            if (!currentTab || !isMarketInOutTab(currentTab)) {
-                throw new Error('Not on MarketInOut page');
+            if (!currentTab || !isSupportedPlatform(currentTab)) {
+                const platform = detectPlatform(currentTab);
+                const platformName = getPlatformDisplayName(platform);
+                throw new Error(`Not on supported platform (current: ${platformName})`);
             }
+
+            const currentPlatform = detectPlatform(currentTab);
+            const platformName = getPlatformDisplayName(currentPlatform);
 
             const response = await chrome.tabs.sendMessage(currentTab.id, {
                 action: 'extractSession',
@@ -268,7 +328,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             if (response && response.success) {
                 sessionData = response.sessionData;
-                updateStatus(elements.sessionStatus, 'Extracted', 'success');
+                updateStatus(elements.sessionStatus, `${platformName}: Extracted`, 'success');
                 updateSessionInfo(sessionData);
 
                 // Show success message briefly
@@ -281,10 +341,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     elements.extractBtn.style.background = '';
                 }, 2000);
             } else {
-                throw new Error('Extraction failed');
+                throw new Error(`${platformName} extraction failed`);
             }
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error extracting session:', error);
+            console.error('[MULTI-EXTRACTOR] Error extracting session:', error);
             updateStatus(elements.sessionStatus, 'Failed', 'error');
 
             // Show error message briefly
@@ -319,17 +379,23 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function showHelp() {
         const helpText = `
-MIO Session Extractor Help:
+Multi-Platform Session Extractor Help:
 
-1. Navigate to marketinout.com and log in
+Supported Platforms:
+• MarketInOut (marketinout.com)
+• TradingView (tradingview.com)
+
+How to use:
+1. Navigate to a supported platform and log in
 2. Click "Extract Session" to capture your session
 3. The extension will automatically send the session to your trading app
 4. Use "Open App" to launch your trading tools
 
 Troubleshooting:
-- Make sure you're logged into MarketInOut
-- Check that your trading app is running
-- Try refreshing the MarketInOut page if extraction fails
+- Make sure you're logged into the platform
+- Check that your trading app is running (localhost:3000 or localhost:3001)
+- Try refreshing the page if extraction fails
+- Ensure you're on a supported platform
 
 For more help, check the extension documentation.
         `;
@@ -338,12 +404,10 @@ For more help, check the extension documentation.
     }
 
     /**
-     * Show settings (placeholder)
+     * Show settings page
      */
     function showSettings() {
-        alert(
-            'Settings panel coming soon!\n\nFor now, you can configure the extension by editing the content-script.js file.'
-        );
+        chrome.runtime.openOptionsPage();
     }
 
     // Event listeners
@@ -366,13 +430,13 @@ For more help, check the extension documentation.
 
         // Prevent concurrent updates
         if (isUpdating && !forceRefresh) {
-            console.log('[MIO-EXTRACTOR] Status update already in progress, skipping');
+            console.log('[MULTI-EXTRACTOR] Status update already in progress, skipping');
             return;
         }
 
         // Throttle updates (minimum interval between updates)
         if (!forceRefresh && now - lastStatusUpdate < 5000) {
-            console.log('[MIO-EXTRACTOR] Status update throttled');
+            console.log('[MULTI-EXTRACTOR] Status update throttled');
             return;
         }
 
@@ -382,7 +446,7 @@ For more help, check the extension documentation.
         try {
             await getStatus();
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error in optimized status update:', error);
+            console.error('[MULTI-EXTRACTOR] Error in optimized status update:', error);
         } finally {
             isUpdating = false;
         }
@@ -403,7 +467,7 @@ For more help, check the extension documentation.
         }, POPUP_CONFIG.AUTO_REFRESH_INTERVAL);
 
         console.log(
-            '[MIO-EXTRACTOR] Adaptive refresh started with',
+            '[MULTI-EXTRACTOR] Adaptive refresh started with',
             POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000,
             'second interval'
         );
@@ -417,11 +481,11 @@ For more help, check the extension documentation.
             clearInterval(autoRefreshTimer);
             autoRefreshTimer = null;
         }
-        console.log('[MIO-EXTRACTOR] Popup cleanup completed');
+        console.log('[MULTI-EXTRACTOR] Popup cleanup completed');
     }
 
     // Initialize popup with performance optimizations
-    console.log('[MIO-EXTRACTOR] Initializing performance-optimized popup...');
+    console.log('[MULTI-EXTRACTOR] Initializing performance-optimized multi-platform popup...');
 
     // Initial status check
     await updateStatusOptimized(true);
@@ -433,10 +497,11 @@ For more help, check the extension documentation.
     window.addEventListener('beforeunload', cleanup);
     window.addEventListener('unload', cleanup);
 
-    console.log('[MIO-EXTRACTOR] Performance-optimized popup initialized successfully');
-    console.log('[MIO-EXTRACTOR] Configuration:', {
+    console.log('[MULTI-EXTRACTOR] Performance-optimized multi-platform popup initialized successfully');
+    console.log('[MULTI-EXTRACTOR] Configuration:', {
         autoRefreshInterval: POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000 + 's',
         appConnectionCacheTTL: POPUP_CONFIG.APP_CONNECTION_CACHE_TTL / 1000 + 's',
         requestTimeout: POPUP_CONFIG.REQUEST_TIMEOUT / 1000 + 's',
+        supportedPlatforms: Object.values(PLATFORMS).filter((p) => p !== PLATFORMS.UNKNOWN),
     });
 });

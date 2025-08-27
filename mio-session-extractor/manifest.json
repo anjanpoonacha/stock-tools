@@ -1,8 +1,8 @@
 {
 	"manifest_version": 3,
-	"name": "MIO Session Extractor",
-	"version": "2.0.0",
-	"description": "Performance-optimized MarketInOut session extractor with adaptive polling and advanced caching",
+	"name": "Multi-Platform Session Extractor",
+	"version": "2.1.0",
+	"description": "Performance-optimized session extractor for MarketInOut and TradingView with adaptive polling and advanced caching",
 	"permissions": [
 		"cookies",
 		"activeTab",
@@ -12,6 +12,7 @@
 	],
 	"host_permissions": [
 		"https://www.marketinout.com/*",
+		"https://www.tradingview.com/*",
 		"http://localhost:3000/*",
 		"http://localhost:3001/*",
 		"https://*.vercel.app/*"
@@ -19,7 +20,8 @@
 	"content_scripts": [
 		{
 			"matches": [
-				"https://www.marketinout.com/*"
+				"https://www.marketinout.com/*",
+				"https://www.tradingview.com/*"
 			],
 			"js": [
 				"content-script.js"
@@ -29,8 +31,9 @@
 	],
 	"action": {
 		"default_popup": "popup.html",
-		"default_title": "MIO Session Extractor (Performance Optimized)"
+		"default_title": "Multi-Platform Session Extractor"
 	},
+	"options_page": "settings.html",
 	"background": {
 		"service_worker": "background.js"
 	},
@@ -40,7 +43,8 @@
 				"performance-worker.js"
 			],
 			"matches": [
-				"https://www.marketinout.com/*"
+				"https://www.marketinout.com/*",
+				"https://www.tradingview.com/*"
 			]
 		}
 	],

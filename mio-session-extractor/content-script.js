@@ -1,10 +1,30 @@
-// MIO Session Extractor - Content Script (Performance Optimized)
-// This script runs on marketinout.com pages and extracts ASPSESSIONID cookies
+// Multi-Platform Session Extractor - Content Script (Performance Optimized)
+// This script runs on marketinout.com and tradingview.com pages and extracts session cookies
 
 (function () {
     'use strict';
 
-    console.log('[MIO-EXTRACTOR] Content script loaded on:', window.location.href);
+    console.log('[MULTI-EXTRACTOR] Content script loaded on:', window.location.href);
+
+    // Platform Detection
+    const PLATFORMS = {
+        MARKETINOUT: 'marketinout',
+        TRADINGVIEW: 'tradingview',
+    };
+
+    const currentPlatform = window.location.hostname.includes('marketinout.com')
+        ? PLATFORMS.MARKETINOUT
+        : window.location.hostname.includes('.tradingview.com') || window.location.hostname === 'tradingview.com'
+        ? PLATFORMS.TRADINGVIEW
+        : null;
+
+    console.log('[MULTI-EXTRACTOR] Detected platform:', currentPlatform);
+
+    // Exit early if platform is not supported
+    if (!currentPlatform) {
+        console.log('[MULTI-EXTRACTOR] Unsupported platform, exiting');
+        return;
+    }
 
     // Configuration - Performance Optimized
     const CONFIG = {
@@ -25,6 +45,28 @@
         MAX_RETRIES: 2, // Reduced retries
         SESSION_CACHE_TTL: 300000, // 5 minutes cache TTL
         VISIBILITY_CHECK_INTERVAL: 5000, // Check visibility every 5s
+
+        // Platform-specific session configurations
+        PLATFORMS: {
+            [PLATFORMS.MARKETINOUT]: {
+                sessionCookieName: 'ASPSESSIONID',
+                loginIndicators: {
+                    cookiePresent: 'ASPSESSIONID',
+                    urlExcludes: ['login', 'signin'],
+                    elementSelectors: ['[class*="watch"]', '[id*="watch"]'],
+                    loginFormSelector: 'input[type="password"]',
+                },
+            },
+            [PLATFORMS.TRADINGVIEW]: {
+                sessionCookieName: 'sessionid',
+                loginIndicators: {
+                    cookiePresent: 'sessionid',
+                    urlExcludes: ['signin', 'accounts'],
+                    elementSelectors: ['.tv-header__user-menu', '[data-name="header-user-menu"]'],
+                    loginFormSelector: 'input[name="password"]',
+                },
+            },
+        },
     };
 
     // State tracking - Memory optimized
@@ -40,27 +82,60 @@
     let abortController = null;
 
     /**
-     * Check if user is logged into MarketInOut
+     * Multi-platform login detection
      */
-    function isLoggedIn() {
-        // Check for ASPSESSIONID cookie presence
-        const hasSessionCookie = document.cookie.includes('ASPSESSIONID');
+    async function isLoggedIn() {
+        const platformConfig = CONFIG.PLATFORMS[currentPlatform];
+
+        // For TradingView, check session cookie using background script
+        let hasSessionCookie = false;
+        if (currentPlatform === PLATFORMS.TRADINGVIEW) {
+            try {
+                const cookie = await new Promise((resolve, reject) => {
+                    chrome.runtime.sendMessage(
+                        {
+                            action: 'getCookie',
+                            url: 'https://www.tradingview.com',
+                            name: 'sessionid',
+                        },
+                        (response) => {
+                            if (chrome.runtime.lastError) {
+                                reject(chrome.runtime.lastError);
+                            } else {
+                                resolve(response.cookie);
+                            }
+                        }
+                    );
+                });
+                hasSessionCookie = !!(cookie && cookie.value);
+            } catch (error) {
+                console.error('[MULTI-EXTRACTOR] Error checking TradingView session cookie:', error);
+                hasSessionCookie = false;
+            }
+        } else {
+            // For MarketInOut, use document.cookie
+            hasSessionCookie = document.cookie.includes(platformConfig.loginIndicators.cookiePresent);
+        }
 
         // Check URL is not a login page
-        const isNotLoginPage = !window.location.href.includes('login') && !window.location.href.includes('signin');
+        const isNotLoginPage = !platformConfig.loginIndicators.urlExcludes.some((exclude) =>
+            window.location.href.includes(exclude)
+        );
 
-        // Check for login form absence (additional validation)
-        const hasNoLoginForm =
-            !document.querySelector('input[type="password"]') ||
-            document.querySelector('[class*="watch"]') ||
-            document.querySelector('[id*="watch"]');
+        // Check for login form absence and platform-specific elements
+        const hasNoLoginForm = !document.querySelector(platformConfig.loginIndicators.loginFormSelector);
+        const hasLoggedInElements = platformConfig.loginIndicators.elementSelectors.some((selector) =>
+            document.querySelector(selector)
+        );
 
-        const loggedIn = hasSessionCookie && isNotLoginPage && hasNoLoginForm;
+        const loggedIn = hasSessionCookie && isNotLoginPage && (hasNoLoginForm || hasLoggedInElements);
 
-        console.log('[MIO-EXTRACTOR] Login status check:', {
+        console.log(`[MULTI-EXTRACTOR] ${currentPlatform.toUpperCase()} login status check:`, {
+            platform: currentPlatform,
             hasSessionCookie,
             isNotLoginPage,
             hasNoLoginForm,
+            hasLoggedInElements,
             loggedIn,
             url: window.location.href,
         });
@@ -69,29 +144,117 @@
     }
 
     /**
-     * Extract ASPSESSIONID cookie from document.cookie
+     * Multi-platform session extraction using Chrome Cookies API
      */
-    function extractASPSESSION() {
+    async function extractSessionData() {
+        try {
+            const platformConfig = CONFIG.PLATFORMS[currentPlatform];
+
+            // For TradingView, we need to use chrome.cookies API to access .tradingview.com domain cookies
+            if (currentPlatform === PLATFORMS.TRADINGVIEW) {
+                return await extractTradingViewSession(platformConfig);
+            } else {
+                // For MarketInOut, use document.cookie as it works fine
+                return extractMarketInOutSession(platformConfig);
+            }
+        } catch (error) {
+            console.error(`[MULTI-EXTRACTOR] Error extracting ${currentPlatform} session:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Extract TradingView session using background script message passing
+     */
+    async function extractTradingViewSession(platformConfig) {
+        try {
+            // Use background script to get sessionid from .tradingview.com domain
+            const cookie = await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage(
+                    {
+                        action: 'getCookie',
+                        url: 'https://www.tradingview.com',
+                        name: 'sessionid',
+                    },
+                    (response) => {
+                        if (chrome.runtime.lastError) {
+                            reject(chrome.runtime.lastError);
+                        } else {
+                            resolve(response.cookie);
+                        }
+                    }
+                );
+            });
+
+            if (cookie && cookie.value) {
+                const sessionData = {
+                    platform: currentPlatform,
+                    sessionKey: cookie.name,
+                    sessionValue: cookie.value,
+                    extractedAt: new Date().toISOString(),
+                    url: window.location.href,
+                    source: 'browser-extension',
+                    domain: cookie.domain,
+                };
+
+                console.log(
+                    `[MULTI-EXTRACTOR] ${currentPlatform.toUpperCase()} session extracted via background script:`,
+                    {
+                        platform: sessionData.platform,
+                        sessionKey: sessionData.sessionKey,
+                        sessionValueLength: sessionData.sessionValue.length,
+                        domain: sessionData.domain,
+                        extractedAt: sessionData.extractedAt,
+                    }
+                );
+
+                return sessionData;
+            } else {
+                console.log(
+                    `[MULTI-EXTRACTOR] No ${platformConfig.sessionCookieName} cookie found for ${currentPlatform} via background script`
+                );
+                return null;
+            }
+        } catch (error) {
+            console.error(`[MULTI-EXTRACTOR] Error extracting TradingView session via background script:`, error);
+            return null;
+        }
+    }
+
+    /**
+     * Extract MarketInOut session using document.cookie
+     */
+    function extractMarketInOutSession(platformConfig) {
         try {
             const cookies = document.cookie.split(';');
+
             console.log(
-                '[MIO-EXTRACTOR] All cookies:',
+                `[MULTI-EXTRACTOR] ${currentPlatform.toUpperCase()} cookies:`,
                 cookies.map((c) => c.trim().split('=')[0])
             );
 
-            // Find cookie that starts with ASPSESSIONID
-            const aspSessionCookie = cookies.find((cookie) => cookie.trim().startsWith('ASPSESSIONID'));
+            // Find platform-specific session cookie
+            const sessionCookie = cookies.find((cookie) => {
+                const cookieName = cookie.trim().split('=')[0];
+                return (
+                    cookieName === platformConfig.sessionCookieName ||
+                    cookieName.startsWith(platformConfig.sessionCookieName)
+                );
+            });
 
-            if (aspSessionCookie) {
-                const [key, value] = aspSessionCookie.trim().split('=');
+            if (sessionCookie) {
+                const [key, value] = sessionCookie.trim().split('=');
                 const sessionData = {
+                    platform: currentPlatform,
                     sessionKey: key.trim(),
                     sessionValue: value ? value.trim() : '',
                     extractedAt: new Date().toISOString(),
                     url: window.location.href,
+                    source: 'browser-extension',
                 };
 
-                console.log('[MIO-EXTRACTOR] Session extracted:', {
+                console.log(`[MULTI-EXTRACTOR] ${currentPlatform.toUpperCase()} session extracted:`, {
+                    platform: sessionData.platform,
                     sessionKey: sessionData.sessionKey,
                     sessionValueLength: sessionData.sessionValue.length,
                     extractedAt: sessionData.extractedAt,
@@ -99,11 +262,13 @@
 
                 return sessionData;
             } else {
-                console.log('[MIO-EXTRACTOR] No ASPSESSIONID cookie found');
+                console.log(
+                    `[MULTI-EXTRACTOR] No ${platformConfig.sessionCookieName} cookie found for ${currentPlatform}`
+                );
                 return null;
             }
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error extracting session:', error);
+            console.error(`[MULTI-EXTRACTOR] Error extracting MarketInOut session:`, error);
             return null;
         }
     }
@@ -154,15 +319,21 @@
         }
         abortController = new AbortController();
 
-        // Method 1: Store in Chrome extension storage
+        // Method 1: Store in Chrome extension storage with platform-specific keys
         try {
-            await chrome.storage.local.set({
-                mioSession: sessionData,
+            const storageKey = currentPlatform === PLATFORMS.TRADINGVIEW ? 'tvSession' : 'mioSession';
+            const storageData = {
+                [storageKey]: sessionData,
                 lastUpdated: Date.now(),
-            });
-            console.log('[MIO-EXTRACTOR] Session stored in Chrome storage');
+            };
+
+            await chrome.storage.local.set(storageData);
+            console.log(
+                `[MULTI-EXTRACTOR] ${currentPlatform.toUpperCase()} session stored in Chrome storage under key:`,
+                storageKey
+            );
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error storing in Chrome storage:', error);
+            console.error(`[MULTI-EXTRACTOR] Error storing ${currentPlatform} session in Chrome storage:`, error);
         }
 
         // Method 2: Optimized API calls with timeout and abort
@@ -253,12 +424,13 @@
             return;
         }
 
-        if (!isLoggedIn()) {
+        const loggedIn = await isLoggedIn();
+        if (!loggedIn) {
             console.log('[MIO-EXTRACTOR] User not logged in, skipping extraction');
             return;
         }
 
-        const sessionData = extractASPSESSION();
+        const sessionData = await extractSessionData();
         if (!sessionData) {
             console.log('[MIO-EXTRACTOR] No session data found');
             return;
@@ -314,10 +486,8 @@
             return CONFIG.ADAPTIVE_INTERVALS.ERROR;
         }
 
-        if (!isLoggedIn()) {
-            return CONFIG.ADAPTIVE_INTERVALS.INACTIVE;
-        }
-
+        // Note: We can't await isLoggedIn() here since this is used synchronously
+        // The login state will be checked in processSession anyway
         return CONFIG.ADAPTIVE_INTERVALS.ACTIVE;
     }
 
@@ -571,8 +741,9 @@
                                 extractionAttempts = 0; // Reset attempts
 
                                 // Check for session after a delay
-                                setTimeout(() => {
-                                    if (isLoggedIn()) {
+                                setTimeout(async () => {
+                                    const loggedIn = await isLoggedIn();
+                                    if (loggedIn) {
                                         processSession();
                                     }
                                 }, 3000);

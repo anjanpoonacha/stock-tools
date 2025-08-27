@@ -170,6 +170,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             }
         }
 
+        if (request.action === 'getCookie') {
+            // Handle cookie requests from content script
+            chrome.cookies.get(
+                {
+                    url: request.url,
+                    name: request.name,
+                },
+                (cookie) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('[MIO-EXTRACTOR] Error getting cookie:', chrome.runtime.lastError);
+                        sendResponse({ success: false, error: chrome.runtime.lastError.message, cookie: null });
+                    } else {
+                        console.log(
+                            `[MIO-EXTRACTOR] Cookie retrieved: ${request.name} from ${request.url}`,
+                            cookie ? 'found' : 'not found'
+                        );
+                        sendResponse({ success: true, cookie: cookie });
+                    }
+                }
+            );
+            return true; // Keep message channel open for async response
+        }
+
         if (request.action === 'storeSession') {
             // Phase 2: Compressed storage
             requestIdleCallback(async () => {
