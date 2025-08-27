@@ -26,6 +26,7 @@
             'importFileInput',
 
             // General settings
+            'userEmail',
             'enableMarketInOut',
             'enableTradingView',
             'autoRefreshPopup',
@@ -151,6 +152,9 @@
      */
     function populateUI(settings) {
         // General settings
+        if (elements.userEmail) {
+            elements.userEmail.value = settings.general.userEmail || '';
+        }
         if (elements.enableMarketInOut) {
             elements.enableMarketInOut.checked = settings.general.enabledPlatforms.marketinout;
         }
@@ -541,6 +545,7 @@
         const values = {};
 
         // General settings
+        values['general.userEmail'] = elements.userEmail?.value?.trim() || '';
         values['general.enabledPlatforms.marketinout'] = elements.enableMarketInOut?.checked ?? true;
         values['general.enabledPlatforms.tradingview'] = elements.enableTradingView?.checked ?? true;
         values['general.autoRefreshPopup'] = elements.autoRefreshPopup?.checked ?? true;

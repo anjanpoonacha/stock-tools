@@ -27,6 +27,17 @@ let performanceMetrics = {
  * Lazy loading and optimized badge updates
  */
 
+// Polyfill for requestIdleCallback
+function requestIdleCallbackPolyfill(callback, options = {}) {
+    if (typeof requestIdleCallback !== 'undefined') {
+        return requestIdleCallback(callback, options);
+    } else {
+        // Fallback using setTimeout
+        const timeout = options.timeout || 0;
+        return setTimeout(callback, timeout);
+    }
+}
+
 // Throttled badge update to prevent excessive UI updates
 function updateBadgeThrottled(tabId, text, color) {
     const now = Date.now();
@@ -40,7 +51,7 @@ function updateBadgeThrottled(tabId, text, color) {
     badgeUpdateQueue.set(key, now);
 
     // Batch badge updates
-    requestIdleCallback(() => {
+    requestIdleCallbackPolyfill(() => {
         chrome.action.setBadgeText({ text: text || '', tabId: tabId });
         if (color) {
             chrome.action.setBadgeBackgroundColor({ color: color, tabId: tabId });
@@ -171,31 +182,57 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         }
 
         if (request.action === 'getCookie') {
-            // Handle cookie requests from content script
-            chrome.cookies.get(
-                {
-                    url: request.url,
-                    name: request.name,
-                },
-                (cookie) => {
-                    if (chrome.runtime.lastError) {
-                        console.error('[MIO-EXTRACTOR] Error getting cookie:', chrome.runtime.lastError);
-                        sendResponse({ success: false, error: chrome.runtime.lastError.message, cookie: null });
-                    } else {
-                        console.log(
-                            `[MIO-EXTRACTOR] Cookie retrieved: ${request.name} from ${request.url}`,
-                            cookie ? 'found' : 'not found'
-                        );
-                        sendResponse({ success: true, cookie: cookie });
-                    }
+            // Handle cookie requests from content script with comprehensive error handling
+            try {
+                // Check if chrome.cookies API is available
+                if (!chrome.cookies || typeof chrome.cookies.get !== 'function') {
+                    console.error('[MIO-EXTRACTOR] Chrome cookies API not available');
+                    sendResponse({ success: false, error: 'Chrome cookies API not available', cookie: null });
+                    return true;
                 }
-            );
+
+                // Validate request parameters
+                if (!request.url || !request.name) {
+                    console.error('[MIO-EXTRACTOR] Invalid cookie request parameters:', {
+                        url: request.url,
+                        name: request.name,
+                    });
+                    sendResponse({
+                        success: false,
+                        error: 'Invalid parameters: url and name are required',
+                        cookie: null,
+                    });
+                    return true;
+                }
+
+                chrome.cookies.get(
+                    {
+                        url: request.url,
+                        name: request.name,
+                    },
+                    (cookie) => {
+                        if (chrome.runtime.lastError) {
+                            console.error('[MIO-EXTRACTOR] Error getting cookie:', chrome.runtime.lastError);
+                            sendResponse({ success: false, error: chrome.runtime.lastError.message, cookie: null });
+                        } else {
+                            console.log(
+                                `[MIO-EXTRACTOR] Cookie retrieved: ${request.name} from ${request.url}`,
+                                cookie ? 'found' : 'not found'
+                            );
+                            sendResponse({ success: true, cookie: cookie });
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error('[MIO-EXTRACTOR] Exception in getCookie handler:', error);
+                sendResponse({ success: false, error: error.message, cookie: null });
+            }
             return true; // Keep message channel open for async response
         }
 
         if (request.action === 'storeSession') {
             // Phase 2: Compressed storage
-            requestIdleCallback(async () => {
+            requestIdleCallbackPolyfill(async () => {
                 try {
                     const compressed = compressSessionData(request.sessionData);
                     await chrome.storage.local.set({
@@ -243,7 +280,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
         if (!isMarketInOut) {
             // Lazy badge reset - only if badge was previously set
-            requestIdleCallback(() => {
+            requestIdleCallbackPolyfill(() => {
                 chrome.action.setBadgeText({ text: '', tabId: tabId });
             });
         }
@@ -261,7 +298,7 @@ chrome.idle.onStateChanged.addListener((state) => {
 
     if (state === 'idle') {
         // Perform maintenance tasks during idle time
-        requestIdleCallback(() => {
+        requestIdleCallbackPolyfill(() => {
             cleanupStorage();
 
             // Clean up old tab states

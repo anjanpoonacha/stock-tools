@@ -6,6 +6,17 @@
 
     console.log('[MULTI-EXTRACTOR] Content script loaded on:', window.location.href);
 
+    // Polyfill for requestIdleCallback
+    function requestIdleCallbackPolyfill(callback, options = {}) {
+        if (typeof requestIdleCallback !== 'undefined') {
+            return requestIdleCallback(callback, options);
+        } else {
+            // Fallback using setTimeout
+            const timeout = options.timeout || 0;
+            return setTimeout(callback, timeout);
+        }
+    }
+
     // Platform Detection
     const PLATFORMS = {
         MARKETINOUT: 'marketinout',
@@ -301,6 +312,19 @@
     }
 
     /**
+     * Get user email from extension settings
+     */
+    async function getUserEmail() {
+        try {
+            const result = await chrome.storage.sync.get(['general.userEmail']);
+            return result['general.userEmail'] || '';
+        } catch (error) {
+            console.error('[MIO-EXTRACTOR] Error getting user email from settings:', error);
+            return '';
+        }
+    }
+
+    /**
      * Send session data to the trading app - Performance Optimized
      */
     async function sendSessionToApp(sessionData) {
@@ -311,6 +335,13 @@
         if (cached) {
             console.log('[MIO-EXTRACTOR] Using cached session data');
             return true;
+        }
+
+        // Get user email from settings
+        const userEmail = await getUserEmail();
+        if (userEmail) {
+            sessionData.userEmail = userEmail;
+            console.log('[MIO-EXTRACTOR] Added user email to session data:', userEmail);
         }
 
         // Cancel any previous request
@@ -779,6 +810,18 @@
 
     function initializeWebWorker() {
         try {
+            // Check if Web Workers are supported
+            if (typeof Worker === 'undefined') {
+                console.warn('[MIO-EXTRACTOR] Web Workers not supported in this environment');
+                return;
+            }
+
+            // Check if chrome.runtime is available
+            if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
+                console.warn('[MIO-EXTRACTOR] Chrome runtime not available for Web Worker');
+                return;
+            }
+
             performanceWorker = new Worker(chrome.runtime.getURL('performance-worker.js'));
 
             performanceWorker.onmessage = function (e) {
@@ -793,11 +836,17 @@
 
             performanceWorker.onerror = function (error) {
                 console.error('[MIO-EXTRACTOR] Worker error:', error);
+                // Fallback: disable worker on error
+                if (performanceWorker) {
+                    performanceWorker.terminate();
+                    performanceWorker = null;
+                }
             };
 
             console.log('[MIO-EXTRACTOR] Performance worker initialized');
         } catch (error) {
-            console.warn('[MIO-EXTRACTOR] Web Worker not supported:', error);
+            console.warn('[MIO-EXTRACTOR] Web Worker not supported:', error.message);
+            performanceWorker = null;
         }
     }
 
@@ -805,12 +854,7 @@
      * Phase 3: Idle callback optimization
      */
     function scheduleIdleTask(task, timeout = 5000) {
-        if ('requestIdleCallback' in window) {
-            requestIdleCallback(task, { timeout });
-        } else {
-            // Fallback for browsers without requestIdleCallback
-            setTimeout(task, 0);
-        }
+        requestIdleCallbackPolyfill(task, { timeout });
     }
 
     /**

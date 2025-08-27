@@ -8,6 +8,7 @@
     const DEFAULT_SETTINGS = {
         // General Settings
         general: {
+            userEmail: '', // User email for session identification
             enabledPlatforms: {
                 marketinout: true,
                 tradingview: true,
