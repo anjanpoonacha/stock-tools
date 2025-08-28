@@ -19,7 +19,7 @@ export function SessionStatus({
     return (
         <div className={`p-4 bg-muted/50 border border-border rounded-lg ${className}`}>
             <div className='text-sm font-medium text-foreground'>
-                {platform} Session: {loading ? '⏳ Checking...' : sessionId ? '✅ Connected' : '❌ Not connected'}
+                {platform} Session: {loading ? 'Checking...' : sessionId ? 'Connected' : 'Not connected'}
             </div>
             {error && <div className='text-xs text-destructive mt-2'>Error: {error}</div>}
             {!loading && !sessionId && !error && (

@@ -2,6 +2,7 @@
 
 import { existsSync, readFileSync } from 'fs';
 import { SESSION_CONFIG, LOG_PREFIXES } from './constants';
+import { UserContext } from './AuthService';
 
 export interface SessionData {
 	sessionId: string;
@@ -33,6 +34,11 @@ export interface MIOSessionInfo {
 export interface SessionStats {
 	totalSessions: number;
 	platformCounts: Record<string, number>;
+}
+
+export interface UserCredentials {
+	userEmail: string;
+	userPassword: string;
 }
 
 interface PlatformSessionWithTimestamp extends SessionInfo {
@@ -69,14 +75,26 @@ export class SessionResolver {
 	 * Extracts sessions for a specific platform from all stored sessions
 	 * @param allSessions - All stored session data
 	 * @param platform - Target platform name
+	 * @param userCredentials - Optional user credentials to filter sessions
 	 * @returns Array of platform sessions with timestamps
 	 */
-	private static extractPlatformSessions(allSessions: StoredSessions, platform: string): PlatformSessionWithTimestamp[] {
+	private static extractPlatformSessions(allSessions: StoredSessions, platform: string, userCredentials?: UserCredentials): PlatformSessionWithTimestamp[] {
 		const platformSessions: PlatformSessionWithTimestamp[] = [];
 
 		for (const [internalId, sessionEntry] of Object.entries(allSessions)) {
 			const platformData = sessionEntry[platform];
 			if (this.isValidSessionData(platformData)) {
+				// Filter by user credentials if provided
+				if (userCredentials) {
+					const sessionEmail = platformData.userEmail;
+					const sessionPassword = platformData.userPassword;
+
+					// Skip sessions that don't match the user credentials
+					if (sessionEmail !== userCredentials.userEmail || sessionPassword !== userCredentials.userPassword) {
+						continue;
+					}
+				}
+
 				platformSessions.push({
 					sessionData: platformData,
 					internalId,
@@ -223,6 +241,285 @@ export class SessionResolver {
 		} catch (error) {
 			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting session stats:`, error);
 			return { totalSessions: 0, platformCounts: {} };
+		}
+	}
+
+	/**
+	 * Retrieves the most recent valid session for a specific platform and user
+	 * @param platform - Platform name (e.g., 'marketinout', 'tradingview')
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns Session info or null if no valid session found
+	 */
+	static getLatestSessionForUser(platform: string, userCredentials: UserCredentials): SessionInfo | null {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractPlatformSessions(allSessions, platform, userCredentials);
+
+			if (platformSessions.length === 0) {
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found for user: ${userCredentials.userEmail}`);
+				return null;
+			}
+
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+			const latestSession = sortedSessions[0];
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions for user ${userCredentials.userEmail}, using most recent: ${latestSession.internalId}`);
+
+			return {
+				sessionData: latestSession.sessionData,
+				internalId: latestSession.internalId
+			};
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session for user:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Retrieves the most recent MarketInOut session for a specific user
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns MIO session info with key-value pair for cookies, or null if not found
+	 */
+	static getLatestMIOSessionForUser(userCredentials: UserCredentials): MIOSessionInfo | null {
+		const sessionInfo = this.getLatestSessionForUser(SESSION_CONFIG.PLATFORMS.MARKETINOUT, userCredentials);
+		if (!sessionInfo) {
+			return null;
+		}
+
+		const { sessionData, internalId } = sessionInfo;
+		const sessionKey = this.findSessionCookieKey(sessionData);
+
+		if (!sessionKey) {
+			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data for user: ${userCredentials.userEmail}`);
+			return null;
+		}
+
+		return {
+			key: sessionKey,
+			value: sessionData[sessionKey]!,
+			internalId
+		};
+	}
+
+	/**
+	 * Checks if any sessions exist for a platform and user
+	 * @param platform - Platform name to check
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns True if sessions exist for the platform and user
+	 */
+	static hasSessionsForPlatformAndUser(platform: string, userCredentials: UserCredentials): boolean {
+		return this.getLatestSessionForUser(platform, userCredentials) !== null;
+	}
+
+	/**
+	 * Gets all available user emails from stored sessions
+	 * @returns Array of unique user emails found in sessions
+	 */
+	static getAvailableUsers(): string[] {
+		try {
+			const allSessions = this.loadSessions();
+			const userEmails = new Set<string>();
+
+			for (const sessionEntry of Object.values(allSessions)) {
+				for (const platformData of Object.values(sessionEntry)) {
+					if (platformData.userEmail) {
+						userEmails.add(platformData.userEmail);
+					}
+				}
+			}
+
+			return Array.from(userEmails).sort();
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting available users:`, error);
+			return [];
+		}
+	}
+
+	// ===== NEW SECURE METHODS USING AUTHENTICATED USER CONTEXT =====
+
+	/**
+	 * Extract sessions for authenticated user based on user context
+	 * @param allSessions - All stored session data
+	 * @param platform - Target platform name
+	 * @param userContext - Authenticated user context
+	 * @returns Array of platform sessions for the authenticated user
+	 */
+	private static extractSessionsForAuthenticatedUser(
+		allSessions: StoredSessions,
+		platform: string,
+		userContext: UserContext
+	): PlatformSessionWithTimestamp[] {
+		const platformSessions: PlatformSessionWithTimestamp[] = [];
+
+		for (const [internalId, sessionEntry] of Object.entries(allSessions)) {
+			const platformData = sessionEntry[platform];
+			if (this.isValidSessionData(platformData)) {
+				// Match sessions by user ID (derived from email) instead of plain text credentials
+				const sessionEmail = platformData.userEmail;
+				if (sessionEmail && sessionEmail.toLowerCase() === userContext.userEmail.toLowerCase()) {
+					platformSessions.push({
+						sessionData: platformData,
+						internalId,
+						extractedAt: platformData.extractedAt || SESSION_CONFIG.DEFAULT_EXTRACTED_AT
+					});
+				}
+			}
+		}
+
+		return platformSessions;
+	}
+
+	/**
+	 * SECURE: Get latest session for authenticated user using user context
+	 * @param platform - Platform name
+	 * @param userContext - Authenticated user context
+	 * @returns Session info or null if no valid session found
+	 */
+	static getLatestSessionForAuthenticatedUser(platform: string, userContext: UserContext): SessionInfo | null {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractSessionsForAuthenticatedUser(allSessions, platform, userContext);
+
+			if (platformSessions.length === 0) {
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found for authenticated user: ${userContext.userEmail}`);
+				return null;
+			}
+
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+			const latestSession = sortedSessions[0];
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions for authenticated user ${userContext.userEmail}, using most recent: ${latestSession.internalId}`);
+
+			return {
+				sessionData: latestSession.sessionData,
+				internalId: latestSession.internalId
+			};
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session for authenticated user:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * SECURE: Get latest MIO session for authenticated user
+	 * @param userContext - Authenticated user context
+	 * @returns MIO session info or null if not found
+	 */
+	static getLatestMIOSessionForAuthenticatedUser(userContext: UserContext): MIOSessionInfo | null {
+		const sessionInfo = this.getLatestSessionForAuthenticatedUser(SESSION_CONFIG.PLATFORMS.MARKETINOUT, userContext);
+		if (!sessionInfo) {
+			return null;
+		}
+
+		const { sessionData, internalId } = sessionInfo;
+		const sessionKey = this.findSessionCookieKey(sessionData);
+
+		if (!sessionKey) {
+			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data for authenticated user: ${userContext.userEmail}`);
+			return null;
+		}
+
+		return {
+			key: sessionKey,
+			value: sessionData[sessionKey]!,
+			internalId
+		};
+	}
+
+	/**
+	 * SECURE: Get all sessions for authenticated user and platform
+	 * @param platform - Platform name
+	 * @param userContext - Authenticated user context
+	 * @returns Array of sessions for the authenticated user
+	 */
+	static getAllSessionsForAuthenticatedUser(platform: string, userContext: UserContext): SessionInfo[] {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractSessionsForAuthenticatedUser(allSessions, platform, userContext);
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+
+			return sortedSessions.map(({ sessionData, internalId }) => ({ sessionData, internalId }));
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting all ${platform} sessions for authenticated user:`, error);
+			return [];
+		}
+	}
+
+	/**
+	 * SECURE: Check if authenticated user has sessions for platform
+	 * @param platform - Platform name
+	 * @param userContext - Authenticated user context
+	 * @returns True if sessions exist for the authenticated user and platform
+	 */
+	static hasSessionsForAuthenticatedUser(platform: string, userContext: UserContext): boolean {
+		return this.getLatestSessionForAuthenticatedUser(platform, userContext) !== null;
+	}
+
+	/**
+	 * SECURE: Get session statistics for authenticated user
+	 * @param userContext - Authenticated user context
+	 * @returns Session statistics for the authenticated user
+	 */
+	static getSessionStatsForAuthenticatedUser(userContext: UserContext): SessionStats {
+		try {
+			const allSessions = this.loadSessions();
+			const platformCounts: Record<string, number> = {};
+			let totalSessions = 0;
+
+			for (const sessionEntry of Object.values(allSessions)) {
+				for (const [platform, platformData] of Object.entries(sessionEntry)) {
+					if (this.isValidSessionData(platformData)) {
+						const sessionEmail = platformData.userEmail;
+						if (sessionEmail && sessionEmail.toLowerCase() === userContext.userEmail.toLowerCase()) {
+							platformCounts[platform] = (platformCounts[platform] || 0) + 1;
+							totalSessions++;
+						}
+					}
+				}
+			}
+
+			return { totalSessions, platformCounts };
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting session stats for authenticated user:`, error);
+			return { totalSessions: 0, platformCounts: {} };
+		}
+	}
+
+	/**
+	 * SECURE: Get session by internal ID for authenticated user (prevents cross-user access)
+	 * @param internalId - Internal session ID
+	 * @param userContext - Authenticated user context
+	 * @returns Session info or null if not found or not owned by user
+	 */
+	static getSessionByIdForAuthenticatedUser(internalId: string, userContext: UserContext): SessionInfo | null {
+		try {
+			const allSessions = this.loadSessions();
+			const sessionEntry = allSessions[internalId];
+
+			if (!sessionEntry) {
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Session ${internalId} not found`);
+				return null;
+			}
+
+			// Find any platform session that belongs to this user
+			for (const [platform, platformData] of Object.entries(sessionEntry)) {
+				if (this.isValidSessionData(platformData)) {
+					const sessionEmail = platformData.userEmail;
+					if (sessionEmail && sessionEmail.toLowerCase() === userContext.userEmail.toLowerCase()) {
+						console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found session ${internalId} for authenticated user ${userContext.userEmail} on platform ${platform}`);
+						return {
+							sessionData: platformData,
+							internalId
+						};
+					}
+				}
+			}
+
+			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} Session ${internalId} exists but does not belong to authenticated user ${userContext.userEmail}`);
+			return null;
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting session by ID for authenticated user:`, error);
+			return null;
 		}
 	}
 }
