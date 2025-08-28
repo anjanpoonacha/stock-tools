@@ -1,6 +1,6 @@
 // API endpoint for multi-platform browser extension session communication
 import { NextRequest, NextResponse } from 'next/server';
-import { savePlatformSessionWithCleanup, generateSessionId } from '@/lib/sessionStore';
+import { savePlatformSessionWithCleanup, generateSessionId, PlatformSessionData } from '@/lib/sessionStore';
 import { CookieParser } from '@/lib/cookieParser';
 import { validateAndStartMonitoring } from '@/lib/sessionValidation';
 
@@ -273,7 +273,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Prepare session data with proper cookie handling
-		const sessionData: any = {
+		const sessionData: PlatformSessionData = {
 			sessionId: sanitizedSessionValue,
 			[sessionKey]: sanitizedSessionValue,
 			// Extension metadata
@@ -289,7 +289,14 @@ export async function POST(req: NextRequest) {
 		// Platform-specific session data validation
 		let validatedSessionData = {};
 		if (platform === PLATFORMS.MARKETINOUT) {
-			validatedSessionData = CookieParser.extractASPSESSION(sessionData);
+			// Convert PlatformSessionData to the format expected by CookieParser
+			const cookieData: { [key: string]: string } = {};
+			for (const [key, value] of Object.entries(sessionData)) {
+				if (value !== undefined) {
+					cookieData[key] = value;
+				}
+			}
+			validatedSessionData = CookieParser.extractASPSESSION(cookieData);
 			if (Object.keys(validatedSessionData).length === 0) {
 				console.warn('[EXTENSION-API] No ASPSESSION cookies detected for MarketInOut, storing as-is:', { sessionKey });
 			}

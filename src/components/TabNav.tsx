@@ -3,17 +3,7 @@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-    ArrowLeftRight,
-    FileSpreadsheet,
-    Download,
-    RefreshCw,
-    Upload,
-    List,
-    LogIn,
-    UserCheck,
-    TestTube,
-} from 'lucide-react';
+import { ArrowLeftRight, FileSpreadsheet, Download, RefreshCw, Upload, List, UserCheck, TestTube } from 'lucide-react';
 
 const ROUTES = [
     { path: '/', label: 'Symbol Converter', value: 'converter', icon: ArrowLeftRight },

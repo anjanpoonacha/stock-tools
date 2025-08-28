@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { MIOService } from '@/lib/MIOService';
-import { SessionResolver } from '@/lib/SessionResolver';
+import { SessionResolver, MIOSessionInfo } from '@/lib/SessionResolver';
 import { HTTP_STATUS, ERROR_MESSAGES, LOG_PREFIXES } from '@/lib/constants';
 
 
@@ -27,20 +27,6 @@ interface APIResponse<T = unknown> {
 	needsSession?: boolean;
 }
 
-/**
- * Validates and retrieves MIO session information for authenticated user
- * @param userContext - Authenticated user context
- * @returns Session info or null if not found
- */
-function validateMIOSession(userContext: { userId: string; platform: string }) {
-	const sessionInfo = SessionResolver.getLatestMIOSessionForAuthenticatedUser(userContext.userId);
-	if (!sessionInfo) {
-		console.error(`${LOG_PREFIXES.API} No MIO session available for user: ${userContext.userId}`);
-		return null;
-	}
-	console.log(`${LOG_PREFIXES.API} Using MIO session: ${sessionInfo.internalId} for user: ${userContext.userId}`);
-	return sessionInfo;
-}
 
 /**
  * Creates standardized error response
@@ -72,7 +58,7 @@ function getErrorMessage(error: unknown): string {
 /**
  * Handles MIO watchlist retrieval
  */
-async function handleGetWatchlists(sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>): Promise<NextResponse<APIResponse>> {
+async function handleGetWatchlists(sessionInfo: MIOSessionInfo): Promise<NextResponse<APIResponse>> {
 	try {
 		const watchlists = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
 		console.log(`${LOG_PREFIXES.API} Retrieved ${watchlists.length} watchlists`);
@@ -93,7 +79,7 @@ async function handleGetWatchlists(sessionInfo: NonNullable<ReturnType<typeof va
  * Handles adding symbols to MIO watchlist
  */
 async function handleAddToWatchlist(
-	sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>,
+	sessionInfo: MIOSessionInfo,
 	mioWlid: string,
 	symbols: string[]
 ): Promise<NextResponse<APIResponse>> {
@@ -127,7 +113,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 
 		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, { mioWlid, symbols, userEmail: userEmail ? '[PROVIDED]' : '[MISSING]' });
 
-		let sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>> | null = null;
+		let sessionInfo: MIOSessionInfo | null = null;
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {
@@ -178,7 +164,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 			return createErrorResponse(ERROR_MESSAGES.NAME_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		let sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>> | null = null;
+		let sessionInfo: MIOSessionInfo | null = null;
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {
@@ -236,7 +222,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 			return createErrorResponse(ERROR_MESSAGES.DELETE_IDS_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		let sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>> | null = null;
+		let sessionInfo: MIOSessionInfo | null = null;
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {

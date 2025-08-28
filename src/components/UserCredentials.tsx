@@ -36,6 +36,47 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
 
     // Load saved credentials from localStorage on component mount
     useEffect(() => {
+        const autoLogin = async (emailToUse: string, passwordToUse: string) => {
+            setIsLoading(true);
+            setError(null);
+
+            try {
+                const response = await fetch('/api/session/current', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userEmail: emailToUse,
+                        userPassword: passwordToUse,
+                    }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    setSessionStats(data);
+                    setIsLoggedIn(true);
+
+                    // Notify parent component
+                    onCredentialsChange({
+                        userEmail: emailToUse,
+                        userPassword: passwordToUse,
+                    });
+                } else {
+                    setError(data.details || data.error || 'Login failed');
+                    setIsLoggedIn(false);
+                    onCredentialsChange(null);
+                }
+            } catch {
+                setError('Network error - please try again');
+                setIsLoggedIn(false);
+                onCredentialsChange(null);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
         const savedEmail = localStorage.getItem('userEmail');
         const savedPassword = localStorage.getItem('userPassword');
 
@@ -43,9 +84,9 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
             setUserEmail(savedEmail);
             setUserPassword(savedPassword);
             // Auto-login with saved credentials
-            handleLogin(savedEmail, savedPassword);
+            autoLogin(savedEmail, savedPassword);
         }
-    }, []);
+    }, [onCredentialsChange]);
 
     const handleLogin = async (email?: string, password?: string) => {
         const emailToUse = email || userEmail;
@@ -91,7 +132,7 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                 setIsLoggedIn(false);
                 onCredentialsChange(null);
             }
-        } catch (error) {
+        } catch {
             setError('Network error - please try again');
             setIsLoggedIn(false);
             onCredentialsChange(null);

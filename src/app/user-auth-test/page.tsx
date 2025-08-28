@@ -12,10 +12,27 @@ interface UserCredentials {
     userPassword: string;
 }
 
+interface SessionData {
+    message?: string;
+    availableUsers?: string[];
+    platforms?: {
+        marketinout?: {
+            sessionAvailable: boolean;
+        };
+        tradingview?: {
+            sessionAvailable: boolean;
+        };
+    };
+    sessionStats?: {
+        totalSessions: number;
+        platformCounts?: Record<string, number>;
+    };
+}
+
 export default function UserAuthTestPage() {
     const [currentUser, setCurrentUser] = useState<UserCredentials | null>(null);
     const [availableUsers, setAvailableUsers] = useState<string[]>([]);
-    const [sessionData, setSessionData] = useState<any>(null);
+    const [sessionData, setSessionData] = useState<SessionData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
     // Load available users on component mount
