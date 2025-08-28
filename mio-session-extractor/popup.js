@@ -334,11 +334,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 // Show success message briefly
                 const originalText = elements.extractBtn.textContent;
                 elements.extractBtn.textContent = 'Success!';
-                elements.extractBtn.style.background = '#4CAF50';
+                elements.extractBtn.classList.add('btn-success');
 
                 setTimeout(() => {
                     elements.extractBtn.textContent = originalText;
-                    elements.extractBtn.style.background = '';
+                    elements.extractBtn.classList.remove('btn-success');
                 }, 2000);
             } else {
                 throw new Error(`${platformName} extraction failed`);
@@ -350,11 +350,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Show error message briefly
             const originalText = elements.extractBtn.textContent;
             elements.extractBtn.textContent = 'Failed';
-            elements.extractBtn.style.background = '#f44336';
+            elements.extractBtn.classList.add('btn-error');
 
             setTimeout(() => {
                 elements.extractBtn.textContent = originalText;
-                elements.extractBtn.style.background = '';
+                elements.extractBtn.classList.remove('btn-error');
             }, 2000);
         } finally {
             setLoading(false);
