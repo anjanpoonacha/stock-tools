@@ -216,7 +216,7 @@ export async function POST(req: NextRequest) {
 			return NextResponse.json({
 				error: 'Missing sessionKey or sessionValue',
 				success: false
-			}, { status: 400 });
+			}, { status: 400, headers: corsHeaders });
 		}
 
 		// Detect platform from URL and session key
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
 				error: 'Invalid cookie format',
 				details: 'Cookie name or value contains invalid characters or exceeds length limits',
 				success: false
-			}, { status: 400 });
+			}, { status: 400, headers: corsHeaders });
 		}
 
 		// Sanitize the cookie value for security
@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
 				details: validation.error,
 				platform,
 				success: false
-			}, { status: 401 });
+			}, { status: 401, headers: corsHeaders });
 		}
 
 		console.log('[EXTENSION-API] Session validation passed, bridging session:', { sessionKey, platform });
@@ -385,7 +385,7 @@ export async function POST(req: NextRequest) {
 			error: 'Internal server error',
 			details: error instanceof Error ? error.message : 'Unknown error',
 			success: false
-		}, { status: 500 });
+		}, { status: 500, headers: corsHeaders });
 	}
 }
 
@@ -396,5 +396,5 @@ export async function GET() {
 		service: 'multi-platform-session-extractor-api',
 		supportedPlatforms: Object.values(PLATFORMS).filter(p => p !== PLATFORMS.UNKNOWN),
 		timestamp: new Date().toISOString()
-	});
+	}, { headers: corsHeaders });
 }
