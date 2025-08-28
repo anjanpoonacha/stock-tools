@@ -49,31 +49,31 @@ jobs:
                   VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('mio-session-extractor/manifest.json', 'utf8')).version)")
                   echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-                  # Check if tag already exists
-                  if git tag -l | grep -q "^v$VERSION$"; then
-                    echo "Tag v$VERSION already exists"
-                    if [ "${{ github.event.inputs.force_release }}" = "true" ]; then
-                      echo "Force release requested, proceeding anyway"
+                  # Always check for changes since last tag, regardless of current version
+                  if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+                    LAST_TAG=$(git describe --tags --abbrev=0)
+                    echo "Last tag: $LAST_TAG"
+                    echo "Current version in manifest: $VERSION"
+                    
+                    # Check for changes in extension files since last tag
+                    CHANGES=$(git diff $LAST_TAG..HEAD --name-only -- mio-session-extractor/ | wc -l)
+                    
+                    if [ $CHANGES -gt 0 ]; then
+                      echo "Extension changes detected since $LAST_TAG:"
+                      git diff $LAST_TAG..HEAD --name-only -- mio-session-extractor/
                       echo "has_changes=true" >> $GITHUB_OUTPUT
                     else
-                      echo "has_changes=false" >> $GITHUB_OUTPUT
-                    fi
-                  else
-                    # Check for changes since last tag or if no tags exist
-                    if git describe --tags --abbrev=0 >/dev/null 2>&1; then
-                      LAST_TAG=$(git describe --tags --abbrev=0)
-                      CHANGES=$(git diff $LAST_TAG..HEAD --name-only -- mio-session-extractor/ | wc -l)
-                      if [ $CHANGES -gt 0 ]; then
-                        echo "Extension changes detected since $LAST_TAG"
+                      echo "No extension changes since $LAST_TAG"
+                      if [ "${{ github.event.inputs.force_release }}" = "true" ]; then
+                        echo "Force release requested, proceeding anyway"
                         echo "has_changes=true" >> $GITHUB_OUTPUT
                       else
-                        echo "No extension changes since $LAST_TAG"
                         echo "has_changes=false" >> $GITHUB_OUTPUT
                       fi
-                    else
-                      echo "No previous tags found, treating as initial release"
-                      echo "has_changes=true" >> $GITHUB_OUTPUT
                     fi
+                  else
+                    echo "No previous tags found, treating as initial release"
+                    echo "has_changes=true" >> $GITHUB_OUTPUT
                   fi
 
     package-and-release:
