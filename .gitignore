@@ -41,3 +41,7 @@ yarn-error.log*
 next-env.d.ts
 memory_bank
 sessions.json
+
+# extension packaging
+/dist
+release-notes.md

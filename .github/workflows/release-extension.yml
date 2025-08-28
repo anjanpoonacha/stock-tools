@@ -1,0 +1,235 @@
+name: Release Extension
+
+on:
+    push:
+        branches: [main, master]
+        paths:
+            - 'mio-session-extractor/**'
+    workflow_dispatch:
+        inputs:
+            force_release:
+                description: 'Force release even if no changes detected'
+                required: false
+                default: 'false'
+                type: boolean
+            version_bump:
+                description: 'Version bump type (auto, patch, minor, major)'
+                required: false
+                default: 'auto'
+                type: choice
+                options:
+                    - auto
+                    - patch
+                    - minor
+                    - major
+
+jobs:
+    check-changes:
+        runs-on: ubuntu-latest
+        outputs:
+            has_changes: ${{ steps.check.outputs.has_changes }}
+            version: ${{ steps.check.outputs.version }}
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '18'
+
+            - name: Check for extension changes
+              id: check
+              run: |
+                  chmod +x scripts/package-extension.js
+
+                  # Get current version
+                  VERSION=$(node -e "console.log(JSON.parse(require('fs').readFileSync('mio-session-extractor/manifest.json', 'utf8')).version)")
+                  echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+                  # Check if tag already exists
+                  if git tag -l | grep -q "^v$VERSION$"; then
+                    echo "Tag v$VERSION already exists"
+                    if [ "${{ github.event.inputs.force_release }}" = "true" ]; then
+                      echo "Force release requested, proceeding anyway"
+                      echo "has_changes=true" >> $GITHUB_OUTPUT
+                    else
+                      echo "has_changes=false" >> $GITHUB_OUTPUT
+                    fi
+                  else
+                    # Check for changes since last tag or if no tags exist
+                    if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+                      LAST_TAG=$(git describe --tags --abbrev=0)
+                      CHANGES=$(git diff $LAST_TAG..HEAD --name-only -- mio-session-extractor/ | wc -l)
+                      if [ $CHANGES -gt 0 ]; then
+                        echo "Extension changes detected since $LAST_TAG"
+                        echo "has_changes=true" >> $GITHUB_OUTPUT
+                      else
+                        echo "No extension changes since $LAST_TAG"
+                        echo "has_changes=false" >> $GITHUB_OUTPUT
+                      fi
+                    else
+                      echo "No previous tags found, treating as initial release"
+                      echo "has_changes=true" >> $GITHUB_OUTPUT
+                    fi
+                  fi
+
+    package-and-release:
+        needs: check-changes
+        if: needs.check-changes.outputs.has_changes == 'true'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '18'
+
+            - name: Install dependencies
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y zip
+
+            - name: Auto-bump version
+              id: version_bump
+              run: |
+                  chmod +x scripts/version-extension.js
+
+                  CURRENT_VERSION="${{ needs.check-changes.outputs.version }}"
+                  BUMP_TYPE="${{ github.event.inputs.version_bump || 'auto' }}"
+
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "Bump type: $BUMP_TYPE"
+
+                  # Configure git for commits
+                  git config --local user.email "action@github.com"
+                  git config --local user.name "GitHub Action"
+
+                  if [ "$BUMP_TYPE" = "auto" ]; then
+                    # Auto-detect version bump type from commit messages
+                    if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+                      LAST_TAG=$(git describe --tags --abbrev=0)
+                      COMMITS=$(git log $LAST_TAG..HEAD --oneline -- mio-session-extractor/)
+                    else
+                      COMMITS=$(git log --oneline -- mio-session-extractor/)
+                    fi
+                    
+                    echo "Analyzing commits for version bump type:"
+                    echo "$COMMITS"
+                    
+                    # Check for breaking changes or major features
+                    if echo "$COMMITS" | grep -iE "(BREAKING|major:|feat!:|fix!:)" >/dev/null; then
+                      BUMP_TYPE="major"
+                      echo "🔥 Detected breaking changes - bumping major version"
+                    # Check for new features
+                    elif echo "$COMMITS" | grep -iE "(feat:|feature:|minor:)" >/dev/null; then
+                      BUMP_TYPE="minor"
+                      echo "✨ Detected new features - bumping minor version"
+                    # Default to patch for fixes and other changes
+                    else
+                      BUMP_TYPE="patch"
+                      echo "🐛 Detected fixes/improvements - bumping patch version"
+                    fi
+                  fi
+
+                  # Only bump version if it's not a manual workflow dispatch with existing version
+                  if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.version_bump }}" != "" ]; then
+                    echo "Bumping version: $BUMP_TYPE"
+                    NEW_VERSION=$(node scripts/version-extension.js $BUMP_TYPE --no-commit)
+                    
+                    # Update manifest.json
+                    node scripts/version-extension.js set $NEW_VERSION --no-commit
+                    
+                    echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                    echo "version_changed=true" >> $GITHUB_OUTPUT
+                    
+                    # Commit the version change
+                    git add mio-session-extractor/manifest.json
+                    git commit -m "chore: bump extension version to $NEW_VERSION [skip ci]"
+                    git push
+                  else
+                    echo "new_version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+                    echo "version_changed=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Create extension package
+              id: package
+              run: |
+                  chmod +x scripts/package-extension.js
+                  node scripts/package-extension.js
+              env:
+                  GITHUB_ACTIONS: true
+
+            - name: Generate release notes
+              id: release_notes
+              run: |
+                  VERSION="${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}"
+
+                  # Generate release notes
+                  if git describe --tags --abbrev=0 >/dev/null 2>&1; then
+                    LAST_TAG=$(git describe --tags --abbrev=0)
+                    echo "## Changes since $LAST_TAG" > release-notes.md
+                    echo "" >> release-notes.md
+                    git log $LAST_TAG..HEAD --oneline --grep="mio-session-extractor" >> release-notes.md || true
+                    git log $LAST_TAG..HEAD --oneline -- mio-session-extractor/ >> release-notes.md || true
+                  else
+                    echo "## Initial Release" > release-notes.md
+                    echo "" >> release-notes.md
+                    echo "First packaged release of the Multi-Platform Session Extractor extension." >> release-notes.md
+                  fi
+
+                  echo "" >> release-notes.md
+                  echo "## Installation" >> release-notes.md
+                  echo "" >> release-notes.md
+                  echo "1. Download the \`mio-session-extractor-v$VERSION.zip\` file" >> release-notes.md
+                  echo "2. Extract the ZIP file" >> release-notes.md
+                  echo "3. Open Chrome and go to \`chrome://extensions/\`" >> release-notes.md
+                  echo "4. Enable 'Developer mode' in the top right" >> release-notes.md
+                  echo "5. Click 'Load unpacked' and select the extracted folder" >> release-notes.md
+                  echo "" >> release-notes.md
+                  echo "## Features" >> release-notes.md
+                  echo "" >> release-notes.md
+                  echo "- Performance-optimized session extraction for MarketInOut and TradingView" >> release-notes.md
+                  echo "- Adaptive polling with intelligent caching" >> release-notes.md
+                  echo "- Configurable settings and presets" >> release-notes.md
+                  echo "- Real-time session monitoring" >> release-notes.md
+
+            - name: Create Release
+              uses: softprops/action-gh-release@v1
+              with:
+                  tag_name: v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
+                  name: Extension v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
+                  body_path: release-notes.md
+                  files: |
+                      dist/mio-session-extractor-v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}.zip
+                      dist/mio-session-extractor-latest.zip
+                  draft: false
+                  prerelease: false
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Update latest release info
+              run: |
+                  VERSION="${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}"
+                  echo "✅ Released extension v$VERSION"
+                  echo "📦 Package: mio-session-extractor-v$VERSION.zip"
+                  echo "🔗 Download: https://github.com/${{ github.repository }}/releases/tag/v$VERSION"
+
+    notify-no-changes:
+        needs: check-changes
+        if: needs.check-changes.outputs.has_changes == 'false'
+        runs-on: ubuntu-latest
+        steps:
+            - name: No changes detected
+              run: |
+                  echo "ℹ️ No extension changes detected since last release"
+                  echo "Current version: ${{ needs.check-changes.outputs.version }}"
+                  echo "Skipping release creation"

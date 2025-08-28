@@ -6,7 +6,10 @@
     "dev": "NODE_OPTIONS='--inspect' next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "package-extension": "node scripts/package-extension.js",
+    "version-extension": "node scripts/version-extension.js",
+    "release-extension": "pnpm run package-extension && echo 'Extension packaged successfully. Push to main branch to trigger release.'"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
