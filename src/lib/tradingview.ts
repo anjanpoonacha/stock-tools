@@ -117,4 +117,68 @@ export async function appendSymbolToWatchlist(watchlistId: string, symbol: strin
 	}
 }
 
+/**
+ * Validate TradingView session by checking the custom watchlists endpoint.
+ * If not logged in, it returns an array with 1 watchlist where id is null.
+ * If logged in, it returns the user's actual watchlists with valid IDs.
+ * @param cookie - TradingView session cookie
+ * @returns Promise with validation result
+ */
+export async function validateTradingViewSession(cookie: string): Promise<{
+	isValid: boolean;
+	watchlistCount: number;
+	hasValidIds: boolean;
+	error?: string;
+}> {
+	const validationUrl = 'https://www.tradingview.com/api/v1/symbols_list/custom/';
+
+	try {
+		const res = await fetch(validationUrl, {
+			headers: {
+				'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+				Cookie: cookie,
+			},
+		});
+
+		if (!res.ok) {
+			return {
+				isValid: false,
+				watchlistCount: 0,
+				hasValidIds: false,
+				error: `HTTP ${res.status}: ${res.statusText}`
+			};
+		}
+
+		const data = await res.json();
+
+		if (!Array.isArray(data)) {
+			return {
+				isValid: false,
+				watchlistCount: 0,
+				hasValidIds: false,
+				error: 'Unexpected response format'
+			};
+		}
+
+		// Check if this is a logged-out response (1 watchlist with null id)
+		const hasValidIds = data.length > 1 || (data.length === 1 && data[0].id !== null);
+
+		return {
+			isValid: hasValidIds,
+			watchlistCount: data.length,
+			hasValidIds,
+			error: hasValidIds ? undefined : 'Session appears to be logged out (null watchlist ID detected)'
+		};
+
+	} catch (err) {
+		console.error('[TradingView Validation] Error validating session:', err);
+		return {
+			isValid: false,
+			watchlistCount: 0,
+			hasValidIds: false,
+			error: err instanceof Error ? err.message : 'Unknown validation error'
+		};
+	}
+}
+
 // Add more TradingView-related abstractions as needed.

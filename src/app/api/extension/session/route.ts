@@ -1,6 +1,6 @@
 // API endpoint for multi-platform browser extension session communication
 import { NextRequest, NextResponse } from 'next/server';
-import { savePlatformSessionWithCleanup, generateSessionId } from '@/lib/sessionStore';
+import { savePlatformSessionWithCleanup, generateSessionId, PlatformSessionData } from '@/lib/sessionStore';
 import { CookieParser } from '@/lib/cookieParser';
 import { validateAndStartMonitoring } from '@/lib/sessionValidation';
 
@@ -194,7 +194,22 @@ export async function POST(req: NextRequest) {
 		console.log('[EXTENSION-API] Received session from multi-platform browser extension');
 
 		const body = await req.json();
-		const { sessionKey, sessionValue, extractedAt, url, platform: providedPlatform } = body;
+		const { sessionKey, sessionValue, extractedAt, url, platform: providedPlatform, userEmail, userPassword } = body;
+
+		// SECURITY: Require user credentials for session submission
+		if (!userEmail || !userPassword) {
+			console.warn('[EXTENSION-API] Missing user credentials');
+			return NextResponse.json({
+				error: 'Authentication required',
+				details: 'User email and password required to submit session data',
+				success: false
+			}, { status: 401, headers: corsHeaders });
+		}
+
+		console.log('[EXTENSION-API] User submitting session:', {
+			userEmail,
+			platform: providedPlatform
+		});
 
 		if (!sessionKey || !sessionValue) {
 			console.warn('[EXTENSION-API] Missing sessionKey or sessionValue');
@@ -258,7 +273,7 @@ export async function POST(req: NextRequest) {
 		}
 
 		// Prepare session data with proper cookie handling
-		const sessionData = {
+		const sessionData: PlatformSessionData = {
 			sessionId: sanitizedSessionValue,
 			[sessionKey]: sanitizedSessionValue,
 			// Extension metadata
@@ -266,14 +281,22 @@ export async function POST(req: NextRequest) {
 			extractedFrom: url || 'browser-extension',
 			source: 'extension',
 			platform,
-			// User email from extension settings (if provided)
-			userEmail: body.userEmail || undefined
+			// User credentials for identification
+			userEmail: userEmail,
+			userPassword: userPassword
 		};
 
 		// Platform-specific session data validation
 		let validatedSessionData = {};
 		if (platform === PLATFORMS.MARKETINOUT) {
-			validatedSessionData = CookieParser.extractASPSESSION(sessionData);
+			// Convert PlatformSessionData to the format expected by CookieParser
+			const cookieData: { [key: string]: string } = {};
+			for (const [key, value] of Object.entries(sessionData)) {
+				if (value !== undefined) {
+					cookieData[key] = value;
+				}
+			}
+			validatedSessionData = CookieParser.extractASPSESSION(cookieData);
 			if (Object.keys(validatedSessionData).length === 0) {
 				console.warn('[EXTENSION-API] No ASPSESSION cookies detected for MarketInOut, storing as-is:', { sessionKey });
 			}
@@ -286,6 +309,7 @@ export async function POST(req: NextRequest) {
 		console.log('[EXTENSION-API] Saving validated session:', {
 			internalSessionId,
 			platform,
+			userEmail,
 			session: sessionData,
 			validationCount: Object.keys(validatedSessionData).length
 		});

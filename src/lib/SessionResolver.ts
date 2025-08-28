@@ -35,6 +35,11 @@ export interface SessionStats {
 	platformCounts: Record<string, number>;
 }
 
+export interface UserCredentials {
+	userEmail: string;
+	userPassword: string;
+}
+
 interface PlatformSessionWithTimestamp extends SessionInfo {
 	extractedAt: string;
 }
@@ -69,14 +74,26 @@ export class SessionResolver {
 	 * Extracts sessions for a specific platform from all stored sessions
 	 * @param allSessions - All stored session data
 	 * @param platform - Target platform name
+	 * @param userCredentials - Optional user credentials to filter sessions
 	 * @returns Array of platform sessions with timestamps
 	 */
-	private static extractPlatformSessions(allSessions: StoredSessions, platform: string): PlatformSessionWithTimestamp[] {
+	private static extractPlatformSessions(allSessions: StoredSessions, platform: string, userCredentials?: UserCredentials): PlatformSessionWithTimestamp[] {
 		const platformSessions: PlatformSessionWithTimestamp[] = [];
 
 		for (const [internalId, sessionEntry] of Object.entries(allSessions)) {
 			const platformData = sessionEntry[platform];
 			if (this.isValidSessionData(platformData)) {
+				// Filter by user credentials if provided
+				if (userCredentials) {
+					const sessionEmail = platformData.userEmail;
+					const sessionPassword = platformData.userPassword;
+
+					// Skip sessions that don't match the user credentials
+					if (sessionEmail !== userCredentials.userEmail || sessionPassword !== userCredentials.userPassword) {
+						continue;
+					}
+				}
+
 				platformSessions.push({
 					sessionData: platformData,
 					internalId,
@@ -225,4 +242,96 @@ export class SessionResolver {
 			return { totalSessions: 0, platformCounts: {} };
 		}
 	}
+
+	/**
+	 * Retrieves the most recent valid session for a specific platform and user
+	 * @param platform - Platform name (e.g., 'marketinout', 'tradingview')
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns Session info or null if no valid session found
+	 */
+	static getLatestSessionForUser(platform: string, userCredentials: UserCredentials): SessionInfo | null {
+		try {
+			const allSessions = this.loadSessions();
+			const platformSessions = this.extractPlatformSessions(allSessions, platform, userCredentials);
+
+			if (platformSessions.length === 0) {
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found for user: ${userCredentials.userEmail}`);
+				return null;
+			}
+
+			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
+			const latestSession = sortedSessions[0];
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions for user ${userCredentials.userEmail}, using most recent: ${latestSession.internalId}`);
+
+			return {
+				sessionData: latestSession.sessionData,
+				internalId: latestSession.internalId
+			};
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session for user:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Retrieves the most recent MarketInOut session for a specific user
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns MIO session info with key-value pair for cookies, or null if not found
+	 */
+	static getLatestMIOSessionForUser(userCredentials: UserCredentials): MIOSessionInfo | null {
+		const sessionInfo = this.getLatestSessionForUser(SESSION_CONFIG.PLATFORMS.MARKETINOUT, userCredentials);
+		if (!sessionInfo) {
+			return null;
+		}
+
+		const { sessionData, internalId } = sessionInfo;
+		const sessionKey = this.findSessionCookieKey(sessionData);
+
+		if (!sessionKey) {
+			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data for user: ${userCredentials.userEmail}`);
+			return null;
+		}
+
+		return {
+			key: sessionKey,
+			value: sessionData[sessionKey]!,
+			internalId
+		};
+	}
+
+	/**
+	 * Checks if any sessions exist for a platform and user
+	 * @param platform - Platform name to check
+	 * @param userCredentials - User credentials to filter sessions
+	 * @returns True if sessions exist for the platform and user
+	 */
+	static hasSessionsForPlatformAndUser(platform: string, userCredentials: UserCredentials): boolean {
+		return this.getLatestSessionForUser(platform, userCredentials) !== null;
+	}
+
+	/**
+	 * Gets all available user emails from stored sessions
+	 * @returns Array of unique user emails found in sessions
+	 */
+	static getAvailableUsers(): string[] {
+		try {
+			const allSessions = this.loadSessions();
+			const userEmails = new Set<string>();
+
+			for (const sessionEntry of Object.values(allSessions)) {
+				for (const platformData of Object.values(sessionEntry)) {
+					if (platformData.userEmail) {
+						userEmails.add(platformData.userEmail);
+					}
+				}
+			}
+
+			return Array.from(userEmails).sort();
+		} catch (error) {
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting available users:`, error);
+			return [];
+		}
+	}
+
 }

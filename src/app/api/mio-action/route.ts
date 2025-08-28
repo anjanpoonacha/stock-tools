@@ -2,8 +2,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { MIOService } from '@/lib/MIOService';
-import { SessionResolver } from '@/lib/SessionResolver';
+import { SessionResolver, MIOSessionInfo } from '@/lib/SessionResolver';
 import { HTTP_STATUS, ERROR_MESSAGES, LOG_PREFIXES } from '@/lib/constants';
+
 
 interface MIOActionRequest {
 	mioWlid?: string;
@@ -26,19 +27,6 @@ interface APIResponse<T = unknown> {
 	needsSession?: boolean;
 }
 
-/**
- * Validates and retrieves MIO session information
- * @returns Session info or null if not found
- */
-function validateMIOSession() {
-	const sessionInfo = SessionResolver.getLatestMIOSession();
-	if (!sessionInfo) {
-		console.error(`${LOG_PREFIXES.API} No MIO session available`);
-		return null;
-	}
-	console.log(`${LOG_PREFIXES.API} Using MIO session: ${sessionInfo.internalId}`);
-	return sessionInfo;
-}
 
 /**
  * Creates standardized error response
@@ -70,7 +58,7 @@ function getErrorMessage(error: unknown): string {
 /**
  * Handles MIO watchlist retrieval
  */
-async function handleGetWatchlists(sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>): Promise<NextResponse<APIResponse>> {
+async function handleGetWatchlists(sessionInfo: MIOSessionInfo): Promise<NextResponse<APIResponse>> {
 	try {
 		const watchlists = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
 		console.log(`${LOG_PREFIXES.API} Retrieved ${watchlists.length} watchlists`);
@@ -91,7 +79,7 @@ async function handleGetWatchlists(sessionInfo: NonNullable<ReturnType<typeof va
  * Handles adding symbols to MIO watchlist
  */
 async function handleAddToWatchlist(
-	sessionInfo: NonNullable<ReturnType<typeof validateMIOSession>>,
+	sessionInfo: MIOSessionInfo,
 	mioWlid: string,
 	symbols: string[]
 ): Promise<NextResponse<APIResponse>> {
@@ -120,14 +108,37 @@ async function handleAddToWatchlist(
 
 export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body: MIOActionRequest = await req.json();
-		const { mioWlid, symbols } = body;
+		const body: MIOActionRequest & { userEmail?: string; userPassword?: string } = await req.json();
+		const { mioWlid, symbols, userEmail, userPassword } = body;
 
-		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, body);
+		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, { mioWlid, symbols, userEmail: userEmail ? '[PROVIDED]' : '[MISSING]' });
 
-		const sessionInfo = validateMIOSession();
+		let sessionInfo: MIOSessionInfo | null = null;
+
+		// Try credential-based authentication first (if credentials provided)
+		if (userEmail && userPassword) {
+			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
+			}
+		}
+
+		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
-			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
+			// Try to get the latest available MIO session (fallback)
+			sessionInfo = SessionResolver.getLatestMIOSession();
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
+			}
+		}
+
+		// If still no session found, return error
+		if (!sessionInfo) {
+			return createErrorResponse(
+				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
 		}
 
 		// If no specific action requested, treat as "get watchlists"
@@ -146,16 +157,39 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 
 export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body: CreateWatchlistRequest = await req.json();
-		const { name } = body;
+		const body: CreateWatchlistRequest & { userEmail?: string; userPassword?: string } = await req.json();
+		const { name, userEmail, userPassword } = body;
 
 		if (!name) {
 			return createErrorResponse(ERROR_MESSAGES.NAME_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		const sessionInfo = validateMIOSession();
+		let sessionInfo: MIOSessionInfo | null = null;
+
+		// Try credential-based authentication first (if credentials provided)
+		if (userEmail && userPassword) {
+			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
+			}
+		}
+
+		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
-			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
+			// Try to get the latest available MIO session (fallback)
+			sessionInfo = SessionResolver.getLatestMIOSession();
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
+			}
+		}
+
+		// If still no session found, return error
+		if (!sessionInfo) {
+			return createErrorResponse(
+				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
 		}
 
 		console.log(`${LOG_PREFIXES.API} Creating watchlist with session: ${sessionInfo.internalId}`);
@@ -181,16 +215,39 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 
 export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body: DeleteWatchlistRequest = await req.json();
-		const { deleteIds } = body;
+		const body: DeleteWatchlistRequest & { userEmail?: string; userPassword?: string } = await req.json();
+		const { deleteIds, userEmail, userPassword } = body;
 
 		if (!Array.isArray(deleteIds)) {
 			return createErrorResponse(ERROR_MESSAGES.DELETE_IDS_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		const sessionInfo = validateMIOSession();
+		let sessionInfo: MIOSessionInfo | null = null;
+
+		// Try credential-based authentication first (if credentials provided)
+		if (userEmail && userPassword) {
+			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
+			}
+		}
+
+		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
-			return createErrorResponse(ERROR_MESSAGES.NO_SESSION, HTTP_STATUS.UNAUTHORIZED, true);
+			// Try to get the latest available MIO session (fallback)
+			sessionInfo = SessionResolver.getLatestMIOSession();
+			if (sessionInfo) {
+				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
+			}
+		}
+
+		// If still no session found, return error
+		if (!sessionInfo) {
+			return createErrorResponse(
+				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
 		}
 
 		console.log(`${LOG_PREFIXES.API} Deleting watchlists with session: ${sessionInfo.internalId}`);

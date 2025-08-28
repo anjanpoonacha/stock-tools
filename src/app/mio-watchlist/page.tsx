@@ -48,12 +48,34 @@ export default function MioWatchlistPage() {
     };
 
     /**
-     * Makes API request with standardized error handling
+     * Makes API request with standardized error handling and authentication
      */
     const makeAPIRequest = async (method: string, body: object): Promise<APIResponse> => {
+        // Get authentication token from localStorage
+        const storedTokenData = localStorage.getItem('mio-auth-token');
+        let token = null;
+
+        if (storedTokenData) {
+            try {
+                const tokenData = JSON.parse(storedTokenData);
+                token = tokenData.token;
+            } catch (error) {
+                console.error('Failed to parse token data from localStorage', error);
+            }
+        }
+
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+        };
+
+        // Add authentication token if available
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
         const response = await fetch(API_ENDPOINTS.MIO_ACTION, {
             method,
-            headers: { 'Content-Type': 'application/json' },
+            headers,
             body: JSON.stringify(body),
         });
 

@@ -37,25 +37,25 @@
         return;
     }
 
-    // Configuration - Performance Optimized
-    const CONFIG = {
-        APP_URLS: [
-            'http://localhost:3001',
-            'http://localhost:3000',
-            // 'https://your-app-domain.com', // Replace with your actual domain
-        ],
+    // Configuration - Performance Optimized (Will be loaded from settings)
+    let CONFIG = {
+        APP_URLS: [], // Will be loaded from settings
         INITIAL_CHECK_DELAY: 2000, // Initial check after 2 seconds
         ADAPTIVE_INTERVALS: {
-            ACTIVE: 30000, // 30s when session is active and stable
-            INACTIVE: 60000, // 60s when no session or logged out
-            BACKGROUND: 120000, // 2min when tab is hidden
-            ERROR: 45000, // 45s after errors
+            ACTIVE: 30000, // Default: 30s when session is active and stable
+            INACTIVE: 60000, // Default: 60s when no session or logged out
+            BACKGROUND: 120000, // Default: 2min when tab is hidden
+            ERROR: 45000, // Default: 45s after errors
+            POPUP: 15000, // Default: 15s popup refresh
         },
-        RETRY_DELAY: 8000, // Wait 8 seconds between retries
-        MIN_REQUEST_INTERVAL: 10000, // Minimum 10 seconds between API requests
-        MAX_RETRIES: 2, // Reduced retries
-        SESSION_CACHE_TTL: 300000, // 5 minutes cache TTL
+        RETRY_DELAY: 8000, // Default: Wait 8 seconds between retries
+        MIN_REQUEST_INTERVAL: 10000, // Default: Minimum 10 seconds between API requests
+        MAX_RETRIES: 2, // Default: Reduced retries
+        SESSION_CACHE_TTL: 300000, // Default: 5 minutes cache TTL
         VISIBILITY_CHECK_INTERVAL: 5000, // Check visibility every 5s
+        REQUEST_TIMEOUT: 5000, // Default: 5s request timeout
+        DEBUG_MODE: false, // Will be loaded from settings
+        PERFORMANCE_MONITORING: true, // Will be loaded from settings
 
         // Platform-specific session configurations
         PLATFORMS: {
@@ -312,20 +312,178 @@
     }
 
     /**
-     * Get user email from extension settings
+     * Load settings from extension storage and update CONFIG with all settings
      */
-    async function getUserEmail() {
+    async function loadSettings() {
         try {
-            const result = await chrome.storage.sync.get(['general.userEmail']);
-            return result['general.userEmail'] || '';
+            const result = await chrome.storage.sync.get(['extensionSettings']);
+            const settings = result.extensionSettings || {};
+
+            // Update APP_URLS from settings - check both quickSettings and connection
+            const quickUrls = settings.quickSettings?.appUrls || [];
+            const connectionUrls = settings.connection?.appUrls || [];
+            const customUrls = settings.connection?.customUrls || [];
+
+            // Combine all URL sources, prioritizing quickSettings
+            CONFIG.APP_URLS = [...quickUrls, ...connectionUrls, ...customUrls].filter(
+                (url) => url && url.trim().length > 0
+            );
+
+            // If no URLs configured, show warning but don't use defaults
+            if (CONFIG.APP_URLS.length === 0) {
+                console.warn(
+                    '[MIO-EXTRACTOR] No app URLs configured in settings. Please add URLs in extension settings.'
+                );
+                console.warn(
+                    '[MIO-EXTRACTOR] Extension will not send sessions to any endpoints until URLs are configured.'
+                );
+                CONFIG.APP_URLS = []; // Keep empty to prevent sending to unconfigured endpoints
+            }
+
+            // Load performance settings and apply them to CONFIG
+            const performance = settings.performance || {};
+            const pollingIntervals = performance.pollingIntervals || {};
+
+            // Update adaptive intervals from settings
+            if (pollingIntervals.active) {
+                CONFIG.ADAPTIVE_INTERVALS.ACTIVE = pollingIntervals.active;
+            }
+            if (pollingIntervals.inactive) {
+                CONFIG.ADAPTIVE_INTERVALS.INACTIVE = pollingIntervals.inactive;
+            }
+            if (pollingIntervals.background) {
+                CONFIG.ADAPTIVE_INTERVALS.BACKGROUND = pollingIntervals.background;
+            }
+            if (pollingIntervals.error) {
+                CONFIG.ADAPTIVE_INTERVALS.ERROR = pollingIntervals.error;
+            }
+            if (pollingIntervals.popup) {
+                CONFIG.ADAPTIVE_INTERVALS.POPUP = pollingIntervals.popup;
+            }
+
+            // Load request settings
+            const requestSettings = performance.requestSettings || {};
+            if (requestSettings.timeout) {
+                CONFIG.REQUEST_TIMEOUT = requestSettings.timeout;
+            }
+            if (requestSettings.maxRetries !== undefined) {
+                CONFIG.MAX_RETRIES = requestSettings.maxRetries;
+            }
+            if (requestSettings.minInterval) {
+                CONFIG.MIN_REQUEST_INTERVAL = requestSettings.minInterval;
+            }
+            if (requestSettings.retryDelay) {
+                CONFIG.RETRY_DELAY = requestSettings.retryDelay;
+            }
+
+            // Load cache settings
+            const cacheDurations = performance.cacheDurations || {};
+            if (cacheDurations.session) {
+                CONFIG.SESSION_CACHE_TTL = cacheDurations.session;
+            }
+
+            // Load general settings
+            const general = settings.general || {};
+            if (general.debugMode !== undefined) {
+                CONFIG.DEBUG_MODE = general.debugMode;
+            }
+            if (general.performanceMonitoring !== undefined) {
+                CONFIG.PERFORMANCE_MONITORING = general.performanceMonitoring;
+            }
+
+            // Apply platform-specific multipliers if configured
+            const platforms = settings.platforms || {};
+            const currentPlatformSettings = currentPlatform ? platforms[currentPlatform] || {} : {};
+            if (currentPlatformSettings.pollingMultiplier && currentPlatformSettings.pollingMultiplier !== 1.0) {
+                const multiplier = currentPlatformSettings.pollingMultiplier;
+                CONFIG.ADAPTIVE_INTERVALS.ACTIVE = Math.round(CONFIG.ADAPTIVE_INTERVALS.ACTIVE * multiplier);
+                CONFIG.ADAPTIVE_INTERVALS.INACTIVE = Math.round(CONFIG.ADAPTIVE_INTERVALS.INACTIVE * multiplier);
+                CONFIG.ADAPTIVE_INTERVALS.BACKGROUND = Math.round(CONFIG.ADAPTIVE_INTERVALS.BACKGROUND * multiplier);
+                CONFIG.ADAPTIVE_INTERVALS.ERROR = Math.round(CONFIG.ADAPTIVE_INTERVALS.ERROR * multiplier);
+
+                console.log(`[MIO-EXTRACTOR] Applied ${currentPlatform} polling multiplier: ${multiplier}`);
+            }
+
+            console.log('[MIO-EXTRACTOR] Loaded and applied all settings:', {
+                appUrls: CONFIG.APP_URLS,
+                totalUrls: CONFIG.APP_URLS.length,
+                quickSettingsUrls: quickUrls.length,
+                connectionUrls: connectionUrls.length,
+                customUrls: customUrls.length,
+                adaptiveIntervals: CONFIG.ADAPTIVE_INTERVALS,
+                requestTimeout: CONFIG.REQUEST_TIMEOUT,
+                maxRetries: CONFIG.MAX_RETRIES,
+                minRequestInterval: CONFIG.MIN_REQUEST_INTERVAL,
+                sessionCacheTTL: CONFIG.SESSION_CACHE_TTL,
+                debugMode: CONFIG.DEBUG_MODE,
+                performanceMonitoring: CONFIG.PERFORMANCE_MONITORING,
+            });
+
+            return settings;
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error getting user email from settings:', error);
-            return '';
+            console.error('[MIO-EXTRACTOR] Error loading settings:', error);
+            CONFIG.APP_URLS = []; // Ensure no hardcoded URLs are used
+            return {};
         }
     }
 
     /**
-     * Send session data to the trading app - Performance Optimized
+     * Get user credentials from extension settings
+     */
+    async function getUserCredentials() {
+        try {
+            const result = await chrome.storage.sync.get(['extensionSettings']);
+            const settings = result.extensionSettings || {};
+
+            // Use quickSettings for user credentials (new structure)
+            const userEmail = settings.quickSettings?.userEmail || settings.general?.userEmail || '';
+            const userPassword = settings.quickSettings?.userPassword || settings.general?.userPassword || '';
+
+            return { userEmail, userPassword };
+        } catch (error) {
+            console.error('[MIO-EXTRACTOR] Error getting user credentials from settings:', error);
+            return { userEmail: '', userPassword: '' };
+        }
+    }
+
+    /**
+     * Check if user has provided both email and password
+     */
+    async function hasValidCredentials() {
+        const { userEmail, userPassword } = await getUserCredentials();
+        const hasEmail = userEmail && userEmail.trim().length > 0;
+        const hasPassword = userPassword && userPassword.trim().length > 0;
+
+        console.log('[MIO-EXTRACTOR] Credential check:', {
+            hasEmail,
+            hasPassword,
+            bothProvided: hasEmail && hasPassword,
+        });
+
+        return hasEmail && hasPassword;
+    }
+
+    /**
+     * Get user credentials from extension settings (using sync storage for multi-window support)
+     */
+    async function getUserCredentialsFromStorage() {
+        try {
+            const result = await chrome.storage.sync.get(['extensionSettings']);
+            const settings = result.extensionSettings || {};
+
+            // Use quickSettings for user credentials (new structure)
+            const userEmail = settings.quickSettings?.userEmail || settings.general?.userEmail || '';
+            const userPassword = settings.quickSettings?.userPassword || settings.general?.userPassword || '';
+
+            return { userEmail, userPassword };
+        } catch (error) {
+            console.error('[MIO-EXTRACTOR] Error getting user credentials from storage:', error);
+            return { userEmail: '', userPassword: '' };
+        }
+    }
+
+    /**
+     * Send session data to the trading app - Performance Optimized with Authentication
      */
     async function sendSessionToApp(sessionData) {
         console.log('[MIO-EXTRACTOR] Sending session to app:', sessionData.sessionKey);
@@ -337,12 +495,16 @@
             return true;
         }
 
-        // Get user email from settings
-        const userEmail = await getUserEmail();
-        if (userEmail) {
-            sessionData.userEmail = userEmail;
-            console.log('[MIO-EXTRACTOR] Added user email to session data:', userEmail);
+        // Get user credentials from extension settings
+        const { userEmail, userPassword } = await getUserCredentialsFromStorage();
+        if (!userEmail || !userPassword) {
+            console.warn(
+                '[MIO-EXTRACTOR] No user credentials found. Please configure email and password in extension settings.'
+            );
+            return false;
         }
+
+        console.log('[MIO-EXTRACTOR] Using user credentials for secure session submission:', { userEmail });
 
         // Cancel any previous request
         if (abortController) {
@@ -367,7 +529,7 @@
             console.error(`[MULTI-EXTRACTOR] Error storing ${currentPlatform} session in Chrome storage:`, error);
         }
 
-        // Method 2: Optimized API calls with timeout and abort
+        // Method 2: Optimized API calls with authentication token
         const promises = CONFIG.APP_URLS.map(async (appUrl) => {
             try {
                 const response = await fetch(`${appUrl}/api/extension/session`, {
@@ -375,9 +537,12 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(sessionData),
+                    body: JSON.stringify({
+                        ...sessionData,
+                        userEmail,
+                        userPassword,
+                    }),
                     signal: abortController.signal,
-                    timeout: 5000, // 5 second timeout
                 });
 
                 if (response.ok) {
@@ -452,6 +617,14 @@
         const now = Date.now();
         if (now - lastRequestTime < CONFIG.MIN_REQUEST_INTERVAL) {
             console.log('[MIO-EXTRACTOR] Request throttled, waiting...');
+            return;
+        }
+
+        // Check if user has provided both email and password
+        const hasCredentials = await hasValidCredentials();
+        if (!hasCredentials) {
+            console.log('[MIO-EXTRACTOR] Missing email or password credentials, skipping extraction');
+            console.log('[MIO-EXTRACTOR] Please configure both email and password in extension settings');
             return;
         }
 
@@ -581,13 +754,12 @@
                 if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
                     // Check if any added nodes contain navigation elements
                     for (const node of mutation.addedNodes) {
-                        if (node.nodeType === Node.ELEMENT_NODE) {
-                            const element = node;
+                        if (node.nodeType === Node.ELEMENT_NODE && node.tagName) {
                             if (
-                                element.tagName === 'MAIN' ||
-                                element.tagName === 'SECTION' ||
-                                (element.className && element.className.includes('content')) ||
-                                (element.id && element.id.includes('content'))
+                                node.tagName === 'MAIN' ||
+                                node.tagName === 'SECTION' ||
+                                (node.className && node.className.includes('content')) ||
+                                (node.id && node.id.includes('content'))
                             ) {
                                 significantChange = true;
                                 break;
@@ -647,10 +819,41 @@
     }
 
     /**
+     * Listen for settings changes and reload configuration
+     */
+    function setupSettingsListener() {
+        // Listen for storage changes
+        chrome.storage.onChanged.addListener(async (changes, namespace) => {
+            if (namespace === 'sync' && changes.extensionSettings) {
+                console.log('[MIO-EXTRACTOR] Settings changed, reloading configuration...');
+
+                // Reload settings
+                await loadSettings();
+
+                // Restart polling with new intervals
+                startAdaptivePolling();
+
+                console.log('[MIO-EXTRACTOR] Configuration updated with new settings:', {
+                    intervals: CONFIG.ADAPTIVE_INTERVALS,
+                    requestTimeout: CONFIG.REQUEST_TIMEOUT,
+                    maxRetries: CONFIG.MAX_RETRIES,
+                    debugMode: CONFIG.DEBUG_MODE,
+                });
+            }
+        });
+    }
+
+    /**
      * Initialize the extension with performance optimizations
      */
-    function initialize() {
+    async function initialize() {
         console.log('[MIO-EXTRACTOR] Initializing performance-optimized extension on:', window.location.href);
+
+        // Load settings first
+        await loadSettings();
+
+        // Set up settings change listener
+        setupSettingsListener();
 
         // Set up visibility change monitoring
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -705,6 +908,22 @@
                 });
                 return true;
             }
+
+            if (request.action === 'reloadSettings') {
+                // Reload settings when requested
+                loadSettings().then(() => {
+                    startAdaptivePolling();
+                    sendResponse({
+                        success: true,
+                        config: {
+                            intervals: CONFIG.ADAPTIVE_INTERVALS,
+                            debugMode: CONFIG.DEBUG_MODE,
+                            appUrls: CONFIG.APP_URLS.length,
+                        },
+                    });
+                });
+                return true;
+            }
         });
 
         // Cleanup on page unload
@@ -729,7 +948,7 @@
                 const perfObserver = new PerformanceObserver((list) => {
                     const entries = list.getEntries();
                     entries.forEach((entry) => {
-                        if (entry.entryType === 'navigation') {
+                        if (entry.entryType === 'navigation' && entry.domContentLoadedEventEnd) {
                             console.log('[MIO-EXTRACTOR] Navigation timing:', {
                                 domContentLoaded: entry.domContentLoadedEventEnd - entry.domContentLoadedEventStart,
                                 loadComplete: entry.loadEventEnd - entry.loadEventStart,
@@ -805,49 +1024,16 @@
 
     /**
      * Phase 3: Web Worker integration for heavy computations
+     * Note: Content scripts cannot directly access chrome-extension:// URLs for Workers
+     * This functionality is disabled to prevent security errors
      */
     let performanceWorker = null;
 
     function initializeWebWorker() {
-        try {
-            // Check if Web Workers are supported
-            if (typeof Worker === 'undefined') {
-                console.warn('[MIO-EXTRACTOR] Web Workers not supported in this environment');
-                return;
-            }
-
-            // Check if chrome.runtime is available
-            if (typeof chrome === 'undefined' || !chrome.runtime || !chrome.runtime.getURL) {
-                console.warn('[MIO-EXTRACTOR] Chrome runtime not available for Web Worker');
-                return;
-            }
-
-            performanceWorker = new Worker(chrome.runtime.getURL('performance-worker.js'));
-
-            performanceWorker.onmessage = function (e) {
-                const { type, results, error } = e.data;
-
-                if (type === 'batchComplete') {
-                    console.log('[MIO-EXTRACTOR] Worker completed batch:', results.length, 'tasks');
-                } else if (type === 'error') {
-                    console.error('[MIO-EXTRACTOR] Worker error:', error);
-                }
-            };
-
-            performanceWorker.onerror = function (error) {
-                console.error('[MIO-EXTRACTOR] Worker error:', error);
-                // Fallback: disable worker on error
-                if (performanceWorker) {
-                    performanceWorker.terminate();
-                    performanceWorker = null;
-                }
-            };
-
-            console.log('[MIO-EXTRACTOR] Performance worker initialized');
-        } catch (error) {
-            console.warn('[MIO-EXTRACTOR] Web Worker not supported:', error.message);
-            performanceWorker = null;
-        }
+        // Web Workers are not supported in content scripts due to security restrictions
+        // Content scripts running on external domains cannot access chrome-extension:// URLs
+        console.log('[MIO-EXTRACTOR] Web Worker disabled in content script for security compliance');
+        performanceWorker = null;
     }
 
     /**
