@@ -760,16 +760,62 @@
 
         container.innerHTML = '';
 
-        quickUrls.forEach((url, index) => {
+        quickUrls.forEach((urlData, index) => {
+            // Handle both string URLs (legacy) and object URLs (new format)
+            const url = typeof urlData === 'string' ? urlData : urlData.url;
+            const enabled = typeof urlData === 'string' ? true : urlData.enabled !== false;
+
             const urlItem = document.createElement('div');
-            urlItem.className = 'url-item';
+            urlItem.className = `url-item ${enabled ? '' : 'url-disabled'}`;
             urlItem.innerHTML = `
-                <span class="url-text">${url}</span>
-                <button class="url-remove" data-index="${index}">Remove</button>
+                <div class="url-content">
+                    <span class="url-text ${enabled ? '' : 'disabled'}">${url}</span>
+                    <div class="url-status">
+                        <span class="status-indicator ${enabled ? 'enabled' : 'disabled'}">${
+                enabled ? 'Active' : 'Disabled'
+            }</span>
+                    </div>
+                </div>
+                <div class="url-actions">
+                    <button class="url-edit btn-icon" data-index="${index}" title="Edit URL">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </button>
+                    <button class="url-toggle btn-icon" data-index="${index}" title="${
+                enabled ? 'Disable' : 'Enable'
+            } URL">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            ${
+                                enabled
+                                    ? '<path d="M10 9V5a3 3 0 0 1 6 0v4M7 9h10l1 12H6L7 9z"></path>'
+                                    : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><path d="M21 4L3 20"></path><circle cx="12" cy="12" r="3"></circle>'
+                            }
+                        </svg>
+                    </button>
+                    <button class="url-remove btn-icon" data-index="${index}" title="Remove URL">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                </div>
             `;
 
-            // Add remove event listener
+            // Add event listeners
+            const editBtn = urlItem.querySelector('.url-edit');
+            const toggleBtn = urlItem.querySelector('.url-toggle');
             const removeBtn = urlItem.querySelector('.url-remove');
+
+            if (editBtn) {
+                editBtn.addEventListener('click', () => handleEditQuickUrl(index));
+            }
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', () => handleToggleQuickUrl(index));
+            }
+
             if (removeBtn) {
                 removeBtn.addEventListener('click', () => {
                     quickUrls.splice(index, 1);
@@ -1044,6 +1090,74 @@
                 loadSettings();
             }
         }
+    }
+
+    /**
+     * Handle editing a quick URL
+     */
+    function handleEditQuickUrl(index) {
+        const urlData = quickUrls[index];
+        const currentUrl = typeof urlData === 'string' ? urlData : urlData.url;
+
+        const newUrl = prompt('Edit URL:', currentUrl);
+        if (newUrl === null) return; // User cancelled
+
+        const trimmedUrl = newUrl.trim();
+        if (!trimmedUrl) {
+            updateStatus('URL cannot be empty', 'error');
+            return;
+        }
+
+        // Validate URL
+        try {
+            new URL(trimmedUrl);
+        } catch (error) {
+            updateStatus('Invalid URL format', 'error');
+            return;
+        }
+
+        // Check for duplicates (excluding current URL)
+        const isDuplicate = quickUrls.some((existingUrlData, existingIndex) => {
+            if (existingIndex === index) return false;
+            const existingUrl = typeof existingUrlData === 'string' ? existingUrlData : existingUrlData.url;
+            return existingUrl === trimmedUrl;
+        });
+
+        if (isDuplicate) {
+            updateStatus('URL already exists', 'warning');
+            return;
+        }
+
+        // Update URL while preserving enabled state
+        if (typeof urlData === 'string') {
+            quickUrls[index] = trimmedUrl;
+        } else {
+            quickUrls[index] = { ...urlData, url: trimmedUrl };
+        }
+
+        updateQuickUrlsList();
+        markDirty();
+        updateStatus('Quick URL updated', 'success');
+    }
+
+    /**
+     * Handle toggling a quick URL enabled/disabled state
+     */
+    function handleToggleQuickUrl(index) {
+        const urlData = quickUrls[index];
+
+        // Convert string URL to object format if needed
+        if (typeof urlData === 'string') {
+            quickUrls[index] = { url: urlData, enabled: false };
+        } else {
+            quickUrls[index] = { ...urlData, enabled: !urlData.enabled };
+        }
+
+        updateQuickUrlsList();
+        markDirty();
+
+        const newState = quickUrls[index].enabled;
+        updateStatus(`Quick URL ${newState ? 'enabled' : 'disabled'}`, 'info');
     }
 
     /**
