@@ -12,6 +12,7 @@
     let isDirty = false;
     let isLoading = false;
     let customUrls = [];
+    let quickUrls = [];
 
     // DOM Elements Cache
     const elements = {};
@@ -25,8 +26,18 @@
             'importBtn',
             'importFileInput',
 
+            // Quick Settings
+            'quickUrlInput',
+            'addQuickUrlBtn',
+            'quickUrls',
+            'quickUserEmail',
+            'quickUserPassword',
+            'toggleQuickPassword',
+
             // General settings
             'userEmail',
+            'userPassword',
+            'togglePassword',
             'enableMarketInOut',
             'enableTradingView',
             'autoRefreshPopup',
@@ -151,117 +162,144 @@
      * Populate UI elements with current settings
      */
     function populateUI(settings) {
-        // General settings
+        // Ensure settings structure exists
+        if (!settings) {
+            console.warn('[SETTINGS-UI] Settings object is null or undefined');
+            return;
+        }
+
+        // General settings - Use quickSettings for user credentials
         if (elements.userEmail) {
-            elements.userEmail.value = settings.general.userEmail || '';
+            elements.userEmail.value = settings.quickSettings?.userEmail || settings.general?.userEmail || '';
+        }
+        if (elements.userPassword) {
+            elements.userPassword.value = settings.quickSettings?.userPassword || settings.general?.userPassword || '';
         }
         if (elements.enableMarketInOut) {
-            elements.enableMarketInOut.checked = settings.general.enabledPlatforms.marketinout;
+            elements.enableMarketInOut.checked =
+                settings.quickSettings?.enabledPlatforms?.marketinout ??
+                settings.general?.enabledPlatforms?.marketinout ??
+                true;
         }
         if (elements.enableTradingView) {
-            elements.enableTradingView.checked = settings.general.enabledPlatforms.tradingview;
+            elements.enableTradingView.checked =
+                settings.quickSettings?.enabledPlatforms?.tradingview ??
+                settings.general?.enabledPlatforms?.tradingview ??
+                true;
         }
         if (elements.autoRefreshPopup) {
-            elements.autoRefreshPopup.checked = settings.general.autoRefreshPopup;
+            elements.autoRefreshPopup.checked = settings.general?.autoRefreshPopup ?? true;
         }
         if (elements.uiTheme) {
-            elements.uiTheme.value = settings.ui.theme;
+            elements.uiTheme.value = settings.ui?.theme ?? 'auto';
         }
         if (elements.compactMode) {
-            elements.compactMode.checked = settings.ui.compactMode;
+            elements.compactMode.checked = settings.ui?.compactMode ?? false;
         }
         if (elements.notificationsEnabled) {
-            elements.notificationsEnabled.checked = settings.ui.notificationsEnabled;
+            elements.notificationsEnabled.checked = settings.ui?.notificationsEnabled ?? true;
         }
 
         // Performance settings
         if (elements.activePolling) {
-            elements.activePolling.value = settings.performance.pollingIntervals.active / 1000;
+            elements.activePolling.value = (settings.performance?.pollingIntervals?.active ?? 30000) / 1000;
         }
         if (elements.inactivePolling) {
-            elements.inactivePolling.value = settings.performance.pollingIntervals.inactive / 1000;
+            elements.inactivePolling.value = (settings.performance?.pollingIntervals?.inactive ?? 60000) / 1000;
         }
         if (elements.backgroundPolling) {
-            elements.backgroundPolling.value = settings.performance.pollingIntervals.background / 1000;
+            elements.backgroundPolling.value = (settings.performance?.pollingIntervals?.background ?? 120000) / 1000;
         }
         if (elements.popupPolling) {
-            elements.popupPolling.value = settings.performance.pollingIntervals.popup / 1000;
+            elements.popupPolling.value = (settings.performance?.pollingIntervals?.popup ?? 15000) / 1000;
         }
         if (elements.requestTimeout) {
-            elements.requestTimeout.value = settings.performance.requestSettings.timeout / 1000;
+            elements.requestTimeout.value = (settings.performance?.requestSettings?.timeout ?? 5000) / 1000;
         }
         if (elements.maxRetries) {
-            elements.maxRetries.value = settings.performance.requestSettings.maxRetries;
+            elements.maxRetries.value = settings.performance?.requestSettings?.maxRetries ?? 2;
         }
         if (elements.minRequestInterval) {
-            elements.minRequestInterval.value = settings.performance.requestSettings.minInterval / 1000;
+            elements.minRequestInterval.value = (settings.performance?.requestSettings?.minInterval ?? 10000) / 1000;
         }
         if (elements.sessionCache) {
-            elements.sessionCache.value = settings.performance.cacheDurations.session / 60000;
+            elements.sessionCache.value = (settings.performance?.cacheDurations?.session ?? 300000) / 60000;
         }
         if (elements.connectionCache) {
-            elements.connectionCache.value = settings.performance.cacheDurations.appConnection / 1000;
+            elements.connectionCache.value = (settings.performance?.cacheDurations?.appConnection ?? 30000) / 1000;
         }
 
         // Connection settings
         if (elements.connectionCheckFreq) {
-            elements.connectionCheckFreq.value = settings.connection.connectionCheckFrequency / 1000;
+            elements.connectionCheckFreq.value = (settings.connection?.connectionCheckFrequency ?? 30000) / 1000;
         }
         if (elements.enablePostMessage) {
-            elements.enablePostMessage.checked = settings.connection.enablePostMessage;
+            elements.enablePostMessage.checked = settings.connection?.enablePostMessage ?? true;
         }
         if (elements.enableStorageSync) {
-            elements.enableStorageSync.checked = settings.connection.enableStorageSync;
+            elements.enableStorageSync.checked = settings.connection?.enableStorageSync ?? true;
         }
 
         // Platform settings
         if (elements.mioSessionCookie) {
-            elements.mioSessionCookie.value = settings.platforms.marketinout.sessionCookieName;
+            elements.mioSessionCookie.value = settings.platforms?.marketinout?.sessionCookieName ?? 'ASPSESSIONID';
         }
         if (elements.mioPollingMultiplier) {
-            elements.mioPollingMultiplier.value = settings.platforms.marketinout.pollingMultiplier;
+            elements.mioPollingMultiplier.value = settings.platforms?.marketinout?.pollingMultiplier ?? 1.0;
         }
         if (elements.mioAdvancedDetection) {
-            elements.mioAdvancedDetection.checked = settings.platforms.marketinout.enableAdvancedDetection;
+            elements.mioAdvancedDetection.checked = settings.platforms?.marketinout?.enableAdvancedDetection ?? true;
         }
         if (elements.tvSessionCookie) {
-            elements.tvSessionCookie.value = settings.platforms.tradingview.sessionCookieName;
+            elements.tvSessionCookie.value = settings.platforms?.tradingview?.sessionCookieName ?? 'sessionid';
         }
         if (elements.tvPollingMultiplier) {
-            elements.tvPollingMultiplier.value = settings.platforms.tradingview.pollingMultiplier;
+            elements.tvPollingMultiplier.value = settings.platforms?.tradingview?.pollingMultiplier ?? 1.2;
         }
         if (elements.tvAdvancedDetection) {
-            elements.tvAdvancedDetection.checked = settings.platforms.tradingview.enableAdvancedDetection;
+            elements.tvAdvancedDetection.checked = settings.platforms?.tradingview?.enableAdvancedDetection ?? true;
         }
 
         // Advanced settings
         if (elements.enableWebWorker) {
-            elements.enableWebWorker.checked = settings.advanced.enableWebWorker;
+            elements.enableWebWorker.checked = settings.advanced?.enableWebWorker ?? true;
         }
         if (elements.enableIntersectionObserver) {
-            elements.enableIntersectionObserver.checked = settings.advanced.enableIntersectionObserver;
+            elements.enableIntersectionObserver.checked = settings.advanced?.enableIntersectionObserver ?? true;
         }
         if (elements.enablePerformanceObserver) {
-            elements.enablePerformanceObserver.checked = settings.advanced.enablePerformanceObserver;
+            elements.enablePerformanceObserver.checked = settings.advanced?.enablePerformanceObserver ?? true;
         }
         if (elements.enableAutoRecovery) {
-            elements.enableAutoRecovery.checked = settings.advanced.enableAutoRecovery;
+            elements.enableAutoRecovery.checked = settings.advanced?.enableAutoRecovery ?? true;
         }
         if (elements.debugMode) {
-            elements.debugMode.checked = settings.general.debugMode;
+            elements.debugMode.checked = settings.general?.debugMode ?? false;
         }
         if (elements.logLevel) {
-            elements.logLevel.value = settings.advanced.logLevel;
+            elements.logLevel.value = settings.advanced?.logLevel ?? 'info';
         }
         if (elements.enableMetrics) {
-            elements.enableMetrics.checked = settings.advanced.enableMetrics;
+            elements.enableMetrics.checked = settings.advanced?.enableMetrics ?? true;
         }
         if (elements.storageQuotaWarning) {
-            elements.storageQuotaWarning.value = settings.advanced.storageQuotaWarning;
+            elements.storageQuotaWarning.value = settings.advanced?.storageQuotaWarning ?? 0.8;
         }
 
+        // Update Quick Settings
+        if (elements.quickUserEmail) {
+            elements.quickUserEmail.value = settings.quickSettings?.userEmail || '';
+        }
+        if (elements.quickUserPassword) {
+            elements.quickUserPassword.value = settings.quickSettings?.userPassword || '';
+        }
+
+        // Update quick URLs
+        quickUrls = [...(settings.quickSettings?.appUrls ?? [])];
+        updateQuickUrlsList();
+
         // Update custom URLs
-        customUrls = [...settings.connection.customUrls];
+        customUrls = [...(settings.connection?.customUrls ?? [])];
         updateCustomUrlsList();
 
         // Update all slider values
@@ -308,6 +346,18 @@
             slider.addEventListener('input', updateSliderValue);
         });
 
+        // Quick URL management
+        if (elements.addQuickUrlBtn) {
+            elements.addQuickUrlBtn.addEventListener('click', handleAddQuickUrl);
+        }
+        if (elements.quickUrlInput) {
+            elements.quickUrlInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    handleAddQuickUrl();
+                }
+            });
+        }
+
         // Custom URL management
         if (elements.addUrlBtn) {
             elements.addUrlBtn.addEventListener('click', handleAddCustomUrl);
@@ -318,6 +368,14 @@
                     handleAddCustomUrl();
                 }
             });
+        }
+
+        // Password toggle
+        if (elements.togglePassword) {
+            elements.togglePassword.addEventListener('click', handlePasswordToggle);
+        }
+        if (elements.toggleQuickPassword) {
+            elements.toggleQuickPassword.addEventListener('click', handleQuickPasswordToggle);
         }
 
         // Advanced actions
@@ -368,11 +426,62 @@
      * Initialize preset system
      */
     function initializePresets() {
-        // Mark balanced preset as active by default
-        const balancedCard = document.querySelector('[data-preset="balanced"]');
-        if (balancedCard) {
-            balancedCard.classList.add('active');
+        // Detect and mark the active preset based on current settings
+        updateActivePresetCard();
+    }
+
+    /**
+     * Update active preset card based on current settings
+     */
+    function updateActivePresetCard() {
+        if (!currentSettings || !settingsManager) return;
+
+        // Get current performance intervals
+        const currentIntervals = {
+            active: currentSettings.performance?.pollingIntervals?.active || 30000,
+            inactive: currentSettings.performance?.pollingIntervals?.inactive || 60000,
+            background: currentSettings.performance?.pollingIntervals?.background || 120000,
+        };
+
+        // Get preset definitions from settings manager
+        const presets = settingsManager.getPresets ? settingsManager.getPresets() : {};
+
+        let activePreset = 'balanced'; // default fallback
+
+        // Compare current settings with each preset
+        for (const [presetName, presetConfig] of Object.entries(presets)) {
+            if (presetConfig.settings) {
+                // Extract intervals from flattened preset settings
+                const presetIntervals = {
+                    active: presetConfig.settings['performance.pollingIntervals.active'],
+                    inactive: presetConfig.settings['performance.pollingIntervals.inactive'],
+                    background: presetConfig.settings['performance.pollingIntervals.background'],
+                };
+
+                // Check if all three intervals are defined in the preset
+                if (presetIntervals.active && presetIntervals.inactive && presetIntervals.background) {
+                    // Check if current intervals match this preset
+                    if (
+                        currentIntervals.active === presetIntervals.active &&
+                        currentIntervals.inactive === presetIntervals.inactive &&
+                        currentIntervals.background === presetIntervals.background
+                    ) {
+                        activePreset = presetName;
+                        break;
+                    }
+                }
+            }
         }
+
+        // Update preset card visual state
+        elements.presetCards.forEach((card) => {
+            card.classList.toggle('active', card.dataset.preset === activePreset);
+        });
+
+        console.log(`[SETTINGS-UI] Active preset detected: ${activePreset}`, {
+            currentIntervals,
+            detectedPreset: activePreset,
+        });
     }
 
     /**
@@ -454,22 +563,45 @@
             setLoading(true);
             updateStatus(`Applying ${presetName} preset...`, 'info');
 
-            // Update active preset card
-            elements.presetCards.forEach((card) => {
-                card.classList.toggle('active', card.dataset.preset === presetName);
-            });
-
-            // Apply preset
+            // Apply preset - this updates the settings in memory and saves them
             await settingsManager.applyPreset(presetName);
 
-            // Reload settings and update UI
-            await loadSettings();
+            // Clear cache and force reload to get the updated values
+            settingsManager.clearCache();
+            currentSettings = await settingsManager.loadSettings(true);
 
-            updateStatus(`${presetName} preset applied successfully`, 'success');
-            markDirty();
+            // Update UI with new settings
+            populateUI(currentSettings);
+
+            // Update active preset card based on actual settings
+            updateActivePresetCard();
+
+            // Mark as clean since preset was saved automatically
+            isDirty = false;
+            updateSaveButton();
+
+            updateStatus(`${presetName} preset applied and saved successfully`, 'success');
+
+            // Notify content scripts about the settings change
+            try {
+                chrome.runtime.sendMessage({
+                    action: 'settingsUpdated',
+                    preset: presetName,
+                });
+            } catch (error) {
+                console.warn('[SETTINGS-UI] Could not notify content scripts:', error);
+            }
         } catch (error) {
             console.error('[SETTINGS-UI] Error applying preset:', error);
             updateStatus('Failed to apply preset', 'error');
+
+            // Reload settings to ensure UI is in sync
+            try {
+                await loadSettings();
+                updateActivePresetCard();
+            } catch (reloadError) {
+                console.error('[SETTINGS-UI] Error reloading settings after preset failure:', reloadError);
+            }
         } finally {
             setLoading(false);
         }
@@ -509,6 +641,135 @@
     }
 
     /**
+     * Handle password toggle
+     */
+    function handlePasswordToggle() {
+        if (!elements.userPassword || !elements.togglePassword) return;
+
+        const isPassword = elements.userPassword.type === 'password';
+        elements.userPassword.type = isPassword ? 'text' : 'password';
+
+        // Update the icon
+        const svg = elements.togglePassword.querySelector('svg');
+        if (svg) {
+            if (isPassword) {
+                // Show "eye-off" icon when password is visible
+                svg.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <path d="M21 4L3 20"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                `;
+            } else {
+                // Show "eye" icon when password is hidden
+                svg.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                `;
+            }
+        }
+
+        // Update title
+        elements.togglePassword.title = isPassword ? 'Hide password' : 'Show password';
+    }
+
+    /**
+     * Handle quick URL addition
+     */
+    function handleAddQuickUrl() {
+        const input = elements.quickUrlInput;
+        if (!input) return;
+
+        const url = input.value.trim();
+        if (!url) return;
+
+        // Validate URL
+        try {
+            new URL(url);
+        } catch (error) {
+            updateStatus('Invalid URL format', 'error');
+            return;
+        }
+
+        // Check for duplicates
+        if (quickUrls.includes(url)) {
+            updateStatus('URL already exists', 'warning');
+            return;
+        }
+
+        // Add URL
+        quickUrls.push(url);
+        updateQuickUrlsList();
+        input.value = '';
+        markDirty();
+
+        updateStatus('Quick URL added', 'success');
+    }
+
+    /**
+     * Handle quick password toggle
+     */
+    function handleQuickPasswordToggle() {
+        if (!elements.quickUserPassword || !elements.toggleQuickPassword) return;
+
+        const isPassword = elements.quickUserPassword.type === 'password';
+        elements.quickUserPassword.type = isPassword ? 'text' : 'password';
+
+        // Update the icon
+        const svg = elements.toggleQuickPassword.querySelector('svg');
+        if (svg) {
+            if (isPassword) {
+                // Show "eye-off" icon when password is visible
+                svg.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <path d="M21 4L3 20"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                `;
+            } else {
+                // Show "eye" icon when password is hidden
+                svg.innerHTML = `
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                `;
+            }
+        }
+
+        // Update title
+        elements.toggleQuickPassword.title = isPassword ? 'Hide password' : 'Show password';
+    }
+
+    /**
+     * Update quick URLs list display
+     */
+    function updateQuickUrlsList() {
+        const container = elements.quickUrls;
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        quickUrls.forEach((url, index) => {
+            const urlItem = document.createElement('div');
+            urlItem.className = 'url-item';
+            urlItem.innerHTML = `
+                <span class="url-text">${url}</span>
+                <button class="url-remove" data-index="${index}">Remove</button>
+            `;
+
+            // Add remove event listener
+            const removeBtn = urlItem.querySelector('.url-remove');
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    quickUrls.splice(index, 1);
+                    updateQuickUrlsList();
+                    markDirty();
+                    updateStatus('Quick URL removed', 'info');
+                });
+            }
+
+            container.appendChild(urlItem);
+        });
+    }
+
+    /**
      * Update custom URLs list display
      */
     function updateCustomUrlsList() {
@@ -527,12 +788,14 @@
 
             // Add remove event listener
             const removeBtn = urlItem.querySelector('.url-remove');
-            removeBtn.addEventListener('click', () => {
-                customUrls.splice(index, 1);
-                updateCustomUrlsList();
-                markDirty();
-                updateStatus('Custom URL removed', 'info');
-            });
+            if (removeBtn) {
+                removeBtn.addEventListener('click', () => {
+                    customUrls.splice(index, 1);
+                    updateCustomUrlsList();
+                    markDirty();
+                    updateStatus('Custom URL removed', 'info');
+                });
+            }
 
             container.appendChild(urlItem);
         });
@@ -544,8 +807,14 @@
     function collectFormValues() {
         const values = {};
 
+        // Quick Settings - User credentials and URLs
+        values['quickSettings.userEmail'] =
+            elements.userEmail?.value?.trim() || elements.quickUserEmail?.value?.trim() || '';
+        values['quickSettings.userPassword'] =
+            elements.userPassword?.value?.trim() || elements.quickUserPassword?.value?.trim() || '';
+        values['quickSettings.appUrls'] = quickUrls;
+
         // General settings
-        values['general.userEmail'] = elements.userEmail?.value?.trim() || '';
         values['general.enabledPlatforms.marketinout'] = elements.enableMarketInOut?.checked ?? true;
         values['general.enabledPlatforms.tradingview'] = elements.enableTradingView?.checked ?? true;
         values['general.autoRefreshPopup'] = elements.autoRefreshPopup?.checked ?? true;

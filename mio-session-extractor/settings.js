@@ -6,13 +6,19 @@
 
     // Default Configuration - Performance Optimized
     const DEFAULT_SETTINGS = {
-        // General Settings
-        general: {
+        // Quick Settings - Most Important Settings
+        quickSettings: {
             userEmail: '', // User email for session identification
+            userPassword: '', // User password for session authentication
+            appUrls: ['https://stock-tools-jet.vercel.app'], // Default app URL
             enabledPlatforms: {
                 marketinout: true,
                 tradingview: true,
             },
+        },
+
+        // General Settings
+        general: {
             autoRefreshPopup: true,
             debugMode: false,
             performanceMonitoring: true,
@@ -49,7 +55,7 @@
 
         // Connection Settings
         connection: {
-            appUrls: ['http://localhost:3001', 'http://localhost:3000'],
+            appUrls: ['https://stock-tools-jet.vercel.app'],
             customUrls: [], // User-defined URLs
             connectionCheckFrequency: 30000, // 30s connection checks
             enablePostMessage: true,
@@ -127,7 +133,17 @@
         balanced: {
             name: 'Balanced Mode',
             description: 'Good balance between performance and battery life',
-            settings: DEFAULT_SETTINGS, // Use defaults
+            settings: {
+                'performance.pollingIntervals.active': 30000,
+                'performance.pollingIntervals.inactive': 60000,
+                'performance.pollingIntervals.background': 120000,
+                'performance.requestSettings.timeout': 5000,
+                'performance.requestSettings.maxRetries': 2,
+                'advanced.enableWebWorker': true,
+                'advanced.enablePerformanceObserver': true,
+                'general.debugMode': false,
+                'ui.animationsEnabled': true,
+            },
         },
         battery: {
             name: 'Battery Saver',
@@ -192,11 +208,11 @@
         /**
          * Load settings from Chrome storage with caching
          */
-        async loadSettings() {
+        async loadSettings(forceReload = false) {
             const now = Date.now();
 
-            // Use cache if valid
-            if (this.settings && now - this.cacheTimestamp < this.cacheTTL) {
+            // Use cache if valid and not forcing reload
+            if (!forceReload && this.settings && now - this.cacheTimestamp < this.cacheTTL) {
                 return this.settings;
             }
 
@@ -205,7 +221,7 @@
 
                 if (result.extensionSettings) {
                     this.settings = this.mergeWithDefaults(result.extensionSettings);
-                    console.log('[SETTINGS] Loaded settings from storage');
+                    console.log('[SETTINGS] Loaded settings from storage' + (forceReload ? ' (forced reload)' : ''));
                 } else {
                     this.settings = this.deepClone(DEFAULT_SETTINGS);
                     await this.saveSettings(); // Save defaults
@@ -219,6 +235,14 @@
                 this.settings = this.deepClone(DEFAULT_SETTINGS);
                 return this.settings;
             }
+        }
+
+        /**
+         * Clear cache to force reload on next access
+         */
+        clearCache() {
+            this.cacheTimestamp = 0;
+            console.log('[SETTINGS] Cache cleared');
         }
 
         /**
