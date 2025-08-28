@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,10 +33,25 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
     const [sessionStats, setSessionStats] = useState<SessionStats | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
+    const abortControllerRef = useRef<AbortController | null>(null);
+    const hasAutoLoginAttempted = useRef(false);
 
     // Load saved credentials from localStorage on component mount
     useEffect(() => {
+        // Prevent multiple auto-login attempts
+        if (hasAutoLoginAttempted.current) {
+            return;
+        }
+
         const autoLogin = async (emailToUse: string, passwordToUse: string) => {
+            // Abort any existing request
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+
+            // Create new abort controller
+            abortControllerRef.current = new AbortController();
+
             setIsLoading(true);
             setError(null);
 
@@ -50,6 +65,7 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                         userEmail: emailToUse,
                         userPassword: passwordToUse,
                     }),
+                    signal: abortControllerRef.current.signal,
                 });
 
                 const data = await response.json();
@@ -68,12 +84,20 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                     setIsLoggedIn(false);
                     onCredentialsChange(null);
                 }
-            } catch {
-                setError('Network error - please try again');
-                setIsLoggedIn(false);
-                onCredentialsChange(null);
+            } catch (error) {
+                if (error instanceof Error) {
+                    if (error.name === 'AbortError') {
+                        console.log('Auto-login request was aborted');
+                        return;
+                    }
+                    console.error('Auto-login error:', error);
+                    setError('Network error - please try again');
+                    setIsLoggedIn(false);
+                    onCredentialsChange(null);
+                }
             } finally {
                 setIsLoading(false);
+                abortControllerRef.current = null;
             }
         };
 
@@ -81,11 +105,19 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
         const savedPassword = localStorage.getItem('userPassword');
 
         if (savedEmail && savedPassword) {
+            hasAutoLoginAttempted.current = true;
             setUserEmail(savedEmail);
             setUserPassword(savedPassword);
             // Auto-login with saved credentials
             autoLogin(savedEmail, savedPassword);
         }
+
+        // Cleanup function
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
     }, [onCredentialsChange]);
 
     const handleLogin = async (email?: string, password?: string) => {
@@ -96,6 +128,19 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
             setError('Please enter both email and password');
             return;
         }
+
+        // Prevent multiple simultaneous requests
+        if (isLoading) {
+            return;
+        }
+
+        // Abort any existing request
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        // Create new abort controller
+        abortControllerRef.current = new AbortController();
 
         setIsLoading(true);
         setError(null);
@@ -110,6 +155,7 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                     userEmail: emailToUse,
                     userPassword: passwordToUse,
                 }),
+                signal: abortControllerRef.current.signal,
             });
 
             const data = await response.json();
@@ -132,12 +178,23 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                 setIsLoggedIn(false);
                 onCredentialsChange(null);
             }
-        } catch {
+        } catch (error) {
+            if (!(error instanceof Error)) {
+                setError('An unknown error occurred');
+                setIsLoggedIn(false);
+                onCredentialsChange(null);
+                return;
+            }
+            if (error.name === 'AbortError') {
+                console.log('Login request was aborted');
+                return;
+            }
             setError('Network error - please try again');
             setIsLoggedIn(false);
             onCredentialsChange(null);
         } finally {
             setIsLoading(false);
+            abortControllerRef.current = null;
         }
     };
 

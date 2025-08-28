@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserCredentials } from '@/components/UserCredentials';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -35,12 +35,7 @@ export default function UserAuthTestPage() {
     const [sessionData, setSessionData] = useState<SessionData | null>(null);
     const [isLoading, setIsLoading] = useState(false);
 
-    // Load available users on component mount
-    useEffect(() => {
-        loadAvailableUsers();
-    }, []);
-
-    const loadAvailableUsers = async () => {
+    const loadAvailableUsers = useCallback(async () => {
         try {
             const response = await fetch('/api/session/current');
             const data = await response.json();
@@ -51,37 +46,45 @@ export default function UserAuthTestPage() {
         } catch (error) {
             console.error('Error loading available users:', error);
         }
-    };
+    }, []);
 
-    const handleCredentialsChange = async (credentials: UserCredentials | null) => {
-        setCurrentUser(credentials);
+    // Load available users on component mount
+    useEffect(() => {
+        loadAvailableUsers();
+    }, [loadAvailableUsers]);
 
-        if (credentials) {
-            setIsLoading(true);
-            try {
-                // Test the user-specific session API
-                const response = await fetch('/api/session/current', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(credentials),
-                });
+    const handleCredentialsChange = useCallback(
+        async (credentials: UserCredentials | null) => {
+            setCurrentUser(credentials);
 
-                const data = await response.json();
-                setSessionData(data);
+            if (credentials) {
+                setIsLoading(true);
+                try {
+                    // Test the user-specific session API
+                    const response = await fetch('/api/session/current', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(credentials),
+                    });
 
-                // Refresh available users list
-                await loadAvailableUsers();
-            } catch (error) {
-                console.error('Error fetching session data:', error);
-            } finally {
-                setIsLoading(false);
+                    const data = await response.json();
+                    setSessionData(data);
+
+                    // Refresh available users list
+                    await loadAvailableUsers();
+                } catch (error) {
+                    console.error('Error fetching session data:', error);
+                } finally {
+                    setIsLoading(false);
+                }
+            } else {
+                setSessionData(null);
             }
-        } else {
-            setSessionData(null);
-        }
-    };
+        },
+        [loadAvailableUsers]
+    );
 
     return (
         <div className='container mx-auto py-8 px-4'>
