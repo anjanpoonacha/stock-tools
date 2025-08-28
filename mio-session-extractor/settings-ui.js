@@ -286,7 +286,7 @@
             elements.storageQuotaWarning.value = settings.advanced?.storageQuotaWarning ?? 0.8;
         }
 
-        // Update Quick Settings
+        // Update Quick Settings - Ensure both fields are populated from the same source
         if (elements.quickUserEmail) {
             elements.quickUserEmail.value = settings.quickSettings?.userEmail || '';
         }
@@ -356,6 +356,20 @@
                     handleAddQuickUrl();
                 }
             });
+        }
+
+        // Quick Settings credential sync
+        if (elements.quickUserEmail) {
+            elements.quickUserEmail.addEventListener('input', syncCredentials);
+        }
+        if (elements.quickUserPassword) {
+            elements.quickUserPassword.addEventListener('input', syncCredentials);
+        }
+        if (elements.userEmail) {
+            elements.userEmail.addEventListener('input', syncCredentials);
+        }
+        if (elements.userPassword) {
+            elements.userPassword.addEventListener('input', syncCredentials);
         }
 
         // Custom URL management
@@ -808,11 +822,17 @@
         const values = {};
 
         // Quick Settings - User credentials and URLs
-        values['quickSettings.userEmail'] =
-            elements.userEmail?.value?.trim() || elements.quickUserEmail?.value?.trim() || '';
-        values['quickSettings.userPassword'] =
-            elements.userPassword?.value?.trim() || elements.quickUserPassword?.value?.trim() || '';
+        // Prioritize Quick Settings fields, then fall back to General settings fields
+        const userEmail = elements.quickUserEmail?.value?.trim() || elements.userEmail?.value?.trim() || '';
+        const userPassword = elements.quickUserPassword?.value?.trim() || elements.userPassword?.value?.trim() || '';
+
+        values['quickSettings.userEmail'] = userEmail;
+        values['quickSettings.userPassword'] = userPassword;
         values['quickSettings.appUrls'] = quickUrls;
+
+        // Also update general settings to keep them in sync
+        values['general.userEmail'] = userEmail;
+        values['general.userPassword'] = userPassword;
 
         // General settings
         values['general.enabledPlatforms.marketinout'] = elements.enableMarketInOut?.checked ?? true;
@@ -1024,6 +1044,26 @@
                 loadSettings();
             }
         }
+    }
+
+    /**
+     * Sync credentials between Quick Settings and General Settings
+     */
+    function syncCredentials(event) {
+        const sourceElement = event.target;
+        const isQuickSetting = sourceElement.id.startsWith('quick');
+
+        if (sourceElement.id === 'quickUserEmail' && elements.userEmail) {
+            elements.userEmail.value = sourceElement.value;
+        } else if (sourceElement.id === 'quickUserPassword' && elements.userPassword) {
+            elements.userPassword.value = sourceElement.value;
+        } else if (sourceElement.id === 'userEmail' && elements.quickUserEmail) {
+            elements.quickUserEmail.value = sourceElement.value;
+        } else if (sourceElement.id === 'userPassword' && elements.quickUserPassword) {
+            elements.quickUserPassword.value = sourceElement.value;
+        }
+
+        markDirty();
     }
 
     /**
