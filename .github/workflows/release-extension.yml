@@ -143,10 +143,10 @@ jobs:
                   # Only bump version if it's not a manual workflow dispatch with existing version
                   if [ "${{ github.event_name }}" = "push" ] || [ "${{ github.event.inputs.version_bump }}" != "" ]; then
                     echo "Bumping version: $BUMP_TYPE"
-                    NEW_VERSION=$(node scripts/version-extension.js $BUMP_TYPE --no-commit)
                     
-                    # Update manifest.json
-                    node scripts/version-extension.js set $NEW_VERSION --no-commit
+                    # Bump the version and capture the new version
+                    node scripts/version-extension.js $BUMP_TYPE --no-commit
+                    NEW_VERSION=$(node scripts/version-extension.js current)
                     
                     echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
                     echo "version_changed=true" >> $GITHUB_OUTPUT
