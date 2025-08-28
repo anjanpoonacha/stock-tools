@@ -876,6 +876,10 @@
         values['quickSettings.userPassword'] = userPassword;
         values['quickSettings.appUrls'] = quickUrls;
 
+        // Update enabled platforms from quickSettings
+        values['quickSettings.enabledPlatforms.marketinout'] = elements.enableMarketInOut?.checked ?? true;
+        values['quickSettings.enabledPlatforms.tradingview'] = elements.enableTradingView?.checked ?? true;
+
         // Also update general settings to keep them in sync
         values['general.userEmail'] = userEmail;
         values['general.userPassword'] = userPassword;

@@ -19,9 +19,15 @@
 
         // General Settings
         general: {
+            userEmail: '', // User email for session identification (synced with quickSettings)
+            userPassword: '', // User password for session authentication (synced with quickSettings)
             autoRefreshPopup: true,
             debugMode: false,
             performanceMonitoring: true,
+            enabledPlatforms: {
+                marketinout: true,
+                tradingview: true,
+            },
         },
 
         // Performance Settings
