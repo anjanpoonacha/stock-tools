@@ -325,9 +325,24 @@
             const customUrls = settings.connection?.customUrls || [];
 
             // Combine all URL sources, prioritizing quickSettings
-            CONFIG.APP_URLS = [...quickUrls, ...connectionUrls, ...customUrls].filter(
-                (url) => url && url.trim().length > 0
-            );
+            // Handle both string URLs and URL objects with enabled/disabled state
+            CONFIG.APP_URLS = [...quickUrls, ...connectionUrls, ...customUrls]
+                .filter(Boolean)
+                .map((item) => {
+                    // Handle URL objects with enabled/disabled state
+                    if (typeof item === 'object' && item !== null && item.url) {
+                        // Only return URL if explicitly enabled (enabled: true) or not disabled (enabled !== false)
+                        return item.enabled === true ? item.url : null;
+                    }
+                    // Handle simple string URLs - only if they're not localhost
+                    if (typeof item === 'string') {
+                        return item.includes('localhost') ? null : item;
+                    }
+                    return null;
+                })
+                .filter(Boolean)
+                .map((url) => String(url).trim())
+                .filter((url) => url.length > 0 && !url.includes('localhost'));
 
             // If no URLs configured, show warning but don't use defaults
             if (CONFIG.APP_URLS.length === 0) {
