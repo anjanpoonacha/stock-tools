@@ -173,7 +173,7 @@ git commit -m "docs: document new backup feature"
 # Recent commits:
 git commit -m "feat!: change settings storage format for better performance"
 git commit -m "BREAKING: remove deprecated polling methods"
-git commit -m "docs: update migration guide for v3.0"
+git commit -m "docs: update migration guide for major release"
 
 # Result: 2.1.0 → 3.0.0 (major bump)
 # Reason: Contains breaking changes (feat!, BREAKING:)
