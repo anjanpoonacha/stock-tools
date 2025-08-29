@@ -453,6 +453,31 @@ The Knowledge Graph is successful when:
 - Complex tasks can be resumed seamlessly
 - Mono repo projects maintain clear separation and shared knowledge
 
+## Task Completion Integration
+
+**MANDATORY WORKFLOW**: When using `attempt_completion`, the task completion checklist requires a knowledge graph update assessment. This assessment MUST be followed by actual execution:
+
+### Knowledge Graph Update Execution Protocol
+
+**When Knowledge Graph Update checkbox is marked "Yes":**
+
+1. **BEFORE using `attempt_completion`**: Execute the knowledge graph update using MCP memory tools
+2. **Required Actions**:
+   - Use `search_nodes` to find relevant entities for the completed task
+   - Use `add_observations` to document new patterns, architectural changes, or implementations
+   - Use `create_entities` for new components or significant features
+   - Use `create_relations` to establish new relationships between entities
+3. **Verification**: Use `read_graph` to confirm updates were applied successfully
+4. **Only then**: Proceed with `attempt_completion` and mark the checkbox as completed
+
+**Enforcement**: The checkbox represents what SHOULD HAVE HAPPENED before task completion, not what might happen later. If marked "Yes", the update must be completed before using `attempt_completion`.
+
+**Integration with Task Completion Checklist**:
+
+- The task completion checklist serves as a reminder and verification step
+- Knowledge graph updates must be executed immediately when the assessment indicates "Yes"
+- This ensures continuity and prevents loss of critical architectural knowledge
+
 ## Important Notes
 
 **CRITICAL REMINDERS:**
@@ -461,6 +486,7 @@ The Knowledge Graph is successful when:
 - **MCP Memory integration enhances knowledge retrieval and reasoning**
 - Quality of initialization determines all future effectiveness
 - **Current context entities MUST be updated after EVERY task completion**
+- **Task completion checklist integration ensures updates are executed, not just planned**
 - Foundation entities should be carefully maintained - suggest improvements when needed
 - Consistency across entities is essential for reliability
 - **All knowledge is stored in MCP memory for optimal performance and consistency**
@@ -478,20 +504,20 @@ After every reset, I begin completely fresh. The Knowledge Graph in MCP Memory i
 3. **Maturity**: Slower growth, focus on refinement and optimization
 4. **Maintenance**: Regular pruning to maintain performance and relevance
 
-**Pruning Metrics:**
+**Pruning Metrics (Aggressive for Efficiency):**
 
-- **Entity Count**: Target <1000 entities for optimal performance
-- **Observation Density**: Average 3-7 observations per entity
-- **Relationship Ratio**: 1.5-3 relationships per entity
-- **Query Performance**: <2 second response time for complex queries
-- **Memory Efficiency**: <50MB total memory footprint
+- **Entity Count**: Target <200 entities for optimal performance
+- **Observation Density**: Average 2-4 observations per entity (lean and focused)
+- **Relationship Ratio**: 1-2 relationships per entity (avoid over-connection)
+- **Query Performance**: <1 second response time for complex queries
+- **Memory Efficiency**: <10MB total memory footprint
 
-**Automated Maintenance:**
+**Automated Maintenance (Aggressive Schedule):**
 
-- **Weekly**: Light pruning of duplicate observations
-- **Monthly**: Comprehensive pruning of stale entities
-- **Quarterly**: Full graph optimization and relationship cleanup
-- **Annually**: Complete knowledge graph restructuring if needed
+- **Daily**: Light pruning of duplicate observations and stale temporary entities
+- **Weekly**: Comprehensive pruning of outdated task entities and experimental code
+- **Monthly**: Full graph optimization and relationship cleanup
+- **Quarterly**: Complete knowledge graph restructuring and core entity review
 
 **MCP Memory Benefits:**
 
