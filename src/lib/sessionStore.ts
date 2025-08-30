@@ -18,9 +18,10 @@ export type SessionData = {
 // Always use Vercel KV - check for KV credentials or force local KV usage
 const USE_VERCEL_KV = process.env.KV_REST_API_URL || process.env.FORCE_KV_LOCALLY === 'true';
 
-// Import KV functions dynamically
+// Import KV functions dynamically with caching
 let kvStore: typeof import('./sessionStore.kv') | null = null;
-async function getKVStore() {
+
+async function withKVStore<T>(operation: (kv: typeof import('./sessionStore.kv')) => Promise<T>): Promise<T> {
 	if (!kvStore && USE_VERCEL_KV) {
 		try {
 			kvStore = await import('./sessionStore.kv');
@@ -32,83 +33,40 @@ async function getKVStore() {
 	if (!kvStore) {
 		throw new Error('KV store is not available. Check your KV configuration in .env file.');
 	}
-	return kvStore;
+	return operation(kvStore);
 }
 
-/**
- * Save or update a session for a specific platform under an internal session ID.
- */
-export async function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData) {
-	const kv = await getKVStore();
-	return await kv.savePlatformSession(internalId, platform, data);
-}
+// Session data operations
+export const savePlatformSession = (internalId: string, platform: string, data: PlatformSessionData) =>
+	withKVStore(kv => kv.savePlatformSession(internalId, platform, data));
 
-/**
- * Get session data for a specific platform under an internal session ID.
- */
-export async function getPlatformSession(internalId: string, platform: string): Promise<PlatformSessionData | undefined> {
-	const kv = await getKVStore();
-	return await kv.getPlatformSession(internalId, platform);
-}
+export const getPlatformSession = (internalId: string, platform: string): Promise<PlatformSessionData | undefined> =>
+	withKVStore(kv => kv.getPlatformSession(internalId, platform));
 
+export const getSession = (internalId: string): Promise<SessionData | undefined> =>
+	withKVStore(kv => kv.getSession(internalId));
 
-/**
- * Get all session data for an internal session ID.
- */
-export async function getSession(internalId: string): Promise<SessionData | undefined> {
-	const kv = await getKVStore();
-	return await kv.getSession(internalId);
-}
+export const updatePlatformSession = (internalId: string, platform: string, updates: Partial<PlatformSessionData>) =>
+	withKVStore(kv => kv.updatePlatformSession(internalId, platform, updates));
 
-/**
- * Update specific session data for a platform under an internal session ID.
- * This merges new data with existing session data.
- */
-export async function updatePlatformSession(internalId: string, platform: string, updates: Partial<PlatformSessionData>) {
-	const kv = await getKVStore();
-	return await kv.updatePlatformSession(internalId, platform, updates);
-}
+export const savePlatformSessionWithCleanup = (internalId: string, platform: string, data: PlatformSessionData): Promise<string> =>
+	withKVStore(kv => kv.savePlatformSessionWithCleanup(internalId, platform, data));
 
-
-/**
- * Save or update a session for a platform with automatic deduplication
- * This replaces the old savePlatformSession with built-in cleanup
- */
-export async function savePlatformSessionWithCleanup(internalId: string, platform: string, data: PlatformSessionData): Promise<string> {
-	const kv = await getKVStore();
-	return await kv.savePlatformSessionWithCleanup(internalId, platform, data);
-}
-
+// Session ID generation
 /**
  * Generate a secure random internal session ID.
  * @deprecated Use generateDeterministicSessionId for user-scoped sessions
  */
 export function generateSessionId(): string {
-	// Always use crypto.randomUUID() since we're using KV exclusively
 	return crypto.randomUUID();
 }
 
-/**
- * Generate a deterministic session ID based on user credentials and platform.
- * This ensures one session per user per platform - new sessions will overwrite existing ones.
- */
-export async function generateDeterministicSessionId(userEmail: string, userPassword: string, platform: string): Promise<string> {
-	const kv = await getKVStore();
-	return await kv.generateDeterministicSessionId(userEmail, userPassword, platform);
-}
+export const generateDeterministicSessionId = (userEmail: string, userPassword: string, platform: string): Promise<string> =>
+	withKVStore(kv => kv.generateDeterministicSessionId(userEmail, userPassword, platform));
 
-/**
- * Delete session data for a specific platform under an internal session ID.
- */
-export async function deletePlatformSession(internalId: string, platform: string): Promise<void> {
-	const kv = await getKVStore();
-	return await kv.deletePlatformSession(internalId, platform);
-}
+// Session deletion operations
+export const deletePlatformSession = (internalId: string, platform: string): Promise<void> =>
+	withKVStore(kv => kv.deletePlatformSession(internalId, platform));
 
-/**
- * Delete the entire session for an internal session ID.
- */
-export async function deleteSession(internalId: string): Promise<void> {
-	const kv = await getKVStore();
-	return await kv.deleteSession(internalId);
-}
+export const deleteSession = (internalId: string): Promise<void> =>
+	withKVStore(kv => kv.deleteSession(internalId));

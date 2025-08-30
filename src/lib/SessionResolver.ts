@@ -177,28 +177,7 @@ export class SessionResolver {
 	 * @returns Session info or null if no valid session found
 	 */
 	static async getLatestSession(platform: string): Promise<SessionInfo | null> {
-		try {
-			const allSessions = await this.loadSessions();
-			const platformSessions = this.extractPlatformSessions(allSessions, platform);
-
-			if (platformSessions.length === 0) {
-				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found`);
-				return null;
-			}
-
-			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
-			const latestSession = sortedSessions[0];
-
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions, using most recent: ${latestSession.internalId}`);
-
-			return {
-				sessionData: latestSession.sessionData,
-				internalId: latestSession.internalId
-			};
-		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session:`, error);
-			return null;
-		}
+		return this.getLatestSessionInternal(platform);
 	}
 
 	/**
@@ -285,26 +264,39 @@ export class SessionResolver {
 	 * @returns Session info or null if no valid session found
 	 */
 	static async getLatestSessionForUser(platform: string, userCredentials: UserCredentials): Promise<SessionInfo | null> {
+		return this.getLatestSessionInternal(platform, userCredentials);
+	}
+
+	/**
+	 * Internal method to retrieve the most recent valid session for a platform with optional user filtering
+	 * @param platform - Platform name (e.g., 'marketinout', 'tradingview')
+	 * @param userCredentials - Optional user credentials to filter sessions
+	 * @returns Session info or null if no valid session found
+	 */
+	private static async getLatestSessionInternal(platform: string, userCredentials?: UserCredentials): Promise<SessionInfo | null> {
 		try {
 			const allSessions = await this.loadSessions();
 			const platformSessions = this.extractPlatformSessions(allSessions, platform, userCredentials);
 
 			if (platformSessions.length === 0) {
-				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found for user: ${userCredentials.userEmail}`);
+				const userContext = userCredentials ? ` for user: ${userCredentials.userEmail}` : '';
+				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found${userContext}`);
 				return null;
 			}
 
 			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
 			const latestSession = sortedSessions[0];
 
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions for user ${userCredentials.userEmail}, using most recent: ${latestSession.internalId}`);
+			const userContext = userCredentials ? ` for user ${userCredentials.userEmail}` : '';
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions${userContext}, using most recent: ${latestSession.internalId}`);
 
 			return {
 				sessionData: latestSession.sessionData,
 				internalId: latestSession.internalId
 			};
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session for user:`, error);
+			const userContext = userCredentials ? ' for user' : '';
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session${userContext}:`, error);
 			return null;
 		}
 	}
