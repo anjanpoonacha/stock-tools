@@ -108,7 +108,7 @@ async function validateTradingViewSession(internalSessionId: string): Promise<bo
 		}
 
 		// Get session data to extract the cookie
-		const session = getSession(internalSessionId);
+		const session = await getSession(internalSessionId);
 		if (!session?.tradingview?.sessionId) {
 			const error = ErrorHandler.createSessionExpiredError(
 				Platform.TRADINGVIEW,
@@ -215,7 +215,7 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 			throw error;
 		}
 
-		const session = getSession(internalSessionId);
+		const session = await getSession(internalSessionId);
 		if (!session) {
 			const error = ErrorHandler.createSessionExpiredError(
 				Platform.UNKNOWN,
@@ -356,7 +356,7 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
  * Get session health status with validation context
  * Enhanced with error handling and detailed health information.
  */
-export function getSessionHealthWithValidation(internalSessionId: string): {
+export async function getSessionHealthWithValidation(internalSessionId: string): Promise<{
 	healthReport: {
 		sessionId: string;
 		platforms: {
@@ -392,7 +392,7 @@ export function getSessionHealthWithValidation(internalSessionId: string): {
 	timestamp: string;
 	errors?: SessionError[];
 	recommendations?: string[];
-} {
+}> {
 	try {
 		// Validate input parameters
 		if (!internalSessionId) {
@@ -406,7 +406,7 @@ export function getSessionHealthWithValidation(internalSessionId: string): {
 		}
 
 		const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
-		const session = getSession(internalSessionId);
+		const session = await getSession(internalSessionId);
 
 		const result = {
 			healthReport,
@@ -650,7 +650,7 @@ export async function validateAndStartMonitoring(
  * Get session data with integrated health status.
  * This provides a unified view of session data including health information.
  */
-export function getHealthAwareSessionData(internalSessionId: string): {
+export async function getHealthAwareSessionData(internalSessionId: string): Promise<{
 	sessionExists: boolean;
 	platforms: string[];
 	healthReport: any; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -658,7 +658,7 @@ export function getHealthAwareSessionData(internalSessionId: string): {
 	recommendations: string[];
 	canAutoRecover: boolean;
 	timestamp: string;
-} {
+}> {
 	try {
 		// Validate input parameters
 		if (!internalSessionId) {
@@ -680,7 +680,7 @@ export function getHealthAwareSessionData(internalSessionId: string): {
 			};
 		}
 
-		const session = getSession(internalSessionId);
+		const session = await getSession(internalSessionId);
 		const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
 
 		const result = {

@@ -314,7 +314,7 @@ export async function POST(req: NextRequest) {
 			validationCount: Object.keys(validatedSessionData).length
 		});
 
-		const finalInternalSessionId = savePlatformSessionWithCleanup(internalSessionId, platform, sessionData);
+		const finalInternalSessionId = await savePlatformSessionWithCleanup(internalSessionId, platform, sessionData);
 		console.log('[EXTENSION-API] Successfully saved validated session with cleanup:', {
 			originalInternalSessionId: internalSessionId,
 			finalInternalSessionId,

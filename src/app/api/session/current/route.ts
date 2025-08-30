@@ -12,15 +12,15 @@ export async function GET(request: NextRequest) {
 		const platform = searchParams.get('platform');
 
 		// Get session statistics for debugging
-		const stats = SessionResolver.getSessionStats();
+		const stats = await SessionResolver.getSessionStats();
 
 		if (platform) {
 			// Get specific platform session
-			const hasSession = SessionResolver.hasSessionsForPlatform(platform);
-			const latestSession = SessionResolver.getLatestSession(platform);
+			const hasSession = await SessionResolver.hasSessionsForPlatform(platform);
+			const latestSession = await SessionResolver.getLatestSession(platform);
 
 			if (platform === 'marketinout') {
-				const latestMIOSession = SessionResolver.getLatestMIOSession();
+				const latestMIOSession = await SessionResolver.getLatestMIOSession();
 				return NextResponse.json({
 					platform,
 					hasSession,
@@ -49,10 +49,10 @@ export async function GET(request: NextRequest) {
 			}
 		} else {
 			// Get all platform sessions (legacy behavior)
-			const hasMIOSession = SessionResolver.hasSessionsForPlatform('marketinout');
-			const hasTVSession = SessionResolver.hasSessionsForPlatform('tradingview');
-			const latestMIOSession = SessionResolver.getLatestMIOSession();
-			const latestTVSession = SessionResolver.getLatestSession('tradingview');
+			const hasMIOSession = await SessionResolver.hasSessionsForPlatform('marketinout');
+			const hasTVSession = await SessionResolver.hasSessionsForPlatform('tradingview');
+			const latestMIOSession = await SessionResolver.getLatestMIOSession();
+			const latestTVSession = await SessionResolver.getLatestSession('tradingview');
 
 			return NextResponse.json({
 				hasSession: hasMIOSession || hasTVSession,
@@ -108,16 +108,16 @@ export async function POST(request: NextRequest) {
 		const userCredentials: UserCredentials = { userEmail, userPassword };
 
 		// Get session statistics for debugging
-		const stats = SessionResolver.getSessionStats();
-		const availableUsers = SessionResolver.getAvailableUsers();
+		const stats = await SessionResolver.getSessionStats();
+		const availableUsers = await SessionResolver.getAvailableUsers();
 
 		if (platform) {
 			// Get specific platform session for user
-			const hasSession = SessionResolver.hasSessionsForPlatformAndUser(platform, userCredentials);
-			const latestSession = SessionResolver.getLatestSessionForUser(platform, userCredentials);
+			const hasSession = await SessionResolver.hasSessionsForPlatformAndUser(platform, userCredentials);
+			const latestSession = await SessionResolver.getLatestSessionForUser(platform, userCredentials);
 
 			if (platform === 'marketinout') {
-				const latestMIOSession = SessionResolver.getLatestMIOSessionForUser(userCredentials);
+				const latestMIOSession = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
 				return NextResponse.json({
 					platform,
 					hasSession,
@@ -150,10 +150,10 @@ export async function POST(request: NextRequest) {
 			}
 		} else {
 			// Get all platform sessions for user
-			const hasMIOSession = SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
-			const hasTVSession = SessionResolver.hasSessionsForPlatformAndUser('tradingview', userCredentials);
-			const latestMIOSession = SessionResolver.getLatestMIOSessionForUser(userCredentials);
-			const latestTVSession = SessionResolver.getLatestSessionForUser('tradingview', userCredentials);
+			const hasMIOSession = await SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
+			const hasTVSession = await SessionResolver.hasSessionsForPlatformAndUser('tradingview', userCredentials);
+			const latestMIOSession = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
+			const latestTVSession = await SessionResolver.getLatestSessionForUser('tradingview', userCredentials);
 
 			return NextResponse.json({
 				hasSession: hasMIOSession || hasTVSession,

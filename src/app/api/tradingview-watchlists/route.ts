@@ -6,7 +6,7 @@ import { getSession } from '@/lib/sessionStore';
 export async function POST(req: NextRequest) {
 	try {
 		const { sessionid, internalSessionId } = await req.json();
-		
+
 		// Support both direct sessionid and internalSessionId approaches
 		if (!sessionid && !internalSessionId) {
 			return NextResponse.json({ error: 'Missing sessionid or internalSessionId' }, { status: 400 });
@@ -19,9 +19,9 @@ export async function POST(req: NextRequest) {
 		// If internalSessionId is provided, use health-integrated validation
 		if (internalSessionId) {
 			console.log('[API] Using health-integrated validation for internalSessionId:', internalSessionId);
-			
+
 			// Check health status first
-			const healthData = getHealthAwareSessionData(internalSessionId);
+			const healthData = await getHealthAwareSessionData(internalSessionId);
 			console.log('[API] Health-aware session check:', {
 				sessionExists: healthData.sessionExists,
 				overallStatus: healthData.overallStatus,
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
 			// Use health-integrated validation that automatically starts monitoring
 			const validationResult = await validateAndStartMonitoring(internalSessionId, 'tradingview');
-			
+
 			if (!validationResult.isValid) {
 				console.log('[API] TradingView session validation failed:', validationResult.error?.message);
 				return NextResponse.json({
@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
 			}
 
 			// Get the actual sessionid from session data
-			const sessionData = getSession(internalSessionId);
+			const sessionData = await getSession(internalSessionId);
 			if (sessionData?.tradingview?.sessionId) {
 				actualSessionId = sessionData.tradingview.sessionId;
 				healthStatus = validationResult.healthStatus;
 				monitoringStarted = validationResult.monitoringStarted;
-				
+
 				console.log('[API] Session validated and monitoring started:', {
 					healthStatus,
 					monitoringStarted
@@ -67,9 +67,9 @@ export async function POST(req: NextRequest) {
 		const url = 'https://www.tradingview.com/api/v1/symbols_list/all/';
 		const cookie = `sessionid=${actualSessionId}`;
 		const watchlists = await fetchWatchlistsWithAuth(url, cookie);
-		
+
 		const response = { watchlists };
-		
+
 		// Include health monitoring information if available
 		if (healthStatus !== null) {
 			Object.assign(response, {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
 				monitoringActive: monitoringStarted
 			});
 		}
-		
+
 		return NextResponse.json(response);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'An unknown error occurred';

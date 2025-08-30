@@ -25,10 +25,10 @@ export class MIOService {
 	 * Retrieve the session key and value for MIO from the session store.
 	 * Uses robust ASPSESSION detection from CookieParser and health-aware session data.
 	 */
-	static getSessionKeyValue(internalSessionId: string): { key: string; value: string } | undefined {
+	static async getSessionKeyValue(internalSessionId: string): Promise<{ key: string; value: string } | undefined> {
 		try {
 			// Use health-aware session data retrieval
-			const healthAwareResult = getHealthAwareSessionData(internalSessionId);
+			const healthAwareResult = await getHealthAwareSessionData(internalSessionId);
 
 			if (!healthAwareResult.sessionExists) {
 				console.warn(`[MIOService] No valid session found for ID: ${internalSessionId}`, {
@@ -39,7 +39,7 @@ export class MIOService {
 			}
 
 			// Get the actual session data from session store
-			const session = getPlatformSession(internalSessionId, 'marketinout');
+			const session = await getPlatformSession(internalSessionId, 'marketinout');
 			if (!session) {
 				console.warn(`[MIOService] No MarketInOut session found for ID: ${internalSessionId}`);
 				return undefined;
@@ -138,7 +138,7 @@ export class MIOService {
 	 */
 	static async validateSessionHealth(internalSessionId: string): Promise<boolean> {
 		try {
-			const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+			const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 			if (!sessionKeyValue) {
 				const error = ErrorHandler.createSessionExpiredError(
 					Platform.MARKETINOUT,
@@ -193,7 +193,7 @@ export class MIOService {
 		try {
 			console.log(`[MIOService] Refreshing session for ${internalSessionId}`);
 
-			const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+			const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 			if (!sessionKeyValue) {
 				console.warn(`[MIOService] No valid session to refresh for ID: ${internalSessionId}`);
 				return false;
@@ -245,7 +245,7 @@ export class MIOService {
 				throw error;
 			}
 
-			const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+			const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 			if (!sessionKeyValue) {
 				const error = ErrorHandler.createSessionExpiredError(
 					Platform.MARKETINOUT,
@@ -351,7 +351,7 @@ export class MIOService {
 		mioWlid,
 		symbols,
 	}: AddWatchlistWithSessionParams, retryCount = 0): Promise<string> {
-		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+		const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
 
 		try {
@@ -526,7 +526,7 @@ export class MIOService {
 	 * Now includes automatic session refresh on authentication failures.
 	 */
 	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[], retryCount = 0): Promise<string> {
-		const sessionKeyValue = MIOService.getSessionKeyValue(internalSessionId);
+		const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
 
 		try {

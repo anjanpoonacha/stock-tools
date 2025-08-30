@@ -6,6 +6,10 @@ import { existsSync, readFileSync, writeFileSync } from 'fs';
 export type PlatformSessionData = {
 	sessionId: string;
 	userEmail?: string; // User email for session scoping
+	userPassword?: string; // User password for session scoping
+	extractedAt?: string; // Timestamp when session was extracted
+	extractedFrom?: string; // URL where session was extracted
+	source?: string; // Source of extraction (e.g., 'browser-extension')
 	// Add more fields as needed per platform
 	[key: string]: string | undefined;
 };
@@ -14,8 +18,11 @@ export type SessionData = {
 	[platform: string]: PlatformSessionData;
 };
 
-const SESSION_FILE = process.env.NODE_ENV === 'production' ? '/tmp/sessions.json' : 'sessions.json'; // Use a temp file for simplicity, adjust as needed
+// Use Vercel KV in production, file-based in development
+const USE_VERCEL_KV = process.env.NODE_ENV === 'production' && process.env.KV_REST_API_URL;
+const SESSION_FILE = 'sessions.json'; // Only used in development now
 
+// File-based functions for development
 function loadSessions(): Record<string, SessionData> {
 	if (!existsSync(SESSION_FILE)) return {};
 	try {
@@ -30,10 +37,31 @@ function saveSessions(sessions: Record<string, SessionData>) {
 	writeFileSync(SESSION_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
 }
 
+// Import KV functions dynamically to avoid issues in development
+let kvStore: typeof import('./sessionStore.kv') | null = null;
+async function getKVStore() {
+	if (!kvStore && USE_VERCEL_KV) {
+		try {
+			kvStore = await import('./sessionStore.kv');
+		} catch (error) {
+			console.warn('[SessionStore] Failed to load KV store, falling back to file-based:', error);
+		}
+	}
+	return kvStore;
+}
+
 /**
  * Save or update a session for a specific platform under an internal session ID.
  */
-export function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData) {
+export async function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData) {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.savePlatformSession(internalId, platform, data);
+		}
+	}
+
+	// Fallback to file-based storage
 	const sessions = loadSessions();
 	const existing = sessions[internalId] || {};
 	sessions[internalId] = { ...existing, [platform]: data };
@@ -43,7 +71,15 @@ export function savePlatformSession(internalId: string, platform: string, data: 
 /**
  * Get session data for a specific platform under an internal session ID.
  */
-export function getPlatformSession(internalId: string, platform: string): PlatformSessionData | undefined {
+export async function getPlatformSession(internalId: string, platform: string): Promise<PlatformSessionData | undefined> {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.getPlatformSession(internalId, platform);
+		}
+	}
+
+	// Fallback to file-based storage
 	const sessions = loadSessions();
 	const session = sessions[internalId];
 	return session ? session[platform] : undefined;
@@ -78,7 +114,15 @@ export function deleteSession(internalId: string) {
 /**
  * Get all session data for an internal session ID.
  */
-export function getSession(internalId: string): SessionData | undefined {
+export async function getSession(internalId: string): Promise<SessionData | undefined> {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.getSession(internalId);
+		}
+	}
+
+	// Fallback to file-based storage
 	const sessions = loadSessions();
 	return sessions[internalId];
 }
@@ -87,7 +131,15 @@ export function getSession(internalId: string): SessionData | undefined {
  * Update specific session data for a platform under an internal session ID.
  * This merges new data with existing session data.
  */
-export function updatePlatformSession(internalId: string, platform: string, updates: Partial<PlatformSessionData>) {
+export async function updatePlatformSession(internalId: string, platform: string, updates: Partial<PlatformSessionData>) {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.updatePlatformSession(internalId, platform, updates);
+		}
+	}
+
+	// Fallback to file-based storage
 	const sessions = loadSessions();
 	const existing = sessions[internalId] || {};
 	const platformData = existing[platform] || { sessionId: '' };
@@ -109,7 +161,15 @@ export function updatePlatformSession(internalId: string, platform: string, upda
  * Returns the internal session ID that was kept (most recent)
  * Now considers user email for proper scoping
  */
-export function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): string {
+export async function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): Promise<string> {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.cleanupDuplicateSessions(platform, sessionData, currentInternalId);
+		}
+	}
+
+	// Fallback to file-based storage
 	const sessions = loadSessions();
 	const duplicates: Array<{ id: string; extractedAt: string }> = [];
 
@@ -160,9 +220,17 @@ export function cleanupDuplicateSessions(platform: string, sessionData: Platform
  * Save or update a session for a platform with automatic deduplication
  * This replaces the old savePlatformSession with built-in cleanup
  */
-export function savePlatformSessionWithCleanup(internalId: string, platform: string, data: PlatformSessionData): string {
+export async function savePlatformSessionWithCleanup(internalId: string, platform: string, data: PlatformSessionData): Promise<string> {
+	if (USE_VERCEL_KV) {
+		const kv = await getKVStore();
+		if (kv) {
+			return await kv.savePlatformSessionWithCleanup(internalId, platform, data);
+		}
+	}
+
+	// Fallback to file-based storage
 	// First, clean up any existing duplicates and get the ID to use
-	const finalInternalId = cleanupDuplicateSessions(platform, data, internalId);
+	const finalInternalId = await cleanupDuplicateSessions(platform, data, internalId);
 
 	// Now save the session data
 	const sessions = loadSessions();
@@ -178,5 +246,10 @@ export function savePlatformSessionWithCleanup(internalId: string, platform: str
  * Generate a secure random internal session ID.
  */
 export function generateSessionId(): string {
+	if (USE_VERCEL_KV) {
+		// Use crypto.randomUUID() for KV (more standard)
+		return crypto.randomUUID();
+	}
+	// Use randomBytes for file-based (existing behavior)
 	return randomBytes(32).toString('hex');
 }

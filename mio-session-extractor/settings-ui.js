@@ -11,7 +11,6 @@
     let currentSettings = null;
     let isDirty = false;
     let isLoading = false;
-    let customUrls = [];
     let quickUrls = [];
 
     // DOM Elements Cache
@@ -57,9 +56,6 @@
             'connectionCache',
 
             // Connection settings
-            'customUrlInput',
-            'addUrlBtn',
-            'customUrls',
             'connectionCheckFreq',
             'enablePostMessage',
             'enableStorageSync',
@@ -131,7 +127,6 @@
             initializeSliders();
             initializeTabs();
             initializePresets();
-            initializeCustomUrls();
 
             updateStatus('Settings loaded successfully', 'success');
             console.log('[SETTINGS-UI] Settings UI initialized successfully');
@@ -298,10 +293,6 @@
         quickUrls = [...(settings.quickSettings?.appUrls ?? [])];
         updateQuickUrlsList();
 
-        // Update custom URLs
-        customUrls = [...(settings.connection?.customUrls ?? [])];
-        updateCustomUrlsList();
-
         // Update all slider values
         updateAllSliderValues();
     }
@@ -370,18 +361,6 @@
         }
         if (elements.userPassword) {
             elements.userPassword.addEventListener('input', syncCredentials);
-        }
-
-        // Custom URL management
-        if (elements.addUrlBtn) {
-            elements.addUrlBtn.addEventListener('click', handleAddCustomUrl);
-        }
-        if (elements.customUrlInput) {
-            elements.customUrlInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    handleAddCustomUrl();
-                }
-            });
         }
 
         // Password toggle
@@ -499,13 +478,6 @@
     }
 
     /**
-     * Initialize custom URLs list
-     */
-    function initializeCustomUrls() {
-        updateCustomUrlsList();
-    }
-
-    /**
      * Update slider value display
      */
     function updateSliderValue(event) {
@@ -619,39 +591,6 @@
         } finally {
             setLoading(false);
         }
-    }
-
-    /**
-     * Handle custom URL addition
-     */
-    function handleAddCustomUrl() {
-        const input = elements.customUrlInput;
-        if (!input) return;
-
-        const url = input.value.trim();
-        if (!url) return;
-
-        // Validate URL
-        try {
-            new URL(url);
-        } catch (error) {
-            updateStatus('Invalid URL format', 'error');
-            return;
-        }
-
-        // Check for duplicates
-        if (customUrls.includes(url)) {
-            updateStatus('URL already exists', 'warning');
-            return;
-        }
-
-        // Add URL
-        customUrls.push(url);
-        updateCustomUrlsList();
-        input.value = '';
-        markDirty();
-
-        updateStatus('Custom URL added', 'success');
     }
 
     /**
@@ -830,38 +769,6 @@
     }
 
     /**
-     * Update custom URLs list display
-     */
-    function updateCustomUrlsList() {
-        const container = elements.customUrls;
-        if (!container) return;
-
-        container.innerHTML = '';
-
-        customUrls.forEach((url, index) => {
-            const urlItem = document.createElement('div');
-            urlItem.className = 'url-item';
-            urlItem.innerHTML = `
-                <span class="url-text">${url}</span>
-                <button class="url-remove" data-index="${index}">Remove</button>
-            `;
-
-            // Add remove event listener
-            const removeBtn = urlItem.querySelector('.url-remove');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', () => {
-                    customUrls.splice(index, 1);
-                    updateCustomUrlsList();
-                    markDirty();
-                    updateStatus('Custom URL removed', 'info');
-                });
-            }
-
-            container.appendChild(urlItem);
-        });
-    }
-
-    /**
      * Collect current form values
      */
     function collectFormValues() {
@@ -907,7 +814,6 @@
         values['performance.cacheDurations.appConnection'] = (parseFloat(elements.connectionCache?.value) || 30) * 1000;
 
         // Connection settings
-        values['connection.customUrls'] = customUrls;
         values['connection.connectionCheckFrequency'] = (parseFloat(elements.connectionCheckFreq?.value) || 30) * 1000;
         values['connection.enablePostMessage'] = elements.enablePostMessage?.checked ?? true;
         values['connection.enableStorageSync'] = elements.enableStorageSync?.checked ?? true;

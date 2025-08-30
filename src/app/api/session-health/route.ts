@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 		const action = searchParams.get('action') || 'status';
 		const sessionId = searchParams.get('sessionId');
 		const platform = searchParams.get('platform');
-		
+
 		console.log('[SessionHealth API] Action:', action, 'SessionId:', sessionId, 'Platform:', platform);
 
 		switch (action) {
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
 						{ status: 400 }
 					);
 				}
-				
+
 				const health = sessionHealthMonitor.getSessionHealth(sessionId, platform);
 				if (!health) {
 					return NextResponse.json(
@@ -94,9 +94,9 @@ export async function POST(req: NextRequest) {
 
 				// For testing purposes, allow monitoring without requiring a real session
 				// In production, you might want to enforce session validation
-				const session = getSession(sessionId);
+				const session = await getSession(sessionId);
 				const isTestSession = sessionId.startsWith('test-session-');
-				
+
 				if (!isTestSession && (!session || !session[platform])) {
 					return NextResponse.json(
 						{ error: 'Session or platform data not found' },
@@ -121,9 +121,9 @@ export async function POST(req: NextRequest) {
 				}
 
 				sessionHealthMonitor.stopMonitoring(sessionId, platform);
-				return NextResponse.json({ 
+				return NextResponse.json({
 					message: `Stopped monitoring ${platform} for session ${sessionId}`,
-					success: true 
+					success: true
 				});
 
 			case 'check-health':
@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 				}
 
 				const status = await sessionHealthMonitor.checkSessionHealth(sessionId, platform);
-				return NextResponse.json({ 
+				return NextResponse.json({
 					sessionId,
 					platform,
 					status,
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
 
 			case 'start-all-monitoring':
 				// Start monitoring all platforms for a session
-				const sessionData = getSession(sessionId);
+				const sessionData = await getSession(sessionId);
 				if (!sessionData) {
 					return NextResponse.json(
 						{ error: 'Session not found' },
