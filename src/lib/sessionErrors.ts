@@ -184,6 +184,75 @@ export class SessionError extends Error {
 export class ErrorHandler {
   
   /**
+   * Get platform display name
+   */
+  private static getPlatformName(platform: Platform): string {
+    return platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+  }
+
+  private static createRecoverySteps(actions: RecoveryAction[], descriptions: string[]): RecoveryStep[] {
+    return actions.map((action, index) => ({
+      action,
+      description: descriptions[index] || 'Perform recovery action',
+      priority: index + 1,
+      automated: action === RecoveryAction.WAIT_AND_RETRY || action === RecoveryAction.RETRY,
+      estimatedTime: this.getEstimatedTime(action)
+    }));
+  }
+
+  private static getEstimatedTime(action: RecoveryAction): string {
+    const timeMap: Record<RecoveryAction, string> = {
+      [RecoveryAction.RETRY]: '30 seconds',
+      [RecoveryAction.REFRESH_SESSION]: '1 minute',
+      [RecoveryAction.RE_AUTHENTICATE]: '2-3 minutes',
+      [RecoveryAction.CLEAR_CACHE]: '1-2 minutes',
+      [RecoveryAction.WAIT_AND_RETRY]: '1-5 minutes',
+      [RecoveryAction.CONTACT_SUPPORT]: 'Variable',
+      [RecoveryAction.CHECK_NETWORK]: '1 minute',
+      [RecoveryAction.UPDATE_CREDENTIALS]: '1 minute'
+    };
+    return timeMap[action] || '1 minute';
+  }
+
+  private static createErrorContext(
+    platform: Platform,
+    operation: string,
+    additionalData: Record<string, unknown> = {}
+  ): ErrorContext {
+    return {
+      platform,
+      operation,
+      timestamp: new Date(),
+      additionalData
+    };
+  }
+
+  private static getErrorSeverity(type: SessionErrorType): ErrorSeverity {
+    const severityMap: Record<SessionErrorType, ErrorSeverity> = {
+      [SessionErrorType.SESSION_EXPIRED]: ErrorSeverity.WARNING,
+      [SessionErrorType.INVALID_CREDENTIALS]: ErrorSeverity.ERROR,
+      [SessionErrorType.AUTHENTICATION_FAILED]: ErrorSeverity.ERROR,
+      [SessionErrorType.NETWORK_ERROR]: ErrorSeverity.ERROR,
+      [SessionErrorType.CONNECTION_TIMEOUT]: ErrorSeverity.ERROR,
+      [SessionErrorType.DNS_RESOLUTION_FAILED]: ErrorSeverity.ERROR,
+      [SessionErrorType.PLATFORM_UNAVAILABLE]: ErrorSeverity.WARNING,
+      [SessionErrorType.PLATFORM_MAINTENANCE]: ErrorSeverity.WARNING,
+      [SessionErrorType.API_RATE_LIMITED]: ErrorSeverity.WARNING,
+      [SessionErrorType.COOKIE_INVALID]: ErrorSeverity.ERROR,
+      [SessionErrorType.COOKIE_EXPIRED]: ErrorSeverity.WARNING,
+      [SessionErrorType.SESSION_STORAGE_ERROR]: ErrorSeverity.ERROR,
+      [SessionErrorType.PERMISSION_DENIED]: ErrorSeverity.ERROR,
+      [SessionErrorType.INSUFFICIENT_PRIVILEGES]: ErrorSeverity.ERROR,
+      [SessionErrorType.DATA_FORMAT_ERROR]: ErrorSeverity.ERROR,
+      [SessionErrorType.INVALID_RESPONSE]: ErrorSeverity.ERROR,
+      [SessionErrorType.PARSING_ERROR]: ErrorSeverity.ERROR,
+      [SessionErrorType.UNKNOWN_ERROR]: ErrorSeverity.ERROR,
+      [SessionErrorType.OPERATION_FAILED]: ErrorSeverity.ERROR
+    };
+    return severityMap[type] || ErrorSeverity.ERROR;
+  }
+
+  /**
    * Create a session expired error
    */
   static createSessionExpiredError(
@@ -215,7 +284,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.SESSION_EXPIRED,
@@ -259,7 +328,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.INVALID_CREDENTIALS,
@@ -354,7 +423,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.PLATFORM_UNAVAILABLE,
@@ -435,7 +504,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.COOKIE_INVALID,
@@ -479,7 +548,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     const permissionText = requiredPermission ? ` (${requiredPermission})` : '';
     
     return new SessionError(
@@ -525,7 +594,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.DATA_FORMAT_ERROR,
@@ -580,7 +649,7 @@ export class ErrorHandler {
       }
     ];
 
-    const platformName = platform === Platform.MARKETINOUT ? 'MarketInOut' : 'TradingView';
+    const platformName = this.getPlatformName(platform);
     
     return new SessionError(
       SessionErrorType.OPERATION_FAILED,
@@ -602,64 +671,118 @@ export class ErrorHandler {
     httpStatus?: number,
     requestUrl?: string
   ): SessionError {
-    const errorMessage = typeof error === 'string' ? error : 
-                        error instanceof Error ? error.message : 
-                        String(error);
+    const errorMessage = this.extractErrorMessage(error);
+    const errorCategory = this.categorizeError(errorMessage, httpStatus);
 
-    // Session expired patterns
-    if (errorMessage.toLowerCase().includes('session expired') ||
-        errorMessage.toLowerCase().includes('login') ||
-        errorMessage.toLowerCase().includes('signin') ||
-        httpStatus === 401) {
-      return this.createSessionExpiredError(platform, operation);
+    switch (errorCategory.type) {
+      case SessionErrorType.SESSION_EXPIRED:
+        return this.createSessionExpiredError(platform, operation);
+      
+      case SessionErrorType.INVALID_CREDENTIALS:
+        return this.createInvalidCredentialsError(platform, operation, httpStatus);
+      
+      case SessionErrorType.NETWORK_ERROR:
+        return this.createNetworkError(platform, operation, error instanceof Error ? error : new Error(errorMessage), requestUrl);
+      
+      case SessionErrorType.PLATFORM_UNAVAILABLE:
+        return this.createPlatformUnavailableError(platform, operation, httpStatus);
+      
+      case SessionErrorType.API_RATE_LIMITED:
+        return this.createRateLimitError(platform, operation);
+      
+      case SessionErrorType.COOKIE_INVALID:
+        return this.createCookieError(platform, operation, errorMessage);
+      
+      case SessionErrorType.DATA_FORMAT_ERROR:
+        return this.createDataFormatError(platform, operation, 'JSON', errorMessage);
+      
+      default:
+        return this.createGenericError(platform, operation, error instanceof Error ? error : String(error), httpStatus);
+    }
+  }
+
+  /**
+   * Extract error message from various error types
+   */
+  private static extractErrorMessage(error: Error | string | unknown): string {
+    if (typeof error === 'string') return error;
+    if (error instanceof Error) return error.message;
+    return String(error);
+  }
+
+  /**
+   * Categorize error based on message content and HTTP status
+   */
+  private static categorizeError(errorMessage: string, httpStatus?: number): { type: SessionErrorType; confidence: number } {
+    const lowerMessage = errorMessage.toLowerCase();
+    
+    // Define error patterns with keywords and their associated types
+    const errorPatterns = [
+      {
+        type: SessionErrorType.SESSION_EXPIRED,
+        keywords: ['session expired', 'login', 'signin'],
+        httpStatuses: [401],
+        confidence: 0.9
+      },
+      {
+        type: SessionErrorType.INVALID_CREDENTIALS,
+        keywords: ['credentials', 'authentication failed', 'unauthorized'],
+        httpStatuses: [403],
+        confidence: 0.9
+      },
+      {
+        type: SessionErrorType.NETWORK_ERROR,
+        keywords: ['network', 'connection', 'timeout', 'fetch'],
+        httpStatuses: [],
+        confidence: 0.8
+      },
+      {
+        type: SessionErrorType.PLATFORM_UNAVAILABLE,
+        keywords: ['unavailable', 'maintenance'],
+        httpStatuses: [500, 501, 502, 503, 504, 505],
+        confidence: 0.8
+      },
+      {
+        type: SessionErrorType.API_RATE_LIMITED,
+        keywords: ['rate limit', 'too many requests'],
+        httpStatuses: [429],
+        confidence: 0.9
+      },
+      {
+        type: SessionErrorType.COOKIE_INVALID,
+        keywords: ['cookie', 'session storage'],
+        httpStatuses: [],
+        confidence: 0.7
+      },
+      {
+        type: SessionErrorType.DATA_FORMAT_ERROR,
+        keywords: ['format', 'parsing', 'json', 'unexpected response'],
+        httpStatuses: [],
+        confidence: 0.7
+      }
+    ];
+
+    // Check each pattern for matches
+    for (const pattern of errorPatterns) {
+      // Check HTTP status match
+      if (httpStatus && pattern.httpStatuses.includes(httpStatus)) {
+        return { type: pattern.type, confidence: pattern.confidence };
+      }
+      
+      // Check keyword matches
+      const keywordMatch = pattern.keywords.some(keyword => lowerMessage.includes(keyword));
+      if (keywordMatch) {
+        return { type: pattern.type, confidence: pattern.confidence };
+      }
     }
 
-    // Invalid credentials patterns
-    if (errorMessage.toLowerCase().includes('credentials') ||
-        errorMessage.toLowerCase().includes('authentication failed') ||
-        errorMessage.toLowerCase().includes('unauthorized') ||
-        httpStatus === 403) {
-      return this.createInvalidCredentialsError(platform, operation, httpStatus);
+    // Special case for server errors (5xx range)
+    if (httpStatus && httpStatus >= 500 && httpStatus < 600) {
+      return { type: SessionErrorType.PLATFORM_UNAVAILABLE, confidence: 0.8 };
     }
 
-    // Network error patterns
-    if (errorMessage.toLowerCase().includes('network') ||
-        errorMessage.toLowerCase().includes('connection') ||
-        errorMessage.toLowerCase().includes('timeout') ||
-        errorMessage.toLowerCase().includes('fetch')) {
-      return this.createNetworkError(platform, operation, error instanceof Error ? error : new Error(errorMessage), requestUrl);
-    }
-
-    // Platform unavailable patterns
-    if (httpStatus && (httpStatus >= 500 && httpStatus < 600) ||
-        errorMessage.toLowerCase().includes('unavailable') ||
-        errorMessage.toLowerCase().includes('maintenance')) {
-      return this.createPlatformUnavailableError(platform, operation, httpStatus);
-    }
-
-    // Rate limiting patterns
-    if (httpStatus === 429 ||
-        errorMessage.toLowerCase().includes('rate limit') ||
-        errorMessage.toLowerCase().includes('too many requests')) {
-      return this.createRateLimitError(platform, operation);
-    }
-
-    // Cookie/session issues
-    if (errorMessage.toLowerCase().includes('cookie') ||
-        errorMessage.toLowerCase().includes('session storage')) {
-      return this.createCookieError(platform, operation, errorMessage);
-    }
-
-    // Data format issues
-    if (errorMessage.toLowerCase().includes('format') ||
-        errorMessage.toLowerCase().includes('parsing') ||
-        errorMessage.toLowerCase().includes('json') ||
-        errorMessage.toLowerCase().includes('unexpected response')) {
-      return this.createDataFormatError(platform, operation, 'JSON', errorMessage);
-    }
-
-    // Default to generic error
-    return this.createGenericError(platform, operation, error instanceof Error ? error : String(error), httpStatus);
+    // Default to unknown error
+    return { type: SessionErrorType.UNKNOWN_ERROR, confidence: 0.1 };
   }
 }
 

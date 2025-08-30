@@ -1,10 +1,17 @@
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import ShortlistFetcherClient from './ShortlistFetcherClient';
 
 export const metadata = {
-	title: 'Stock Format Converter – MarketInOut & TradingView',
-	description: 'Convert stock symbol lists between MarketInOut and TradingView formats. Mobile-first, fast, and easy.',
+    title: 'TradingView Shortlist Fetcher – Stock Tools',
+    description: 'Download watchlists from TradingView. Mobile-first, fast, and easy.',
 };
 
 export default function Page() {
-	return <ShortlistFetcherClient />;
+    return (
+        <DashboardLayout showHero={false} showSidebar={true}>
+            <div className='max-w-7xl mx-auto'>
+                <ShortlistFetcherClient />
+            </div>
+        </DashboardLayout>
+    );
 }

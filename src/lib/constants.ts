@@ -53,6 +53,7 @@ export const SUCCESS_MESSAGES = {
 export const LOG_PREFIXES = {
 	API: '[API]',
 	SESSION_RESOLVER: '[SessionResolver]',
+	SESSION_MANAGER: '[SessionManager]',
 	MIO_SERVICE: '[MIOService]',
 	SYNC: '[SYNC]',
 } as const;

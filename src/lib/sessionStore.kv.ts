@@ -21,6 +21,61 @@ export type SessionData = {
 
 
 /**
+ * Generate session key for KV storage
+ */
+function generateSessionKey(internalId: string, platform: string): string {
+	return `session:${internalId}:${platform}`;
+}
+
+/**
+ * Parse KV data handling both string and object formats
+ */
+function parseKVData(data: unknown, key: string): PlatformSessionData | undefined {
+	if (!data) return undefined;
+
+	try {
+		if (typeof data === 'string') {
+			return JSON.parse(data);
+		} else if (typeof data === 'object' && data !== null) {
+			return data as PlatformSessionData;
+		} else {
+			throw new Error(`Unexpected data type: ${typeof data}`);
+		}
+	} catch (error) {
+		console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
+		return undefined;
+	}
+}
+
+/**
+ * Sanitize session data ensuring all values are strings
+ */
+function sanitizeSessionData(data: PlatformSessionData): PlatformSessionData {
+	const sanitized: PlatformSessionData = { sessionId: data.sessionId };
+
+	for (const [propKey, value] of Object.entries(data)) {
+		if (propKey !== 'sessionId' && value !== undefined) {
+			if (typeof value === 'object' && value !== null) {
+				sanitized[propKey] = JSON.stringify(value);
+			} else {
+				sanitized[propKey] = typeof value === 'string' ? value : String(value);
+			}
+		}
+	}
+
+	return sanitized;
+}
+
+/**
+ * Execute operation with cache invalidation
+ */
+async function withCacheInvalidation<T>(operation: () => Promise<T>): Promise<T> {
+	const result = await operation();
+	SessionResolver.invalidateCache();
+	return result;
+}
+
+/**
  * Generate a deterministic session ID based on user credentials and platform.
  * This ensures one session per user per platform - new sessions will overwrite existing ones.
  */
@@ -45,76 +100,22 @@ export async function generateDeterministicSessionId(userEmail: string, userPass
  * Save or update a session for a specific platform under an internal session ID.
  */
 export async function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData): Promise<void> {
-	const key = `session:${internalId}:${platform}`;
+	const key = generateSessionKey(internalId, platform);
+	const sanitizedData = sanitizeSessionData(data);
 
-	// Debug: Log the incoming data
-	console.log(`[SessionStore-KV] DEBUG: Incoming data for ${key}:`, JSON.stringify(data, null, 2));
-
-	// Ensure all values are strings or undefined (sanitize the data)
-	const sanitizedData: PlatformSessionData = {
-		sessionId: data.sessionId
-	};
-
-	// Convert all other properties to strings
-	for (const [propKey, value] of Object.entries(data)) {
-		if (propKey !== 'sessionId' && value !== undefined) {
-			// Ensure we convert objects to strings properly
-			if (typeof value === 'object' && value !== null) {
-				sanitizedData[propKey] = JSON.stringify(value);
-			} else {
-				sanitizedData[propKey] = typeof value === 'string' ? value : String(value);
-			}
-		}
-	}
-
-	// Debug: Log the sanitized data
-	console.log(`[SessionStore-KV] DEBUG: Sanitized data for ${key}:`, JSON.stringify(sanitizedData, null, 2));
-
-	const jsonString = JSON.stringify(sanitizedData);
-	console.log(`[SessionStore-KV] DEBUG: Final JSON string for ${key}:`, jsonString);
-
-	// Set without TTL - sessions persist until manually deleted
-	await kv.set(key, jsonString);
-
-	// Invalidate SessionResolver cache since session data changed
-	SessionResolver.invalidateCache();
-
-	console.log(`[SessionStore-KV] Successfully saved ${platform} session: ${internalId}`);
+	await withCacheInvalidation(async () => {
+		await kv.set(key, JSON.stringify(sanitizedData));
+		console.log(`[SessionStore-KV] Successfully saved ${platform} session: ${internalId}`);
+	});
 }
 
 /**
  * Get session data for a specific platform under an internal session ID.
  */
 export async function getPlatformSession(internalId: string, platform: string): Promise<PlatformSessionData | undefined> {
-	const key = `session:${internalId}:${platform}`;
+	const key = generateSessionKey(internalId, platform);
 	const data = await kv.get(key);
-
-	if (!data) {
-		console.log(`[SessionStore-KV] DEBUG: No data found for key: ${key}`);
-		return undefined;
-	}
-
-	console.log(`[SessionStore-KV] DEBUG: Raw data retrieved for ${key}:`, typeof data, data);
-
-	try {
-		// Handle both cases: string (needs parsing) or already parsed object
-		let parsed: PlatformSessionData;
-		if (typeof data === 'string') {
-			parsed = JSON.parse(data);
-			console.log(`[SessionStore-KV] DEBUG: Parsed JSON string for ${key}:`, parsed);
-		} else if (typeof data === 'object' && data !== null) {
-			parsed = data as PlatformSessionData;
-			console.log(`[SessionStore-KV] DEBUG: Using already-parsed object for ${key}:`, parsed);
-		} else {
-			throw new Error(`Unexpected data type: ${typeof data}`);
-		}
-
-		return parsed;
-	} catch (error) {
-		console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
-		console.error(`[SessionStore-KV] Raw data that failed to process:`, data);
-		return undefined;
-	}
+	return parseKVData(data, key);
 }
 
 /**
@@ -124,8 +125,6 @@ export async function getSession(internalId: string): Promise<SessionData | unde
 	const pattern = `session:${internalId}:*`;
 	const keys = await kv.keys(pattern);
 
-	console.log(`[SessionStore-KV] DEBUG: getSession called for ${internalId}, found ${keys.length} keys:`, keys);
-
 	if (keys.length === 0) {
 		return undefined;
 	}
@@ -134,29 +133,11 @@ export async function getSession(internalId: string): Promise<SessionData | unde
 
 	for (const key of keys) {
 		const data = await kv.get(key);
-		console.log(`[SessionStore-KV] DEBUG: Raw data from KV for ${key}:`, typeof data, data);
-
-		if (data) {
-			try {
-				const platform = key.split(':')[2]; // Extract platform from key
-
-				// Handle both cases: string (needs parsing) or already parsed object
-				let parsedData: PlatformSessionData;
-				if (typeof data === 'string') {
-					parsedData = JSON.parse(data);
-					console.log(`[SessionStore-KV] DEBUG: Parsed JSON string for ${key}:`, parsedData);
-				} else if (typeof data === 'object' && data !== null) {
-					parsedData = data as PlatformSessionData;
-					console.log(`[SessionStore-KV] DEBUG: Using already-parsed object for ${key}:`, parsedData);
-				} else {
-					throw new Error(`Unexpected data type: ${typeof data}`);
-				}
-
-				sessionData[platform] = parsedData;
-			} catch (error) {
-				console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
-				console.error(`[SessionStore-KV] Raw data that failed to process:`, data);
-			}
+		const parsedData = parseKVData(data, key);
+		
+		if (parsedData) {
+			const platform = key.split(':')[2]; // Extract platform from key
+			sessionData[platform] = parsedData;
 		}
 	}
 
@@ -213,27 +194,14 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
 
 	for (const key of keys) {
 		const data = await kv.get(key);
-		if (data) {
-			try {
-				const [, internalId, platform] = key.split(':');
-				if (!sessions[internalId]) {
-					sessions[internalId] = {};
-				}
-
-				// Handle both cases: string (needs parsing) or already parsed object
-				let parsedData: PlatformSessionData;
-				if (typeof data === 'string') {
-					parsedData = JSON.parse(data);
-				} else if (typeof data === 'object' && data !== null) {
-					parsedData = data as PlatformSessionData;
-				} else {
-					throw new Error(`Unexpected data type: ${typeof data}`);
-				}
-
-				sessions[internalId][platform] = parsedData;
-			} catch (error) {
-				console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
+		const parsedData = parseKVData(data, key);
+		
+		if (parsedData) {
+			const [, internalId, platform] = key.split(':');
+			if (!sessions[internalId]) {
+				sessions[internalId] = {};
 			}
+			sessions[internalId][platform] = parsedData;
 		}
 	}
 
@@ -244,13 +212,12 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
  * Delete session data for a specific platform under an internal session ID.
  */
 export async function deletePlatformSession(internalId: string, platform: string): Promise<void> {
-	const key = `session:${internalId}:${platform}`;
-	await kv.del(key);
-
-	// Invalidate SessionResolver cache since session data changed
-	SessionResolver.invalidateCache();
-
-	console.log(`[SessionStore-KV] Deleted ${platform} session: ${internalId}`);
+	const key = generateSessionKey(internalId, platform);
+	
+	await withCacheInvalidation(async () => {
+		await kv.del(key);
+		console.log(`[SessionStore-KV] Deleted ${platform} session: ${internalId}`);
+	});
 }
 
 /**
@@ -261,12 +228,10 @@ export async function deleteSession(internalId: string): Promise<void> {
 	const keys = await kv.keys(pattern);
 
 	if (keys.length > 0) {
-		await Promise.all(keys.map(key => kv.del(key)));
-
-		// Invalidate SessionResolver cache since session data changed
-		SessionResolver.invalidateCache();
-
-		console.log(`[SessionStore-KV] Deleted all sessions for: ${internalId}`);
+		await withCacheInvalidation(async () => {
+			await Promise.all(keys.map(key => kv.del(key)));
+			console.log(`[SessionStore-KV] Deleted all sessions for: ${internalId}`);
+		});
 	}
 }
 

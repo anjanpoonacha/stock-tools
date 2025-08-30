@@ -148,30 +148,68 @@ export class SessionHealthMonitor {
 	 * Get comprehensive health report for a session across all platforms
 	 */
 	public getSessionHealthReport(internalSessionId: string): SessionHealthReport | null {
-		const sessionPlatforms: { [platform: string]: SessionHealthMetrics } = {};
-		let overallStatus: SessionHealthStatus = 'healthy';
-		
-		// Find all platforms for this session
-		for (const [, metrics] of this.healthMetrics.entries()) {
-			if (metrics.internalSessionId === internalSessionId) {
-				sessionPlatforms[metrics.platform] = metrics;
-				
-				// Determine overall status (worst status wins)
-				if (metrics.status === 'expired') {
-					overallStatus = 'expired';
-				} else if (metrics.status === 'critical' && overallStatus !== 'expired') {
-					overallStatus = 'critical';
-				} else if (metrics.status === 'warning' && (overallStatus === 'healthy' || overallStatus === 'warning')) {
-					overallStatus = 'warning';
-				}
-			}
-		}
+		const sessionPlatforms = this.collectSessionPlatforms(internalSessionId);
 		
 		if (Object.keys(sessionPlatforms).length === 0) {
 			return null;
 		}
 		
-		// Collect critical errors and recommended actions
+		const overallStatus = this.determineOverallStatus(sessionPlatforms);
+		const { criticalErrors, recommendedActions, autoRecoveryAvailable } = this.analyzeSessionHealth(sessionPlatforms);
+
+		return {
+			sessionId: internalSessionId,
+			platforms: sessionPlatforms,
+			overallStatus,
+			lastUpdated: new Date(),
+			criticalErrors,
+			recommendedActions,
+			autoRecoveryAvailable,
+		};
+	}
+
+	/**
+	 * Collect all platform metrics for a session
+	 */
+	private collectSessionPlatforms(internalSessionId: string): { [platform: string]: SessionHealthMetrics } {
+		const sessionPlatforms: { [platform: string]: SessionHealthMetrics } = {};
+		
+		for (const [, metrics] of this.healthMetrics.entries()) {
+			if (metrics.internalSessionId === internalSessionId) {
+				sessionPlatforms[metrics.platform] = metrics;
+			}
+		}
+		
+		return sessionPlatforms;
+	}
+
+	/**
+	 * Determine overall status from platform metrics (worst status wins)
+	 */
+	private determineOverallStatus(sessionPlatforms: { [platform: string]: SessionHealthMetrics }): SessionHealthStatus {
+		let overallStatus: SessionHealthStatus = 'healthy';
+		
+		for (const metrics of Object.values(sessionPlatforms)) {
+			if (metrics.status === 'expired') {
+				overallStatus = 'expired';
+			} else if (metrics.status === 'critical' && overallStatus !== 'expired') {
+				overallStatus = 'critical';
+			} else if (metrics.status === 'warning' && (overallStatus === 'healthy' || overallStatus === 'warning')) {
+				overallStatus = 'warning';
+			}
+		}
+		
+		return overallStatus;
+	}
+
+	/**
+	 * Analyze session health and generate recommendations
+	 */
+	private analyzeSessionHealth(sessionPlatforms: { [platform: string]: SessionHealthMetrics }): {
+		criticalErrors: SessionError[];
+		recommendedActions: string[];
+		autoRecoveryAvailable: boolean;
+	} {
 		const criticalErrors: SessionError[] = [];
 		const recommendedActions: string[] = [];
 		let autoRecoveryAvailable = false;
@@ -192,15 +230,7 @@ export class SessionHealthMonitor {
 			}
 		}
 
-		return {
-			sessionId: internalSessionId,
-			platforms: sessionPlatforms,
-			overallStatus,
-			lastUpdated: new Date(),
-			criticalErrors,
-			recommendedActions,
-			autoRecoveryAvailable,
-		};
+		return { criticalErrors, recommendedActions, autoRecoveryAvailable };
 	}
 
 	/**
@@ -241,62 +271,12 @@ export class SessionHealthMonitor {
 		console.log(`[SessionHealthMonitor] Checking health for ${platform} session ${internalSessionId}`);
 		
 		try {
-			let isHealthy = false;
-			
-			// Platform-specific health checks
-			switch (platform) {
-				case 'marketinout':
-					isHealthy = await MIOService.validateSessionHealth(internalSessionId);
-					break;
-				case 'tradingview':
-					// TODO: Implement TradingView health check
-					isHealthy = await this.checkTradingViewHealth(internalSessionId);
-					break;
-				default:
-					console.warn(`[SessionHealthMonitor] Unknown platform: ${platform}`);
-					isHealthy = false;
-			}
-			
-			// Update metrics based on health check result
-			metrics.totalChecks++;
-			
-			if (isHealthy) {
-				metrics.lastSuccessfulCheck = new Date();
-				metrics.consecutiveFailures = 0;
-				
-				// Determine status based on recent history
-				if (metrics.totalFailures === 0 || metrics.totalFailures / metrics.totalChecks < 0.1) {
-					metrics.status = 'healthy';
-					metrics.checkInterval = this.DEFAULT_CHECK_INTERVAL;
-				} else if (metrics.totalFailures / metrics.totalChecks < 0.3) {
-					metrics.status = 'warning';
-					metrics.checkInterval = this.WARNING_CHECK_INTERVAL;
-				}
-			} else {
-				metrics.lastFailedCheck = new Date();
-				metrics.consecutiveFailures++;
-				metrics.totalFailures++;
-				
-				// Determine status based on consecutive failures
-				if (metrics.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
-					metrics.status = 'expired';
-					metrics.isMonitoring = false;
-					console.error(`[SessionHealthMonitor] Session ${internalSessionId} for ${platform} marked as expired`);
-				} else if (metrics.consecutiveFailures >= 2) {
-					metrics.status = 'critical';
-					metrics.checkInterval = this.CRITICAL_CHECK_INTERVAL;
-				} else {
-					metrics.status = 'warning';
-					metrics.checkInterval = this.WARNING_CHECK_INTERVAL;
-				}
-			}
-			
-			// Schedule next check
-			metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
+			const isHealthy = await this.performPlatformHealthCheck(platform, internalSessionId);
+			this.updateHealthMetrics(metrics, isHealthy);
 			this.healthMetrics.set(key, metrics);
 			
-			// Attempt automatic refresh if status is warning or critical
-			if ((metrics.status === 'warning' || metrics.status === 'critical') && isHealthy) {
+			// Attempt automatic refresh if needed
+			if (this.shouldAttemptRefresh(metrics.status, isHealthy)) {
 				await this.attemptSessionRefresh(internalSessionId, platform);
 			}
 			
@@ -305,18 +285,98 @@ export class SessionHealthMonitor {
 			
 		} catch (error) {
 			console.error(`[SessionHealthMonitor] Health check failed for ${platform}:${internalSessionId}:`, error);
-			
-			metrics.lastFailedCheck = new Date();
-			metrics.consecutiveFailures++;
-			metrics.totalFailures++;
-			metrics.totalChecks++;
-			metrics.status = 'critical';
-			metrics.checkInterval = this.CRITICAL_CHECK_INTERVAL;
-			metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
-			
+			this.updateHealthMetricsOnError(metrics);
 			this.healthMetrics.set(key, metrics);
 			return 'critical';
 		}
+	}
+
+	/**
+	 * Perform platform-specific health check
+	 */
+	private async performPlatformHealthCheck(platform: string, internalSessionId: string): Promise<boolean> {
+		switch (platform) {
+			case 'marketinout':
+				return await MIOService.validateSessionHealth(internalSessionId);
+			case 'tradingview':
+				return await this.checkTradingViewHealth(internalSessionId);
+			default:
+				console.warn(`[SessionHealthMonitor] Unknown platform: ${platform}`);
+				return false;
+		}
+	}
+
+	/**
+	 * Update health metrics based on check result
+	 */
+	private updateHealthMetrics(metrics: SessionHealthMetrics, isHealthy: boolean): void {
+		metrics.totalChecks++;
+		
+		if (isHealthy) {
+			this.updateHealthyMetrics(metrics);
+		} else {
+			this.updateUnhealthyMetrics(metrics);
+		}
+		
+		metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
+	}
+
+	/**
+	 * Update metrics for successful health check
+	 */
+	private updateHealthyMetrics(metrics: SessionHealthMetrics): void {
+		metrics.lastSuccessfulCheck = new Date();
+		metrics.consecutiveFailures = 0;
+		
+		const failureRate = metrics.totalFailures / metrics.totalChecks;
+		if (failureRate < 0.1) {
+			metrics.status = 'healthy';
+			metrics.checkInterval = this.DEFAULT_CHECK_INTERVAL;
+		} else if (failureRate < 0.3) {
+			metrics.status = 'warning';
+			metrics.checkInterval = this.WARNING_CHECK_INTERVAL;
+		}
+	}
+
+	/**
+	 * Update metrics for failed health check
+	 */
+	private updateUnhealthyMetrics(metrics: SessionHealthMetrics): void {
+		metrics.lastFailedCheck = new Date();
+		metrics.consecutiveFailures++;
+		metrics.totalFailures++;
+		
+		if (metrics.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
+			metrics.status = 'expired';
+			metrics.isMonitoring = false;
+			console.error(`[SessionHealthMonitor] Session ${metrics.internalSessionId} for ${metrics.platform} marked as expired`);
+		} else if (metrics.consecutiveFailures >= 2) {
+			metrics.status = 'critical';
+			metrics.checkInterval = this.CRITICAL_CHECK_INTERVAL;
+		} else {
+			metrics.status = 'warning';
+			metrics.checkInterval = this.WARNING_CHECK_INTERVAL;
+		}
+	}
+
+	/**
+	 * Update metrics when health check throws an error
+	 */
+	private updateHealthMetricsOnError(metrics: SessionHealthMetrics): void {
+		metrics.lastFailedCheck = new Date();
+		metrics.consecutiveFailures++;
+		metrics.totalFailures++;
+		metrics.totalChecks++;
+		metrics.status = 'critical';
+		metrics.checkInterval = this.CRITICAL_CHECK_INTERVAL;
+		metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
+	}
+
+	/**
+	 * Determine if automatic refresh should be attempted
+	 */
+	private shouldAttemptRefresh(status: SessionHealthStatus, isHealthy: boolean): boolean {
+		return (status === 'warning' || status === 'critical') && isHealthy;
 	}
 
 	/**
@@ -328,17 +388,48 @@ export class SessionHealthMonitor {
 		const metrics = this.healthMetrics.get(key);
 		
 		if (!metrics) {
-			const error = ErrorHandler.createGenericError(
-				Platform.UNKNOWN,
-				'attemptSessionRefresh',
-				`No metrics found for session ${internalSessionId} on platform ${platform}`
-			);
-			ErrorLogger.logError(error);
+			this.logMissingMetricsError(internalSessionId, platform);
 			return false;
 		}
 		
-		// Don't attempt refresh too frequently
-		const timeSinceLastRefresh = metrics.lastRefreshAttempt 
+		if (!this.shouldAttemptRefreshNow(metrics, platform, internalSessionId)) {
+			return false;
+		}
+		
+		console.log(`[SessionHealthMonitor] Attempting automatic session refresh for ${platform}:${internalSessionId}`);
+		
+		try {
+			this.updateRefreshAttemptMetrics(metrics);
+			const refreshResult = await this.performPlatformRefresh(platform, internalSessionId);
+			this.handleRefreshResult(metrics, refreshResult, platform, internalSessionId);
+			this.healthMetrics.set(key, metrics);
+			return refreshResult.success;
+			
+		} catch (error) {
+			console.error(`[SessionHealthMonitor] Error during session refresh for ${platform}:${internalSessionId}:`, error);
+			this.handleRefreshError(metrics, error, platform);
+			this.healthMetrics.set(key, metrics);
+			return false;
+		}
+	}
+
+	/**
+	 * Log error for missing metrics
+	 */
+	private logMissingMetricsError(internalSessionId: string, platform: string): void {
+		const error = ErrorHandler.createGenericError(
+			Platform.UNKNOWN,
+			'attemptSessionRefresh',
+			`No metrics found for session ${internalSessionId} on platform ${platform}`
+		);
+		ErrorLogger.logError(error);
+	}
+
+	/**
+	 * Check if refresh should be attempted now (cooldown logic)
+	 */
+	private shouldAttemptRefreshNow(metrics: SessionHealthMetrics, platform: string, internalSessionId: string): boolean {
+		const timeSinceLastRefresh = metrics.lastRefreshAttempt
 			? Date.now() - metrics.lastRefreshAttempt.getTime()
 			: Infinity;
 			
@@ -346,91 +437,97 @@ export class SessionHealthMonitor {
 			console.log(`[SessionHealthMonitor] Skipping refresh attempt for ${platform}:${internalSessionId} - too recent`);
 			return false;
 		}
-		
-		console.log(`[SessionHealthMonitor] Attempting automatic session refresh for ${platform}:${internalSessionId}`);
-		
-		try {
-			metrics.lastRefreshAttempt = new Date();
-			metrics.lastRecoveryAttempt = new Date();
-			metrics.recoveryAttempts++;
-			let refreshSuccess = false;
-			let refreshError: SessionError | null = null;
-			
-			switch (platform) {
-				case 'marketinout':
-					try {
-						refreshSuccess = await MIOService.refreshSession(internalSessionId);
-					} catch (error) {
-						if (error instanceof SessionError) {
-							refreshError = error;
-						} else {
-							refreshError = ErrorHandler.parseError(
-								error,
-								Platform.MARKETINOUT,
-								'attemptSessionRefresh',
-								undefined,
-								undefined
-							);
-						}
-						refreshSuccess = false;
-					}
-					break;
-				case 'tradingview':
-					try {
-						refreshSuccess = await this.refreshTradingViewSession(internalSessionId);
-					} catch (error) {
-						refreshError = ErrorHandler.parseError(
-							error,
-							Platform.TRADINGVIEW,
-							'refreshTradingViewSession',
-							undefined,
-							undefined
-						);
-						refreshSuccess = false;
-					}
-					break;
-				default:
-					refreshError = ErrorHandler.createGenericError(
-						Platform.UNKNOWN,
-						'attemptSessionRefresh',
-						`Unknown platform for refresh: ${platform}`
-					);
-					console.warn(`[SessionHealthMonitor] Unknown platform for refresh: ${platform}`);
-					refreshSuccess = false;
-			}
-			
-			if (refreshSuccess) {
-				metrics.lastSuccessfulRefresh = new Date();
-				metrics.consecutiveFailures = Math.max(0, metrics.consecutiveFailures - 1);
-				metrics.lastError = undefined; // Clear error on successful refresh
-				console.log(`[SessionHealthMonitor] Successfully refreshed session for ${platform}:${internalSessionId}`);
-			} else {
-				if (refreshError) {
-					this.recordHealthCheckError(metrics, refreshError);
-				}
-				console.warn(`[SessionHealthMonitor] Failed to refresh session for ${platform}:${internalSessionId}`);
-			}
-			
-			this.healthMetrics.set(key, metrics);
-			return refreshSuccess;
-			
-		} catch (error) {
-			console.error(`[SessionHealthMonitor] Error during session refresh for ${platform}:${internalSessionId}:`, error);
-			
-			// Parse and record the error
-			const sessionError = ErrorHandler.parseError(
-				error,
-				platform === 'marketinout' ? Platform.MARKETINOUT : 
-				platform === 'tradingview' ? Platform.TRADINGVIEW : Platform.UNKNOWN,
-				'attemptSessionRefresh',
-				undefined,
-				undefined
-			);
-			this.recordHealthCheckError(metrics, sessionError);
-			
-			this.healthMetrics.set(key, metrics);
-			return false;
+		return true;
+	}
+
+	/**
+	 * Update metrics for refresh attempt
+	 */
+	private updateRefreshAttemptMetrics(metrics: SessionHealthMetrics): void {
+		metrics.lastRefreshAttempt = new Date();
+		metrics.lastRecoveryAttempt = new Date();
+		metrics.recoveryAttempts++;
+	}
+
+	/**
+	 * Perform platform-specific session refresh
+	 */
+	private async performPlatformRefresh(platform: string, internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
+		switch (platform) {
+			case 'marketinout':
+				return await this.refreshMarketInOutSession(internalSessionId);
+			case 'tradingview':
+				return await this.refreshTradingViewSessionSafe(internalSessionId);
+			default:
+				const error = ErrorHandler.createGenericError(
+					Platform.UNKNOWN,
+					'attemptSessionRefresh',
+					`Unknown platform for refresh: ${platform}`
+				);
+				console.warn(`[SessionHealthMonitor] Unknown platform for refresh: ${platform}`);
+				return { success: false, error };
 		}
+	}
+
+	/**
+	 * Safely refresh MarketInOut session with error handling
+	 */
+	private async refreshMarketInOutSession(internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
+		try {
+			const success = await MIOService.refreshSession(internalSessionId);
+			return { success };
+		} catch (error) {
+			const sessionError = error instanceof SessionError
+				? error
+				: ErrorHandler.parseError(error, Platform.MARKETINOUT, 'attemptSessionRefresh', undefined, undefined);
+			return { success: false, error: sessionError };
+		}
+	}
+
+	/**
+	 * Safely refresh TradingView session with error handling
+	 */
+	private async refreshTradingViewSessionSafe(internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
+		try {
+			const success = await this.refreshTradingViewSession(internalSessionId);
+			return { success };
+		} catch (error) {
+			const sessionError = ErrorHandler.parseError(error, Platform.TRADINGVIEW, 'refreshTradingViewSession', undefined, undefined);
+			return { success: false, error: sessionError };
+		}
+	}
+
+	/**
+	 * Handle the result of a refresh attempt
+	 */
+	private handleRefreshResult(
+		metrics: SessionHealthMetrics,
+		result: { success: boolean; error?: SessionError },
+		platform: string,
+		internalSessionId: string
+	): void {
+		if (result.success) {
+			metrics.lastSuccessfulRefresh = new Date();
+			metrics.consecutiveFailures = Math.max(0, metrics.consecutiveFailures - 1);
+			metrics.lastError = undefined;
+			console.log(`[SessionHealthMonitor] Successfully refreshed session for ${platform}:${internalSessionId}`);
+		} else {
+			if (result.error) {
+				this.recordHealthCheckError(metrics, result.error);
+			}
+			console.warn(`[SessionHealthMonitor] Failed to refresh session for ${platform}:${internalSessionId}`);
+		}
+	}
+
+	/**
+	 * Handle errors during refresh attempt
+	 */
+	private handleRefreshError(metrics: SessionHealthMetrics, error: unknown, platform: string): void {
+		const platformEnum = platform === 'marketinout' ? Platform.MARKETINOUT :
+			platform === 'tradingview' ? Platform.TRADINGVIEW : Platform.UNKNOWN;
+		
+		const sessionError = ErrorHandler.parseError(error, platformEnum, 'attemptSessionRefresh', undefined, undefined);
+		this.recordHealthCheckError(metrics, sessionError);
 	}
 
 	/**

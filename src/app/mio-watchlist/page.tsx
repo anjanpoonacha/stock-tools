@@ -3,6 +3,7 @@
 'use client';
 
 import React, { useState, useCallback, useEffect } from 'react';
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -193,108 +194,114 @@ export default function MioWatchlistPage() {
     };
 
     return (
-        <div className='max-w-xl mx-auto py-8'>
-            <h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
-            <UsageGuide
-                title='How to manage your MIO watchlists'
-                steps={[
-                    'Install the browser extension from the extension folder',
-                    'Visit marketinout.com and log in to your account',
-                    'The extension will automatically capture your session',
-                    'Return to this page - everything will work automatically!',
-                    'Use the tools below to manage your watchlists',
-                ]}
-                tips={[
-                    'Symbols should be in MIO format (e.g., TCS.NS, INFY.BO)',
-                    'Use comma-separated format for multiple symbols',
-                    'Group By field helps organize symbols in watchlists',
-                    'If you get session errors, just visit MIO website again',
-                ]}
-                className='mb-4'
-            />
-            <Separator className='mb-4' />
+        <DashboardLayout showHero={false} showSidebar={true}>
+            <div className='max-w-xl mx-auto py-8'>
+                <h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
+                <UsageGuide
+                    title='How to manage your MIO watchlists'
+                    steps={[
+                        'Install the browser extension from the extension folder',
+                        'Visit marketinout.com and log in to your account',
+                        'The extension will automatically capture your session',
+                        'Return to this page - everything will work automatically!',
+                        'Use the tools below to manage your watchlists',
+                    ]}
+                    tips={[
+                        'Symbols should be in MIO format (e.g., TCS.NS, INFY.BO)',
+                        'Use comma-separated format for multiple symbols',
+                        'Group By field helps organize symbols in watchlists',
+                        'If you get session errors, just visit MIO website again',
+                    ]}
+                    className='mb-4'
+                />
+                <Separator className='mb-4' />
 
-            <div className='mb-6'>
-                <h2 className='font-semibold mb-2'>Add to Watchlist</h2>
-                {watchlistsLoading ? (
-                    <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.LOADING_TEXT}</div>
-                ) : watchlistsError ? (
+                <div className='mb-6'>
+                    <h2 className='font-semibold mb-2'>Add to Watchlist</h2>
+                    {watchlistsLoading ? (
+                        <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.LOADING_TEXT}</div>
+                    ) : watchlistsError ? (
+                        <div className='mb-2'>
+                            <ErrorDisplay error={watchlistsError} />
+                        </div>
+                    ) : watchlists.length === 0 ? (
+                        <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
+                    ) : (
+                        <div className='mb-2'>
+                            <label className='block mb-1 font-medium'>MIO Watchlist</label>
+                            <Select value={mioWlid} onValueChange={setMioWlid} disabled={watchlists.length === 0}>
+                                <SelectTrigger className='w-full'>
+                                    <SelectValue placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLIST} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {watchlists.map((w) => (
+                                        <SelectItem key={w.id} value={w.id}>
+                                            {w.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+                    <Input
+                        className='mb-2'
+                        value={symbols}
+                        onChange={(e) => setSymbols(e.target.value)}
+                        placeholder={UI_CONSTANTS.PLACEHOLDER_SYMBOLS}
+                    />
+                    <Input
+                        className='mb-2'
+                        value={groupBy}
+                        onChange={(e) => setGroupBy(e.target.value)}
+                        placeholder={UI_CONSTANTS.PLACEHOLDER_GROUP_BY}
+                    />
+                    <Button onClick={handleAddWatchlist} disabled={loading}>
+                        Add to Watchlist
+                    </Button>
+                </div>
+
+                <Separator className='mb-4' />
+
+                <div className='mb-6'>
+                    <h2 className='font-semibold mb-2'>Create New Watchlist</h2>
+                    <Input
+                        className='mb-2'
+                        value={watchlistName}
+                        onChange={(e) => setWatchlistName(e.target.value)}
+                        placeholder={UI_CONSTANTS.PLACEHOLDER_WATCHLIST_NAME}
+                    />
+                    <Button onClick={handleCreateWatchlist} disabled={loading}>
+                        Create Watchlist
+                    </Button>
+                </div>
+
+                <Separator className='mb-4' />
+
+                <div className='mb-6'>
+                    <h2 className='font-semibold mb-2'>Delete Watchlists</h2>
+                    <MultiSelect
+                        options={watchlists.map((w) => ({ label: w.name, value: w.id }))}
+                        onValueChange={setDeleteIds}
+                        value={deleteIds}
+                        placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLISTS_DELETE}
+                        className='mb-2'
+                    />
+                    <Button
+                        variant='destructive'
+                        onClick={handleDeleteWatchlists}
+                        disabled={loading || deleteIds.length === 0}
+                    >
+                        Delete Watchlists
+                    </Button>
+                </div>
+
+                {result && <div className='text-green-600 font-medium mb-2'>{result}</div>}
+                {error && (
                     <div className='mb-2'>
-                        <ErrorDisplay error={watchlistsError} />
-                    </div>
-                ) : watchlists.length === 0 ? (
-                    <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
-                ) : (
-                    <div className='mb-2'>
-                        <label className='block mb-1 font-medium'>MIO Watchlist</label>
-                        <Select value={mioWlid} onValueChange={setMioWlid} disabled={watchlists.length === 0}>
-                            <SelectTrigger className='w-full'>
-                                <SelectValue placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLIST} />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {watchlists.map((w) => (
-                                    <SelectItem key={w.id} value={w.id}>
-                                        {w.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <ErrorDisplay error={error} />
                     </div>
                 )}
-                <Input
-                    className='mb-2'
-                    value={symbols}
-                    onChange={(e) => setSymbols(e.target.value)}
-                    placeholder={UI_CONSTANTS.PLACEHOLDER_SYMBOLS}
-                />
-                <Input
-                    className='mb-2'
-                    value={groupBy}
-                    onChange={(e) => setGroupBy(e.target.value)}
-                    placeholder={UI_CONSTANTS.PLACEHOLDER_GROUP_BY}
-                />
-                <Button onClick={handleAddWatchlist} disabled={loading}>
-                    Add to Watchlist
-                </Button>
             </div>
-
-            <Separator className='mb-4' />
-
-            <div className='mb-6'>
-                <h2 className='font-semibold mb-2'>Create New Watchlist</h2>
-                <Input
-                    className='mb-2'
-                    value={watchlistName}
-                    onChange={(e) => setWatchlistName(e.target.value)}
-                    placeholder={UI_CONSTANTS.PLACEHOLDER_WATCHLIST_NAME}
-                />
-                <Button onClick={handleCreateWatchlist} disabled={loading}>
-                    Create Watchlist
-                </Button>
-            </div>
-
-            <Separator className='mb-4' />
-
-            <div className='mb-6'>
-                <h2 className='font-semibold mb-2'>Delete Watchlists</h2>
-                <MultiSelect
-                    options={watchlists.map((w) => ({ label: w.name, value: w.id }))}
-                    onValueChange={setDeleteIds}
-                    value={deleteIds}
-                    placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLISTS_DELETE}
-                    className='mb-2'
-                />
-                <Button onClick={handleDeleteWatchlists} disabled={loading || deleteIds.length === 0}>
-                    Delete Watchlists
-                </Button>
-            </div>
-
-            {result && <div className='text-green-600 font-medium mb-2'>{result}</div>}
-            {error && (
-                <div className='mb-2'>
-                    <ErrorDisplay error={error} />
-                </div>
-            )}
-        </div>
+        </DashboardLayout>
     );
 }

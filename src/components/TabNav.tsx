@@ -3,14 +3,25 @@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeftRight, FileSpreadsheet, Download, RefreshCw, Upload, List, UserCheck, TestTube } from 'lucide-react';
+import { ArrowLeftRight, FileSpreadsheet, Download, List, UserCheck, TestTube } from 'lucide-react';
+import { MIOIcon } from './icons/MIOIcon';
+import { TVIcon } from './icons/TVIcon';
+
+interface IconProps {
+    className?: string;
+}
 
 const ROUTES = [
     { path: '/', label: 'Symbol Converter', value: 'converter', icon: ArrowLeftRight },
     { path: '/csv-watchlist', label: 'CSV → TradingView', value: 'csv', icon: FileSpreadsheet },
     { path: '/shortlist-fetcher', label: 'Fetch TV Watchlists', value: 'fetch', icon: Download },
-    { path: '/tv-sync', label: 'Screener → TV', value: 'sync', icon: RefreshCw },
-    { path: '/mio-sync', label: 'TV → MIO', value: 'mio', icon: Upload },
+    { path: '/tv-sync', label: 'Screener → TV', value: 'sync', icon: (props: IconProps) => <TVIcon {...props} /> },
+    {
+        path: '/mio-sync',
+        label: 'TV → MIO',
+        value: 'mio',
+        icon: (props: IconProps) => <MIOIcon {...props} />,
+    },
     { path: '/mio-watchlist', label: 'Manage MIO Lists', value: 'miowatchlist', icon: List },
     // { path: '/mio-auth', label: 'Authenticator', value: 'mioauth', icon: LogIn },
     { path: '/user-auth-test', label: 'User Auth Test', value: 'userauth', icon: UserCheck },
