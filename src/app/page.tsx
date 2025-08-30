@@ -1,10 +1,5 @@
-import StockFormatConverter from './StockFormatConverter';
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 
-export default function Home() {
-	return (
-		<>
-			{/* <ThemeToggle /> Removed, now global */}
-			<StockFormatConverter />
-		</>
-	);
+export default function HomePage() {
+    return <DashboardLayout showHero={true} showSidebar={true} />;
 }
