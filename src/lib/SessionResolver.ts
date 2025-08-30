@@ -48,21 +48,55 @@ interface PlatformSessionWithTimestamp extends SessionInfo {
  * Provides clean abstraction over KV storage operations without requiring frontend session management
  */
 export class SessionResolver {
+	// Cache for session data with 15 second TTL
+	private static sessionCache: {
+		data: StoredSessions | null;
+		timestamp: number;
+	} = { data: null, timestamp: 0 };
+
+	private static readonly CACHE_TTL_MS = 15000; // 15 seconds
 
 	/**
-	 * Loads all sessions from KV storage
+	 * Checks if the current cache is still valid
+	 * @returns True if cache is valid and can be used
+	 */
+	private static isCacheValid(): boolean {
+		return this.sessionCache.data !== null &&
+			(Date.now() - this.sessionCache.timestamp) < this.CACHE_TTL_MS;
+	}
+
+	/**
+	 * Invalidates the session cache (call when sessions are modified)
+	 */
+	static invalidateCache(): void {
+		this.sessionCache = { data: null, timestamp: 0 };
+		console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Cache invalidated`);
+	}
+
+	/**
+	 * Loads all sessions from KV storage with caching
 	 * @returns Parsed session data or empty object if no sessions exist
 	 */
 	private static async loadSessions(): Promise<StoredSessions> {
-		try {
-			// Use the sessionStore interface which handles KV automatically
-			const sessionStore = await import('./sessionStore');
+		// Check cache first
+		if (this.isCacheValid()) {
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Using cached sessions (${Object.keys(this.sessionCache.data!).length} sessions)`);
+			return this.sessionCache.data!;
+		}
 
+		// Cache miss - fetch from KV and update cache
+		try {
 			// Get KV store directly since we're KV-only now
 			const kvStore = await import('./sessionStore.kv');
 			const allSessions = await kvStore.getAllSessions();
 
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Loaded ${Object.keys(allSessions).length} sessions from KV storage`);
+			// Update cache
+			this.sessionCache = {
+				data: allSessions,
+				timestamp: Date.now()
+			};
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Loaded and cached ${Object.keys(allSessions).length} sessions from KV storage`);
 			return allSessions;
 		} catch (error) {
 			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions from KV:`, error);

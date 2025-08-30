@@ -2,6 +2,7 @@
 // Fixed: Handle both string and object data types from KV
 
 import { kv } from '@vercel/kv';
+import { SessionResolver } from './SessionResolver';
 
 export type PlatformSessionData = {
 	sessionId: string;
@@ -18,11 +19,26 @@ export type SessionData = {
 	[platform: string]: PlatformSessionData;
 };
 
+
 /**
- * Generate a secure random internal session ID.
+ * Generate a deterministic session ID based on user credentials and platform.
+ * This ensures one session per user per platform - new sessions will overwrite existing ones.
  */
-export function generateSessionId(): string {
-	return crypto.randomUUID();
+export async function generateDeterministicSessionId(userEmail: string, userPassword: string, platform: string): Promise<string> {
+	// Create a consistent input string
+	const input = `${userEmail.toLowerCase().trim()}:${userPassword}:${platform}`;
+
+	// Use Web Crypto API to generate a secure hash
+	const encoder = new TextEncoder();
+	const data = encoder.encode(input);
+	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+
+	// Convert to hex string
+	const hashArray = Array.from(new Uint8Array(hashBuffer));
+	const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+	// Return a shorter, more manageable ID (first 32 characters of hash)
+	return `det_${hashHex.substring(0, 32)}`;
 }
 
 /**
@@ -57,10 +73,13 @@ export async function savePlatformSession(internalId: string, platform: string, 
 	const jsonString = JSON.stringify(sanitizedData);
 	console.log(`[SessionStore-KV] DEBUG: Final JSON string for ${key}:`, jsonString);
 
-	// Set with 24 hour TTL (86400 seconds)
-	await kv.setex(key, 86400, jsonString);
+	// Set without TTL - sessions persist until manually deleted
+	await kv.set(key, jsonString);
 
-	console.log(`[SessionStore-KV] Saved ${platform} session: ${internalId}`);
+	// Invalidate SessionResolver cache since session data changed
+	SessionResolver.invalidateCache();
+
+	console.log(`[SessionStore-KV] Successfully saved ${platform} session: ${internalId}`);
 }
 
 /**
@@ -163,90 +182,25 @@ export async function updatePlatformSession(internalId: string, platform: string
 	await savePlatformSession(internalId, platform, updatedPlatformData);
 }
 
-/**
- * Clean up duplicate sessions for a platform, keeping only the most recent one
- * Returns the internal session ID that was kept (most recent)
- * Now considers user email for proper scoping
- */
-export async function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): Promise<string> {
-	const pattern = `session:*:${platform}`;
-	const keys = await kv.keys(pattern);
-
-	const duplicates: Array<{ id: string; extractedAt: string; key: string }> = [];
-
-	// Find all sessions with the same session data and user email
-	for (const key of keys) {
-		const data = await kv.get(key);
-		if (data) {
-			try {
-				// Handle both cases: string (needs parsing) or already parsed object
-				let platformData: PlatformSessionData;
-				if (typeof data === 'string') {
-					platformData = JSON.parse(data);
-				} else if (typeof data === 'object' && data !== null) {
-					platformData = data as PlatformSessionData;
-				} else {
-					throw new Error(`Unexpected data type: ${typeof data}`);
-				}
-
-				if (platformData.sessionId === sessionData.sessionId) {
-					// Check if user email matches (both must be defined or both undefined for a match)
-					const emailsMatch = platformData.userEmail === sessionData.userEmail;
-					if (emailsMatch) {
-						const internalId = key.split(':')[1]; // Extract internal ID from key
-						duplicates.push({
-							id: internalId,
-							extractedAt: platformData.extractedAt || '1970-01-01T00:00:00.000Z',
-							key
-						});
-					}
-				}
-			} catch (error) {
-				console.error(`[SessionStore-KV] Error processing session data for cleanup:`, error);
-			}
-		}
-	}
-
-	if (duplicates.length <= 1) {
-		// No duplicates found, return current or first ID
-		return currentInternalId || duplicates[0]?.id || generateSessionId();
-	}
-
-	// Sort by extractedAt timestamp (most recent first)
-	duplicates.sort((a, b) => new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime());
-
-	// Keep the most recent session (first in sorted array)
-	const keepId = currentInternalId || duplicates[0].id;
-
-	// Delete all other duplicate sessions
-	const toDelete = duplicates.filter(d => d.id !== keepId);
-
-	const userEmailInfo = sessionData.userEmail ? ` for user ${sessionData.userEmail}` : ' (no user email)';
-	console.log(`[SessionStore-KV] Cleaning up ${toDelete.length} duplicate ${platform} sessions${userEmailInfo}, keeping: ${keepId}`);
-
-	// Delete duplicates from KV
-	const deletePromises = toDelete.map(async (duplicate) => {
-		await kv.del(duplicate.key);
-		console.log(`[SessionStore-KV] Deleted duplicate session: ${duplicate.id}`);
-	});
-
-	await Promise.all(deletePromises);
-
-	return keepId;
-}
 
 /**
- * Save or update a session for a platform with automatic deduplication
- * This replaces the old savePlatformSession with built-in cleanup
+ * Save or update a session for a platform
+ * Uses deterministic session IDs when user credentials are available to ensure one session per user per platform
  */
 export async function savePlatformSessionWithCleanup(internalId: string, platform: string, data: PlatformSessionData): Promise<string> {
-	// First, clean up any existing duplicates and get the ID to use
-	const finalInternalId = await cleanupDuplicateSessions(platform, data, internalId);
+	let finalInternalId = internalId;
 
-	// Now save the session data
+	// If user credentials are available, use deterministic session ID to ensure one session per user per platform
+	if (data.userEmail && data.userPassword) {
+		finalInternalId = await generateDeterministicSessionId(data.userEmail, data.userPassword, platform);
+		console.log(`[SessionStore-KV] Using deterministic session ID for user ${data.userEmail} on ${platform}: ${finalInternalId}`);
+	} else {
+		console.log(`[SessionStore-KV] No user credentials provided, using provided session ID for ${platform}: ${finalInternalId}`);
+	}
+
+	// Save the session data (deterministic IDs will automatically overwrite existing sessions)
 	await savePlatformSession(finalInternalId, platform, data);
-
-	console.log(`[SessionStore-KV] Saved ${platform} session with cleanup: ${finalInternalId}`);
+	console.log(`[SessionStore-KV] Saved ${platform} session: ${finalInternalId}`);
 	return finalInternalId;
 }
 
@@ -292,6 +246,10 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
 export async function deletePlatformSession(internalId: string, platform: string): Promise<void> {
 	const key = `session:${internalId}:${platform}`;
 	await kv.del(key);
+
+	// Invalidate SessionResolver cache since session data changed
+	SessionResolver.invalidateCache();
+
 	console.log(`[SessionStore-KV] Deleted ${platform} session: ${internalId}`);
 }
 
@@ -304,6 +262,10 @@ export async function deleteSession(internalId: string): Promise<void> {
 
 	if (keys.length > 0) {
 		await Promise.all(keys.map(key => kv.del(key)));
+
+		// Invalidate SessionResolver cache since session data changed
+		SessionResolver.invalidateCache();
+
 		console.log(`[SessionStore-KV] Deleted all sessions for: ${internalId}`);
 	}
 }

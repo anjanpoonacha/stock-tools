@@ -51,25 +51,6 @@ export async function getPlatformSession(internalId: string, platform: string): 
 	return await kv.getPlatformSession(internalId, platform);
 }
 
-/**
- * @deprecated Use savePlatformSessionWithCleanup instead for automatic deduplication
- * Delete session data for a specific platform under an internal session ID.
- */
-export async function deletePlatformSession(internalId: string, platform: string) {
-	console.warn('[SessionStore] deletePlatformSession is deprecated. Use savePlatformSessionWithCleanup for automatic cleanup.');
-	const kv = await getKVStore();
-	return await kv.deletePlatformSession(internalId, platform);
-}
-
-/**
- * @deprecated Use savePlatformSessionWithCleanup instead for automatic deduplication
- * Delete the entire session for an internal session ID.
- */
-export async function deleteSession(internalId: string) {
-	console.warn('[SessionStore] deleteSession is deprecated. Use savePlatformSessionWithCleanup for automatic cleanup.');
-	const kv = await getKVStore();
-	return await kv.deleteSession(internalId);
-}
 
 /**
  * Get all session data for an internal session ID.
@@ -88,15 +69,6 @@ export async function updatePlatformSession(internalId: string, platform: string
 	return await kv.updatePlatformSession(internalId, platform, updates);
 }
 
-/**
- * Clean up duplicate sessions for a platform, keeping only the most recent one
- * Returns the internal session ID that was kept (most recent)
- * Now considers user email for proper scoping
- */
-export async function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): Promise<string> {
-	const kv = await getKVStore();
-	return await kv.cleanupDuplicateSessions(platform, sessionData, currentInternalId);
-}
 
 /**
  * Save or update a session for a platform with automatic deduplication
@@ -109,8 +81,34 @@ export async function savePlatformSessionWithCleanup(internalId: string, platfor
 
 /**
  * Generate a secure random internal session ID.
+ * @deprecated Use generateDeterministicSessionId for user-scoped sessions
  */
 export function generateSessionId(): string {
 	// Always use crypto.randomUUID() since we're using KV exclusively
 	return crypto.randomUUID();
+}
+
+/**
+ * Generate a deterministic session ID based on user credentials and platform.
+ * This ensures one session per user per platform - new sessions will overwrite existing ones.
+ */
+export async function generateDeterministicSessionId(userEmail: string, userPassword: string, platform: string): Promise<string> {
+	const kv = await getKVStore();
+	return await kv.generateDeterministicSessionId(userEmail, userPassword, platform);
+}
+
+/**
+ * Delete session data for a specific platform under an internal session ID.
+ */
+export async function deletePlatformSession(internalId: string, platform: string): Promise<void> {
+	const kv = await getKVStore();
+	return await kv.deletePlatformSession(internalId, platform);
+}
+
+/**
+ * Delete the entire session for an internal session ID.
+ */
+export async function deleteSession(internalId: string): Promise<void> {
+	const kv = await getKVStore();
+	return await kv.deleteSession(internalId);
 }
