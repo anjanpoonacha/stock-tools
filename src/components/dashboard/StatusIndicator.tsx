@@ -76,22 +76,22 @@ export function StatusIndicator() {
     const getStatusIcon = (status: ServiceStatus['status']) => {
         switch (status) {
             case 'online':
-                return <CheckCircle className='w-3 h-3 text-green-500' />;
+                return <CheckCircle className='w-3 h-3 text-green-600 dark:text-green-400' />;
             case 'warning':
-                return <AlertCircle className='w-3 h-3 text-yellow-500' />;
+                return <AlertCircle className='w-3 h-3 text-yellow-600 dark:text-yellow-400' />;
             case 'offline':
-                return <XCircle className='w-3 h-3 text-red-500' />;
+                return <XCircle className='w-3 h-3 text-destructive' />;
         }
     };
 
     const getOverallStatusColor = () => {
         switch (overallStatus) {
             case 'online':
-                return 'bg-green-500';
+                return 'bg-green-600 dark:bg-green-400';
             case 'warning':
-                return 'bg-yellow-500';
+                return 'bg-yellow-600 dark:bg-yellow-400';
             case 'offline':
-                return 'bg-red-500';
+                return 'bg-destructive';
         }
     };
 

@@ -219,13 +219,13 @@ export default function MioWatchlistPage() {
                 <div className='mb-6'>
                     <h2 className='font-semibold mb-2'>Add to Watchlist</h2>
                     {watchlistsLoading ? (
-                        <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.LOADING_TEXT}</div>
+                        <div className='mb-2 text-sm text-muted-foreground'>{UI_CONSTANTS.LOADING_TEXT}</div>
                     ) : watchlistsError ? (
                         <div className='mb-2'>
                             <ErrorDisplay error={watchlistsError} />
                         </div>
                     ) : watchlists.length === 0 ? (
-                        <div className='mb-2 text-sm text-gray-500'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
+                        <div className='mb-2 text-sm text-muted-foreground'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
                     ) : (
                         <div className='mb-2'>
                             <label className='block mb-1 font-medium'>MIO Watchlist</label>
@@ -295,7 +295,7 @@ export default function MioWatchlistPage() {
                     </Button>
                 </div>
 
-                {result && <div className='text-green-600 font-medium mb-2'>{result}</div>}
+                {result && <div className='text-green-600 dark:text-green-400 font-medium mb-2'>{result}</div>}
                 {error && (
                     <div className='mb-2'>
                         <ErrorDisplay error={error} />

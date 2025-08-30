@@ -158,8 +158,8 @@ export default function UserAuthTestPage() {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <div className='h-4 w-4 rounded-full bg-red-200' />
-                                                                    <span className='text-sm text-red-600'>
+                                                                    <div className='h-4 w-4 rounded-full bg-destructive/20' />
+                                                                    <span className='text-sm text-destructive'>
                                                                         No Session
                                                                     </span>
                                                                 </>
@@ -179,8 +179,8 @@ export default function UserAuthTestPage() {
                                                                 </>
                                                             ) : (
                                                                 <>
-                                                                    <div className='h-4 w-4 rounded-full bg-red-200' />
-                                                                    <span className='text-sm text-red-600'>
+                                                                    <div className='h-4 w-4 rounded-full bg-destructive/20' />
+                                                                    <span className='text-sm text-destructive'>
                                                                         No Session
                                                                     </span>
                                                                 </>

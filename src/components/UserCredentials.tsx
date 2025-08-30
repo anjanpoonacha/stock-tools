@@ -233,8 +233,8 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                             <span
                                 className={`px-2 py-1 rounded text-xs font-medium ${
                                     sessionStats.platforms?.marketinout?.sessionAvailable
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                        : 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive'
                                 }`}
                             >
                                 {sessionStats.platforms?.marketinout?.sessionAvailable ? 'Active' : 'No Session'}
@@ -245,8 +245,8 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                             <span
                                 className={`px-2 py-1 rounded text-xs font-medium ${
                                     sessionStats.platforms?.tradingview?.sessionAvailable
-                                        ? 'bg-green-100 text-green-800'
-                                        : 'bg-red-100 text-red-800'
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                        : 'bg-destructive/10 text-destructive dark:bg-destructive/20 dark:text-destructive'
                                 }`}
                             >
                                 {sessionStats.platforms?.tradingview?.sessionAvailable ? 'Active' : 'No Session'}

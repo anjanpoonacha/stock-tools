@@ -95,7 +95,7 @@ export default function TestSessionFlowPage() {
             name: 'Error Handling Scenarios',
             description: 'Tests various error conditions and recovery mechanisms',
             icon: Shield,
-            color: 'bg-red-500',
+            color: 'bg-destructive',
         },
         {
             id: 'cookieParsingRobustness',
@@ -287,7 +287,7 @@ export default function TestSessionFlowPage() {
         return success ? (
             <CheckCircle className='h-4 w-4 text-green-500' />
         ) : (
-            <XCircle className='h-4 w-4 text-red-500' />
+            <XCircle className='h-4 w-4 text-destructive' />
         );
     };
 
@@ -438,7 +438,7 @@ export default function TestSessionFlowPage() {
                                             <div className='text-sm text-muted-foreground'>Passed</div>
                                         </div>
                                         <div className='text-center'>
-                                            <div className='text-2xl font-bold text-red-600'>
+                                            <div className='text-2xl font-bold text-destructive'>
                                                 {testResults.reduce((sum, suite) => sum + suite.failureCount, 0)}
                                             </div>
                                             <div className='text-sm text-muted-foreground'>Failed</div>
