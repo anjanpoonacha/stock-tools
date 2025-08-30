@@ -90,8 +90,8 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
-			const retrieved = getPlatformSession(testSessionId, 'marketinout');
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			const retrieved = await getPlatformSession(testSessionId, 'marketinout');
 
 			if (!retrieved || retrieved.sessionId !== testSessionId) {
 				throw new Error('Session creation failed');
@@ -111,9 +111,9 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
-			const healthResult = getHealthAwareSessionData(testSessionId);
+			const healthResult = await getHealthAwareSessionData(testSessionId);
 
 			if (!healthResult.sessionExists) {
 				throw new Error('Health-aware validation failed');
@@ -137,9 +137,9 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
-			const keyValue = MIOService.getSessionKeyValue(testSessionId);
+			const keyValue = await MIOService.getSessionKeyValue(testSessionId);
 
 			if (!keyValue || keyValue.key !== 'ASPSESSIONIDCQTQTQTQ') {
 				throw new Error('Session key extraction failed');
@@ -180,7 +180,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			const monitor = SessionHealthMonitor.getInstance();
 
@@ -211,7 +211,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// Test validation with health monitoring
 			try {
@@ -248,7 +248,7 @@ export class SessionFlowTester {
 
 			// Don't create a session, so it should be "expired"
 			try {
-				const keyValue = MIOService.getSessionKeyValue(testSessionId);
+				const keyValue = await MIOService.getSessionKeyValue(testSessionId);
 				if (keyValue) {
 					throw new Error('Should not have found session');
 				}
@@ -268,7 +268,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// This will likely fail due to invalid session, which simulates network/auth errors
 			let errorCaught = false;
@@ -292,7 +292,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// This should fail with invalid credentials
 			let errorHandled = false;
@@ -437,7 +437,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// This will likely fail due to invalid session, but should test the refresh mechanism
 			let refreshAttempted = false;
@@ -462,7 +462,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// This will likely fail due to invalid session
 			let refreshAttempted = false;
@@ -487,7 +487,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mockSessionData);
 
 			// This should attempt retry logic
 			let retryAttempted = false;
@@ -528,11 +528,11 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mioSessionData);
-			savePlatformSessionWithCleanup(testSessionId, 'tradingview', tvSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mioSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'tradingview', tvSessionData);
 
-			const mioRetrieved = getPlatformSession(testSessionId, 'marketinout');
-			const tvRetrieved = getPlatformSession(testSessionId, 'tradingview');
+			const mioRetrieved = await getPlatformSession(testSessionId, 'marketinout');
+			const tvRetrieved = await getPlatformSession(testSessionId, 'tradingview');
 
 			// Note: No cleanup needed as the new function handles deduplication automatically
 
@@ -553,7 +553,7 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', mioSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', mioSessionData);
 
 			// Test cross-platform validation
 			let validationAttempted = false;
@@ -580,11 +580,11 @@ export class SessionFlowTester {
 			};
 
 			// Test that sessions can be stored and retrieved across platforms
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', bridgeSessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', bridgeSessionData);
 
 			// Verify session was stored and can be retrieved
-			const storedSession = getSession(testSessionId);
-			const platformSession = getPlatformSession(testSessionId, 'marketinout');
+			const storedSession = await getSession(testSessionId);
+			const platformSession = await getPlatformSession(testSessionId, 'marketinout');
 
 			// Note: No cleanup needed as the new function handles deduplication automatically
 
@@ -617,17 +617,17 @@ export class SessionFlowTester {
 				timestamp: Date.now().toString()
 			};
 
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', sessionData);
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', sessionData);
 			phases.push('created');
 
 			// Phase 2: Health-Aware Validation
-			const healthResult = getHealthAwareSessionData(testSessionId);
+			const healthResult = await getHealthAwareSessionData(testSessionId);
 			if (healthResult.sessionExists) {
 				phases.push('validated');
 			}
 
 			// Phase 3: Session Key Extraction
-			const keyValue = MIOService.getSessionKeyValue(testSessionId);
+			const keyValue = await MIOService.getSessionKeyValue(testSessionId);
 			if (keyValue) {
 				phases.push('extracted');
 			}
@@ -661,8 +661,8 @@ export class SessionFlowTester {
 				ASPSESSIONIDCQTQTQTQ: 'INTEGRATIONTEST12345',
 				timestamp: Date.now().toString()
 			};
-			savePlatformSessionWithCleanup(testSessionId, 'marketinout', sessionData);
-			integrationResults['sessionStore'] = !!getPlatformSession(testSessionId, 'marketinout');
+			await savePlatformSessionWithCleanup(testSessionId, 'marketinout', sessionData);
+			integrationResults['sessionStore'] = !!(await getPlatformSession(testSessionId, 'marketinout'));
 
 			// Component 2: Cookie Parser
 			const extracted = CookieParser.extractASPSESSION(sessionData);
@@ -681,7 +681,7 @@ export class SessionFlowTester {
 			integrationResults['errorHandler'] = testError instanceof SessionError;
 
 			// Component 5: MIOService
-			const keyValue = MIOService.getSessionKeyValue(testSessionId);
+			const keyValue = await MIOService.getSessionKeyValue(testSessionId);
 			integrationResults['mioService'] = !!keyValue;
 
 			// Note: No cleanup needed as the new function handles deduplication automatically
@@ -849,8 +849,8 @@ Generated: ${new Date().toISOString()}
 			// Test session store
 			const testId = 'health-check-' + Date.now();
 			const testData = { sessionId: testId, test: 'data' };
-			savePlatformSessionWithCleanup(testId, 'marketinout', testData);
-			results.sessionStore = !!getPlatformSession(testId, 'marketinout');
+			await savePlatformSessionWithCleanup(testId, 'marketinout', testData);
+			results.sessionStore = !!(await getPlatformSession(testId, 'marketinout'));
 			// Note: No cleanup needed as the new function handles deduplication automatically
 
 			// Test health monitor

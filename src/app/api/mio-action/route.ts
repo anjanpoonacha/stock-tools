@@ -117,7 +117,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {
-			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 			}
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
 			// Try to get the latest available MIO session (fallback)
-			sessionInfo = SessionResolver.getLatestMIOSession();
+			sessionInfo = await SessionResolver.getLatestMIOSession();
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
 			}
@@ -168,7 +168,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {
-			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 			}
@@ -177,7 +177,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
 			// Try to get the latest available MIO session (fallback)
-			sessionInfo = SessionResolver.getLatestMIOSession();
+			sessionInfo = await SessionResolver.getLatestMIOSession();
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
 			}
@@ -226,7 +226,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 
 		// Try credential-based authentication first (if credentials provided)
 		if (userEmail && userPassword) {
-			sessionInfo = SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 			}
@@ -235,7 +235,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 		// If no credentials provided or credential auth failed, try session-based authentication
 		if (!sessionInfo) {
 			// Try to get the latest available MIO session (fallback)
-			sessionInfo = SessionResolver.getLatestMIOSession();
+			sessionInfo = await SessionResolver.getLatestMIOSession();
 			if (sessionInfo) {
 				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
 			}

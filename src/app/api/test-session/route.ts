@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 				console.log('[API] Running all session management tests...');
 				const allTestResults = await tester.runAllTests();
 				const report = tester.generateTestReport(allTestResults);
-				
+
 				return NextResponse.json({
 					success: true,
 					testSuites: allTestResults,
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
 			case 'quickHealthCheck':
 				console.log('[API] Running quick health check...');
 				const healthResults = await tester.quickHealthCheck();
-				
+
 				return NextResponse.json({
 					success: true,
 					healthCheck: healthResults,
@@ -105,15 +105,15 @@ export async function POST(request: NextRequest) {
 				}
 
 				console.log(`[API] Validating session: ${sessionId}`);
-				
+
 				// Import session validation functions
 				const { getHealthAwareSessionData } = await import('@/lib/sessionValidation');
 				const { MIOService } = await import('@/lib/MIOService');
-				
+
 				try {
-					const healthResult = getHealthAwareSessionData(sessionId);
-					const sessionKeyValue = MIOService.getSessionKeyValue(sessionId);
-					
+					const healthResult = await getHealthAwareSessionData(sessionId);
+					const sessionKeyValue = await MIOService.getSessionKeyValue(sessionId);
+
 					return NextResponse.json({
 						success: true,
 						validation: {
@@ -143,11 +143,11 @@ export async function POST(request: NextRequest) {
 				}
 
 				console.log(`[API] Testing session refresh: ${sessionId}`);
-				
+
 				try {
 					const { MIOService } = await import('@/lib/MIOService');
 					const refreshResult = await MIOService.refreshSession(sessionId);
-					
+
 					return NextResponse.json({
 						success: true,
 						refreshTest: {
@@ -177,11 +177,11 @@ export async function POST(request: NextRequest) {
 				}
 
 				console.log(`[API] Testing health monitoring: ${sessionId}`);
-				
+
 				try {
 					const { SessionHealthMonitor } = await import('@/lib/sessionHealthMonitor');
 					const monitor = SessionHealthMonitor.getInstance();
-					
+
 					// Attempt health check
 					let healthCheckResult = false;
 					try {
@@ -190,10 +190,10 @@ export async function POST(request: NextRequest) {
 					} catch {
 						// Expected to fail with test data
 					}
-					
+
 					const status = monitor.getSessionHealth(sessionId, 'marketinout');
 					const monitoringStats = monitor.getMonitoringStats();
-					
+
 					return NextResponse.json({
 						success: true,
 						healthMonitoring: {
@@ -305,7 +305,7 @@ export async function GET(request: NextRequest) {
 		if (action === 'quickHealthCheck') {
 			const tester = new SessionFlowTester();
 			const healthResults = await tester.quickHealthCheck();
-			
+
 			return NextResponse.json({
 				success: true,
 				healthCheck: healthResults,

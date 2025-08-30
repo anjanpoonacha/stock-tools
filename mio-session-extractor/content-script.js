@@ -319,15 +319,14 @@
             const result = await chrome.storage.sync.get(['extensionSettings']);
             const settings = result.extensionSettings || {};
 
-            // Update APP_URLS from settings - check both quickSettings and connection
+            // Update APP_URLS from settings - use only quickSettings for simplicity
             const quickUrls = settings.quickSettings?.appUrls || [];
-            const connectionUrls = settings.connection?.appUrls || [];
-            const customUrls = settings.connection?.customUrls || [];
 
-            // Combine all URL sources, prioritizing quickSettings
-            CONFIG.APP_URLS = [...quickUrls, ...connectionUrls, ...customUrls].filter(
-                (url) => url && url.trim().length > 0
-            );
+            // Handle only quickSettings URL objects with enabled/disabled state
+            CONFIG.APP_URLS = quickUrls
+                .filter((item) => item && typeof item === 'object' && item.url && item.enabled === true)
+                .map((item) => item.url.trim())
+                .filter((url) => url.length > 0);
 
             // If no URLs configured, show warning but don't use defaults
             if (CONFIG.APP_URLS.length === 0) {
@@ -408,8 +407,6 @@
                 appUrls: CONFIG.APP_URLS,
                 totalUrls: CONFIG.APP_URLS.length,
                 quickSettingsUrls: quickUrls.length,
-                connectionUrls: connectionUrls.length,
-                customUrls: customUrls.length,
                 adaptiveIntervals: CONFIG.ADAPTIVE_INTERVALS,
                 requestTimeout: CONFIG.REQUEST_TIMEOUT,
                 maxRetries: CONFIG.MAX_RETRIES,

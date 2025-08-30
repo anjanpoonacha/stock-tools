@@ -1,6 +1,5 @@
 // src/lib/SessionResolver.ts
 
-import { existsSync, readFileSync } from 'fs';
 import { SESSION_CONFIG, LOG_PREFIXES } from './constants';
 
 export interface SessionData {
@@ -46,26 +45,61 @@ interface PlatformSessionWithTimestamp extends SessionInfo {
 
 /**
  * Service for automatically resolving and managing session data
- * Provides clean abstraction over session file operations without requiring frontend session management
+ * Provides clean abstraction over KV storage operations without requiring frontend session management
  */
 export class SessionResolver {
-	private static readonly SESSION_FILE = process.env.NODE_ENV === 'production' ? '/tmp/sessions.json' : 'sessions.json';
+	// Cache for session data with 15 second TTL
+	private static sessionCache: {
+		data: StoredSessions | null;
+		timestamp: number;
+	} = { data: null, timestamp: 0 };
+
+	private static readonly CACHE_TTL_MS = 15000; // 15 seconds
 
 	/**
-	 * Loads all sessions from the sessions.json file
-	 * @returns Parsed session data or empty object if file doesn't exist or is invalid
+	 * Checks if the current cache is still valid
+	 * @returns True if cache is valid and can be used
 	 */
-	private static loadSessions(): StoredSessions {
-		if (!existsSync(this.SESSION_FILE)) {
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No sessions file found`);
-			return {};
+	private static isCacheValid(): boolean {
+		return this.sessionCache.data !== null &&
+			(Date.now() - this.sessionCache.timestamp) < this.CACHE_TTL_MS;
+	}
+
+	/**
+	 * Invalidates the session cache (call when sessions are modified)
+	 */
+	static invalidateCache(): void {
+		this.sessionCache = { data: null, timestamp: 0 };
+		console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Cache invalidated`);
+	}
+
+	/**
+	 * Loads all sessions from KV storage with caching
+	 * @returns Parsed session data or empty object if no sessions exist
+	 */
+	private static async loadSessions(): Promise<StoredSessions> {
+		// Check cache first
+		if (this.isCacheValid()) {
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Using cached sessions (${Object.keys(this.sessionCache.data!).length} sessions)`);
+			return this.sessionCache.data!;
 		}
 
+		// Cache miss - fetch from KV and update cache
 		try {
-			const rawData = readFileSync(this.SESSION_FILE, 'utf-8');
-			return JSON.parse(rawData);
+			// Get KV store directly since we're KV-only now
+			const kvStore = await import('./sessionStore.kv');
+			const allSessions = await kvStore.getAllSessions();
+
+			// Update cache
+			this.sessionCache = {
+				data: allSessions,
+				timestamp: Date.now()
+			};
+
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Loaded and cached ${Object.keys(allSessions).length} sessions from KV storage`);
+			return allSessions;
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions:`, error);
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions from KV:`, error);
 			return {};
 		}
 	}
@@ -142,9 +176,9 @@ export class SessionResolver {
 	 * @param platform - Platform name (e.g., 'marketinout', 'tradingview')
 	 * @returns Session info or null if no valid session found
 	 */
-	static getLatestSession(platform: string): SessionInfo | null {
+	static async getLatestSession(platform: string): Promise<SessionInfo | null> {
 		try {
-			const allSessions = this.loadSessions();
+			const allSessions = await this.loadSessions();
 			const platformSessions = this.extractPlatformSessions(allSessions, platform);
 
 			if (platformSessions.length === 0) {
@@ -171,8 +205,8 @@ export class SessionResolver {
 	 * Retrieves the most recent MarketInOut session with cookie data
 	 * @returns MIO session info with key-value pair for cookies, or null if not found
 	 */
-	static getLatestMIOSession(): MIOSessionInfo | null {
-		const sessionInfo = this.getLatestSession(SESSION_CONFIG.PLATFORMS.MARKETINOUT);
+	static async getLatestMIOSession(): Promise<MIOSessionInfo | null> {
+		const sessionInfo = await this.getLatestSession(SESSION_CONFIG.PLATFORMS.MARKETINOUT);
 		if (!sessionInfo) {
 			return null;
 		}
@@ -197,9 +231,9 @@ export class SessionResolver {
 	 * @param platform - Platform name
 	 * @returns Array of all sessions for the platform, sorted by recency
 	 */
-	static getAllSessions(platform: string): SessionInfo[] {
+	static async getAllSessions(platform: string): Promise<SessionInfo[]> {
 		try {
-			const allSessions = this.loadSessions();
+			const allSessions = await this.loadSessions();
 			const platformSessions = this.extractPlatformSessions(allSessions, platform);
 			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
 
@@ -215,17 +249,18 @@ export class SessionResolver {
 	 * @param platform - Platform name to check
 	 * @returns True if sessions exist for the platform
 	 */
-	static hasSessionsForPlatform(platform: string): boolean {
-		return this.getLatestSession(platform) !== null;
+	static async hasSessionsForPlatform(platform: string): Promise<boolean> {
+		const session = await this.getLatestSession(platform);
+		return session !== null;
 	}
 
 	/**
 	 * Retrieves session statistics for debugging and monitoring
 	 * @returns Object containing total session count and per-platform counts
 	 */
-	static getSessionStats(): SessionStats {
+	static async getSessionStats(): Promise<SessionStats> {
 		try {
-			const allSessions = this.loadSessions();
+			const allSessions = await this.loadSessions();
 			const platformCounts: Record<string, number> = {};
 			let totalSessions = 0;
 
@@ -249,9 +284,9 @@ export class SessionResolver {
 	 * @param userCredentials - User credentials to filter sessions
 	 * @returns Session info or null if no valid session found
 	 */
-	static getLatestSessionForUser(platform: string, userCredentials: UserCredentials): SessionInfo | null {
+	static async getLatestSessionForUser(platform: string, userCredentials: UserCredentials): Promise<SessionInfo | null> {
 		try {
-			const allSessions = this.loadSessions();
+			const allSessions = await this.loadSessions();
 			const platformSessions = this.extractPlatformSessions(allSessions, platform, userCredentials);
 
 			if (platformSessions.length === 0) {
@@ -279,8 +314,8 @@ export class SessionResolver {
 	 * @param userCredentials - User credentials to filter sessions
 	 * @returns MIO session info with key-value pair for cookies, or null if not found
 	 */
-	static getLatestMIOSessionForUser(userCredentials: UserCredentials): MIOSessionInfo | null {
-		const sessionInfo = this.getLatestSessionForUser(SESSION_CONFIG.PLATFORMS.MARKETINOUT, userCredentials);
+	static async getLatestMIOSessionForUser(userCredentials: UserCredentials): Promise<MIOSessionInfo | null> {
+		const sessionInfo = await this.getLatestSessionForUser(SESSION_CONFIG.PLATFORMS.MARKETINOUT, userCredentials);
 		if (!sessionInfo) {
 			return null;
 		}
@@ -306,17 +341,18 @@ export class SessionResolver {
 	 * @param userCredentials - User credentials to filter sessions
 	 * @returns True if sessions exist for the platform and user
 	 */
-	static hasSessionsForPlatformAndUser(platform: string, userCredentials: UserCredentials): boolean {
-		return this.getLatestSessionForUser(platform, userCredentials) !== null;
+	static async hasSessionsForPlatformAndUser(platform: string, userCredentials: UserCredentials): Promise<boolean> {
+		const session = await this.getLatestSessionForUser(platform, userCredentials);
+		return session !== null;
 	}
 
 	/**
 	 * Gets all available user emails from stored sessions
 	 * @returns Array of unique user emails found in sessions
 	 */
-	static getAvailableUsers(): string[] {
+	static async getAvailableUsers(): Promise<string[]> {
 		try {
-			const allSessions = this.loadSessions();
+			const allSessions = await this.loadSessions();
 			const userEmails = new Set<string>();
 
 			for (const sessionEntry of Object.values(allSessions)) {

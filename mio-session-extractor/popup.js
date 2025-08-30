@@ -262,8 +262,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         try {
             const appUrls = [
-                'http://localhost:3001',
-                'http://localhost:3000',
+                // 'http://localhost:3001',
+                // 'http://localhost:3000',
                 // 'https://your-app-domain.com', // Replace with actual domain
             ];
 
@@ -366,8 +366,7 @@ document.addEventListener('DOMContentLoaded', async () => {
      */
     function openApp() {
         const appUrls = [
-            'http://localhost:3000',
-            'https://your-app-domain.com', // Replace with actual domain
+            // No default URLs - configure in extension settings
         ];
 
         // Try to open the first available app URL

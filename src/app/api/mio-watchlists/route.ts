@@ -23,8 +23,8 @@ export async function GET(request: NextRequest) {
 		const userCredentials: UserCredentials = { userEmail, userPassword };
 
 		// Check if user has valid MIO session
-		const hasMIOSession = SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
-		const mioSession = SessionResolver.getLatestMIOSessionForUser(userCredentials);
+		const hasMIOSession = await SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
+		const mioSession = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
 
 		if (!hasMIOSession || !mioSession) {
 			return NextResponse.json({
@@ -103,8 +103,8 @@ export async function POST(request: NextRequest) {
 		const userCredentials: UserCredentials = { userEmail, userPassword };
 
 		// Check if user has valid MIO session
-		const hasMIOSession = SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
-		const mioSession = SessionResolver.getLatestMIOSessionForUser(userCredentials);
+		const hasMIOSession = await SessionResolver.hasSessionsForPlatformAndUser('marketinout', userCredentials);
+		const mioSession = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
 
 		if (!hasMIOSession || !mioSession) {
 			return NextResponse.json({

@@ -4,6 +4,22 @@ import { savePlatformSessionWithCleanup, generateSessionId, PlatformSessionData 
 import { CookieParser } from '@/lib/cookieParser';
 import { validateAndStartMonitoring } from '@/lib/sessionValidation';
 
+/**
+ * Get current timestamp in India timezone
+ */
+function getIndiaTimestamp(): string {
+	return new Date().toLocaleString('en-IN', {
+		timeZone: 'Asia/Kolkata',
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+		hour: '2-digit',
+		minute: '2-digit',
+		second: '2-digit',
+		hour12: false
+	});
+}
+
 // CORS headers for extension requests
 const corsHeaders = {
 	'Access-Control-Allow-Origin': '*',
@@ -314,7 +330,7 @@ export async function POST(req: NextRequest) {
 			validationCount: Object.keys(validatedSessionData).length
 		});
 
-		const finalInternalSessionId = savePlatformSessionWithCleanup(internalSessionId, platform, sessionData);
+		const finalInternalSessionId = await savePlatformSessionWithCleanup(internalSessionId, platform, sessionData);
 		console.log('[EXTENSION-API] Successfully saved validated session with cleanup:', {
 			originalInternalSessionId: internalSessionId,
 			finalInternalSessionId,
@@ -376,7 +392,7 @@ export async function POST(req: NextRequest) {
 			sameSite: 'lax',
 		});
 
-		console.log('[EXTENSION-API] Multi-platform session bridge completed successfully:', { platform });
+		console.log(`[EXTENSION-API] Multi-platform session bridge completed successfully: { platform: '${platform}', timestamp: '${getIndiaTimestamp()}' }`);
 		return response;
 
 	} catch (error) {

@@ -30,7 +30,41 @@ Ensure consistent development practices by enforcing pnpm usage for package mana
 - `yarn add <package>` → `pnpm add <package>`
 - `yarn remove <package>` → `pnpm remove <package>`
 
-### 2. UI Elements - Use Icons Instead of Emojis
+### 2. TypeScript - Never Use 'any' Type
+
+- **Never use `any`** type in TypeScript code
+- **Always define proper types** for all variables, functions, and parameters
+- **Create custom interfaces and types** when needed for type safety
+- **Use union types or generics** instead of `any` for flexible typing
+
+**Type Safety Examples:**
+
+```typescript
+// Good - Proper typing
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+const fetchUser = (id: number): Promise<User> => {
+  // Implementation
+}
+
+// Good - Union types for flexibility
+type Status = 'loading' | 'success' | 'error';
+
+// Good - Generic types
+function processData<T>(data: T[]): T[] {
+  return data.filter(Boolean);
+}
+
+// Avoid - Using 'any' type
+// const userData: any = fetchUserData();
+// function handleData(data: any): any { }
+```
+
+### 3. UI Elements - Use Icons Instead of Emojis
 
 - **Use lucide-react icons** for all UI elements
 - **Avoid emojis** in code, comments, and UI text

@@ -61,8 +61,6 @@
 
         // Connection Settings
         connection: {
-            appUrls: ['https://stock-tools-jet.vercel.app'],
-            customUrls: [], // User-defined URLs
             connectionCheckFrequency: 30000, // 30s connection checks
             enablePostMessage: true,
             enableStorageSync: true,
@@ -115,8 +113,6 @@
         'performance.requestSettings.timeout': { min: 1000, max: 30000, type: 'number' },
         'performance.requestSettings.maxRetries': { min: 0, max: 10, type: 'number' },
         'performance.requestSettings.minInterval': { min: 1000, max: 60000, type: 'number' },
-        'connection.appUrls': { type: 'array', itemType: 'string' },
-        'connection.customUrls': { type: 'array', itemType: 'string' },
         'advanced.logLevel': { type: 'string', enum: ['debug', 'info', 'warn', 'error'] },
         'ui.theme': { type: 'string', enum: ['light', 'dark', 'auto'] },
     };
