@@ -1,4 +1,5 @@
 // src/lib/sessionStore.kv.ts - Vercel KV implementation for production
+// Fixed: Handle both string and object data types from KV
 
 import { kv } from '@vercel/kv';
 
@@ -30,8 +31,34 @@ export function generateSessionId(): string {
 export async function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData): Promise<void> {
 	const key = `session:${internalId}:${platform}`;
 
+	// Debug: Log the incoming data
+	console.log(`[SessionStore-KV] DEBUG: Incoming data for ${key}:`, JSON.stringify(data, null, 2));
+
+	// Ensure all values are strings or undefined (sanitize the data)
+	const sanitizedData: PlatformSessionData = {
+		sessionId: data.sessionId
+	};
+
+	// Convert all other properties to strings
+	for (const [propKey, value] of Object.entries(data)) {
+		if (propKey !== 'sessionId' && value !== undefined) {
+			// Ensure we convert objects to strings properly
+			if (typeof value === 'object' && value !== null) {
+				sanitizedData[propKey] = JSON.stringify(value);
+			} else {
+				sanitizedData[propKey] = typeof value === 'string' ? value : String(value);
+			}
+		}
+	}
+
+	// Debug: Log the sanitized data
+	console.log(`[SessionStore-KV] DEBUG: Sanitized data for ${key}:`, JSON.stringify(sanitizedData, null, 2));
+
+	const jsonString = JSON.stringify(sanitizedData);
+	console.log(`[SessionStore-KV] DEBUG: Final JSON string for ${key}:`, jsonString);
+
 	// Set with 24 hour TTL (86400 seconds)
-	await kv.setex(key, 86400, JSON.stringify(data));
+	await kv.setex(key, 86400, jsonString);
 
 	console.log(`[SessionStore-KV] Saved ${platform} session: ${internalId}`);
 }
@@ -44,13 +71,29 @@ export async function getPlatformSession(internalId: string, platform: string): 
 	const data = await kv.get(key);
 
 	if (!data) {
+		console.log(`[SessionStore-KV] DEBUG: No data found for key: ${key}`);
 		return undefined;
 	}
 
+	console.log(`[SessionStore-KV] DEBUG: Raw data retrieved for ${key}:`, typeof data, data);
+
 	try {
-		return JSON.parse(data as string);
+		// Handle both cases: string (needs parsing) or already parsed object
+		let parsed: PlatformSessionData;
+		if (typeof data === 'string') {
+			parsed = JSON.parse(data);
+			console.log(`[SessionStore-KV] DEBUG: Parsed JSON string for ${key}:`, parsed);
+		} else if (typeof data === 'object' && data !== null) {
+			parsed = data as PlatformSessionData;
+			console.log(`[SessionStore-KV] DEBUG: Using already-parsed object for ${key}:`, parsed);
+		} else {
+			throw new Error(`Unexpected data type: ${typeof data}`);
+		}
+
+		return parsed;
 	} catch (error) {
-		console.error(`[SessionStore-KV] Error parsing session data for ${key}:`, error);
+		console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
+		console.error(`[SessionStore-KV] Raw data that failed to process:`, data);
 		return undefined;
 	}
 }
@@ -62,6 +105,8 @@ export async function getSession(internalId: string): Promise<SessionData | unde
 	const pattern = `session:${internalId}:*`;
 	const keys = await kv.keys(pattern);
 
+	console.log(`[SessionStore-KV] DEBUG: getSession called for ${internalId}, found ${keys.length} keys:`, keys);
+
 	if (keys.length === 0) {
 		return undefined;
 	}
@@ -70,12 +115,28 @@ export async function getSession(internalId: string): Promise<SessionData | unde
 
 	for (const key of keys) {
 		const data = await kv.get(key);
+		console.log(`[SessionStore-KV] DEBUG: Raw data from KV for ${key}:`, typeof data, data);
+
 		if (data) {
 			try {
 				const platform = key.split(':')[2]; // Extract platform from key
-				sessionData[platform] = JSON.parse(data as string);
+
+				// Handle both cases: string (needs parsing) or already parsed object
+				let parsedData: PlatformSessionData;
+				if (typeof data === 'string') {
+					parsedData = JSON.parse(data);
+					console.log(`[SessionStore-KV] DEBUG: Parsed JSON string for ${key}:`, parsedData);
+				} else if (typeof data === 'object' && data !== null) {
+					parsedData = data as PlatformSessionData;
+					console.log(`[SessionStore-KV] DEBUG: Using already-parsed object for ${key}:`, parsedData);
+				} else {
+					throw new Error(`Unexpected data type: ${typeof data}`);
+				}
+
+				sessionData[platform] = parsedData;
 			} catch (error) {
-				console.error(`[SessionStore-KV] Error parsing session data for ${key}:`, error);
+				console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
+				console.error(`[SessionStore-KV] Raw data that failed to process:`, data);
 			}
 		}
 	}
@@ -118,7 +179,16 @@ export async function cleanupDuplicateSessions(platform: string, sessionData: Pl
 		const data = await kv.get(key);
 		if (data) {
 			try {
-				const platformData = JSON.parse(data as string) as PlatformSessionData;
+				// Handle both cases: string (needs parsing) or already parsed object
+				let platformData: PlatformSessionData;
+				if (typeof data === 'string') {
+					platformData = JSON.parse(data);
+				} else if (typeof data === 'object' && data !== null) {
+					platformData = data as PlatformSessionData;
+				} else {
+					throw new Error(`Unexpected data type: ${typeof data}`);
+				}
+
 				if (platformData.sessionId === sessionData.sessionId) {
 					// Check if user email matches (both must be defined or both undefined for a match)
 					const emailsMatch = platformData.userEmail === sessionData.userEmail;
@@ -132,7 +202,7 @@ export async function cleanupDuplicateSessions(platform: string, sessionData: Pl
 					}
 				}
 			} catch (error) {
-				console.error(`[SessionStore-KV] Error parsing session data for cleanup:`, error);
+				console.error(`[SessionStore-KV] Error processing session data for cleanup:`, error);
 			}
 		}
 	}
@@ -195,9 +265,20 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
 				if (!sessions[internalId]) {
 					sessions[internalId] = {};
 				}
-				sessions[internalId][platform] = JSON.parse(data as string);
+
+				// Handle both cases: string (needs parsing) or already parsed object
+				let parsedData: PlatformSessionData;
+				if (typeof data === 'string') {
+					parsedData = JSON.parse(data);
+				} else if (typeof data === 'object' && data !== null) {
+					parsedData = data as PlatformSessionData;
+				} else {
+					throw new Error(`Unexpected data type: ${typeof data}`);
+				}
+
+				sessions[internalId][platform] = parsedData;
 			} catch (error) {
-				console.error(`[SessionStore-KV] Error parsing session data for ${key}:`, error);
+				console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
 			}
 		}
 	}

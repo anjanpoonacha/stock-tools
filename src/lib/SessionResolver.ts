@@ -1,6 +1,5 @@
 // src/lib/SessionResolver.ts
 
-import { existsSync, readFileSync } from 'fs';
 import { SESSION_CONFIG, LOG_PREFIXES } from './constants';
 
 export interface SessionData {
@@ -46,37 +45,27 @@ interface PlatformSessionWithTimestamp extends SessionInfo {
 
 /**
  * Service for automatically resolving and managing session data
- * Provides clean abstraction over session file operations without requiring frontend session management
+ * Provides clean abstraction over KV storage operations without requiring frontend session management
  */
 export class SessionResolver {
-	private static readonly SESSION_FILE = process.env.NODE_ENV === 'production' ? '/tmp/sessions.json' : 'sessions.json';
 
 	/**
-	 * Loads all sessions from storage (KV in production, file in development)
+	 * Loads all sessions from KV storage
 	 * @returns Parsed session data or empty object if no sessions exist
 	 */
 	private static async loadSessions(): Promise<StoredSessions> {
-		// Try to use the session store's getAllSessions if available (for KV)
 		try {
-			const { getAllSessions } = await import('./sessionStore.kv');
-			if (process.env.NODE_ENV === 'production' && process.env.KV_REST_API_URL) {
-				return await getAllSessions();
-			}
-		} catch {
-			// KV not available, fall back to file-based
-		}
+			// Use the sessionStore interface which handles KV automatically
+			const sessionStore = await import('./sessionStore');
 
-		// Fallback to file-based loading
-		if (!existsSync(this.SESSION_FILE)) {
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No sessions file found`);
-			return {};
-		}
+			// Get KV store directly since we're KV-only now
+			const kvStore = await import('./sessionStore.kv');
+			const allSessions = await kvStore.getAllSessions();
 
-		try {
-			const rawData = readFileSync(this.SESSION_FILE, 'utf-8');
-			return JSON.parse(rawData);
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Loaded ${Object.keys(allSessions).length} sessions from KV storage`);
+			return allSessions;
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions:`, error);
+			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions from KV:`, error);
 			return {};
 		}
 	}

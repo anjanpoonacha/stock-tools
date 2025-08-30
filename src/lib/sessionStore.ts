@@ -1,8 +1,5 @@
 // src/lib/sessionStore.ts
 
-import { randomBytes } from 'crypto';
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-
 export type PlatformSessionData = {
 	sessionId: string;
 	userEmail?: string; // User email for session scoping
@@ -18,34 +15,22 @@ export type SessionData = {
 	[platform: string]: PlatformSessionData;
 };
 
-// Use Vercel KV in production, file-based in development
-const USE_VERCEL_KV = process.env.NODE_ENV === 'production' && process.env.KV_REST_API_URL;
-const SESSION_FILE = 'sessions.json'; // Only used in development now
+// Always use Vercel KV - check for KV credentials or force local KV usage
+const USE_VERCEL_KV = process.env.KV_REST_API_URL || process.env.FORCE_KV_LOCALLY === 'true';
 
-// File-based functions for development
-function loadSessions(): Record<string, SessionData> {
-	if (!existsSync(SESSION_FILE)) return {};
-	try {
-		const raw = readFileSync(SESSION_FILE, 'utf-8');
-		return JSON.parse(raw);
-	} catch {
-		return {};
-	}
-}
-
-function saveSessions(sessions: Record<string, SessionData>) {
-	writeFileSync(SESSION_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
-}
-
-// Import KV functions dynamically to avoid issues in development
+// Import KV functions dynamically
 let kvStore: typeof import('./sessionStore.kv') | null = null;
 async function getKVStore() {
 	if (!kvStore && USE_VERCEL_KV) {
 		try {
 			kvStore = await import('./sessionStore.kv');
 		} catch (error) {
-			console.warn('[SessionStore] Failed to load KV store, falling back to file-based:', error);
+			console.error('[SessionStore] Failed to load KV store:', error);
+			throw new Error('KV store is required but failed to load. Check your KV configuration.');
 		}
+	}
+	if (!kvStore) {
+		throw new Error('KV store is not available. Check your KV configuration in .env file.');
 	}
 	return kvStore;
 }
@@ -54,77 +39,44 @@ async function getKVStore() {
  * Save or update a session for a specific platform under an internal session ID.
  */
 export async function savePlatformSession(internalId: string, platform: string, data: PlatformSessionData) {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.savePlatformSession(internalId, platform, data);
-		}
-	}
-
-	// Fallback to file-based storage
-	const sessions = loadSessions();
-	const existing = sessions[internalId] || {};
-	sessions[internalId] = { ...existing, [platform]: data };
-	saveSessions(sessions);
+	const kv = await getKVStore();
+	return await kv.savePlatformSession(internalId, platform, data);
 }
 
 /**
  * Get session data for a specific platform under an internal session ID.
  */
 export async function getPlatformSession(internalId: string, platform: string): Promise<PlatformSessionData | undefined> {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.getPlatformSession(internalId, platform);
-		}
-	}
-
-	// Fallback to file-based storage
-	const sessions = loadSessions();
-	const session = sessions[internalId];
-	return session ? session[platform] : undefined;
+	const kv = await getKVStore();
+	return await kv.getPlatformSession(internalId, platform);
 }
 
 /**
  * @deprecated Use savePlatformSessionWithCleanup instead for automatic deduplication
  * Delete session data for a specific platform under an internal session ID.
  */
-export function deletePlatformSession(internalId: string, platform: string) {
+export async function deletePlatformSession(internalId: string, platform: string) {
 	console.warn('[SessionStore] deletePlatformSession is deprecated. Use savePlatformSessionWithCleanup for automatic cleanup.');
-	const sessions = loadSessions();
-	const session = sessions[internalId];
-	if (session && session[platform]) {
-		delete session[platform];
-		sessions[internalId] = session;
-		saveSessions(sessions);
-	}
+	const kv = await getKVStore();
+	return await kv.deletePlatformSession(internalId, platform);
 }
 
 /**
  * @deprecated Use savePlatformSessionWithCleanup instead for automatic deduplication
  * Delete the entire session for an internal session ID.
  */
-export function deleteSession(internalId: string) {
+export async function deleteSession(internalId: string) {
 	console.warn('[SessionStore] deleteSession is deprecated. Use savePlatformSessionWithCleanup for automatic cleanup.');
-	const sessions = loadSessions();
-	delete sessions[internalId];
-	saveSessions(sessions);
+	const kv = await getKVStore();
+	return await kv.deleteSession(internalId);
 }
 
 /**
  * Get all session data for an internal session ID.
  */
 export async function getSession(internalId: string): Promise<SessionData | undefined> {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.getSession(internalId);
-		}
-	}
-
-	// Fallback to file-based storage
-	const sessions = loadSessions();
-	return sessions[internalId];
+	const kv = await getKVStore();
+	return await kv.getSession(internalId);
 }
 
 /**
@@ -132,28 +84,8 @@ export async function getSession(internalId: string): Promise<SessionData | unde
  * This merges new data with existing session data.
  */
 export async function updatePlatformSession(internalId: string, platform: string, updates: Partial<PlatformSessionData>) {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.updatePlatformSession(internalId, platform, updates);
-		}
-	}
-
-	// Fallback to file-based storage
-	const sessions = loadSessions();
-	const existing = sessions[internalId] || {};
-	const platformData = existing[platform] || { sessionId: '' };
-
-	// Merge updates with existing data, ensuring all values are strings
-	const updatedPlatformData: PlatformSessionData = {
-		...platformData,
-		...Object.fromEntries(
-			Object.entries(updates).filter(([, value]) => value !== undefined)
-		) as PlatformSessionData
-	};
-
-	sessions[internalId] = { ...existing, [platform]: updatedPlatformData };
-	saveSessions(sessions);
+	const kv = await getKVStore();
+	return await kv.updatePlatformSession(internalId, platform, updates);
 }
 
 /**
@@ -162,58 +94,8 @@ export async function updatePlatformSession(internalId: string, platform: string
  * Now considers user email for proper scoping
  */
 export async function cleanupDuplicateSessions(platform: string, sessionData: PlatformSessionData, currentInternalId?: string): Promise<string> {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.cleanupDuplicateSessions(platform, sessionData, currentInternalId);
-		}
-	}
-
-	// Fallback to file-based storage
-	const sessions = loadSessions();
-	const duplicates: Array<{ id: string; extractedAt: string }> = [];
-
-	// Find all sessions with the same session data and user email
-	for (const [internalId, sessionEntry] of Object.entries(sessions)) {
-		const platformData = sessionEntry[platform];
-		if (platformData && platformData.sessionId === sessionData.sessionId) {
-			// Check if user email matches (both must be defined or both undefined for a match)
-			const emailsMatch = platformData.userEmail === sessionData.userEmail;
-			if (emailsMatch) {
-				duplicates.push({
-					id: internalId,
-					extractedAt: platformData.extractedAt || '1970-01-01T00:00:00.000Z'
-				});
-			}
-		}
-	}
-
-	if (duplicates.length <= 1) {
-		// No duplicates found, return current or first ID
-		return currentInternalId || duplicates[0]?.id || generateSessionId();
-	}
-
-	// Sort by extractedAt timestamp (most recent first)
-	duplicates.sort((a, b) => new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime());
-
-	// Keep the most recent session (first in sorted array)
-	const keepId = currentInternalId || duplicates[0].id;
-
-	// Delete all other duplicate sessions
-	const toDelete = duplicates.filter(d => d.id !== keepId);
-
-	const userEmailInfo = sessionData.userEmail ? ` for user ${sessionData.userEmail}` : ' (no user email)';
-	console.log(`[SessionStore] Cleaning up ${toDelete.length} duplicate ${platform} sessions${userEmailInfo}, keeping: ${keepId}`);
-
-	for (const duplicate of toDelete) {
-		delete sessions[duplicate.id];
-		console.log(`[SessionStore] Deleted duplicate session: ${duplicate.id}`);
-	}
-
-	// Save the cleaned sessions
-	saveSessions(sessions);
-
-	return keepId;
+	const kv = await getKVStore();
+	return await kv.cleanupDuplicateSessions(platform, sessionData, currentInternalId);
 }
 
 /**
@@ -221,35 +103,14 @@ export async function cleanupDuplicateSessions(platform: string, sessionData: Pl
  * This replaces the old savePlatformSession with built-in cleanup
  */
 export async function savePlatformSessionWithCleanup(internalId: string, platform: string, data: PlatformSessionData): Promise<string> {
-	if (USE_VERCEL_KV) {
-		const kv = await getKVStore();
-		if (kv) {
-			return await kv.savePlatformSessionWithCleanup(internalId, platform, data);
-		}
-	}
-
-	// Fallback to file-based storage
-	// First, clean up any existing duplicates and get the ID to use
-	const finalInternalId = await cleanupDuplicateSessions(platform, data, internalId);
-
-	// Now save the session data
-	const sessions = loadSessions();
-	const existing = sessions[finalInternalId] || {};
-	sessions[finalInternalId] = { ...existing, [platform]: data };
-	saveSessions(sessions);
-
-	console.log(`[SessionStore] Saved ${platform} session with cleanup: ${finalInternalId}`);
-	return finalInternalId;
+	const kv = await getKVStore();
+	return await kv.savePlatformSessionWithCleanup(internalId, platform, data);
 }
 
 /**
  * Generate a secure random internal session ID.
  */
 export function generateSessionId(): string {
-	if (USE_VERCEL_KV) {
-		// Use crypto.randomUUID() for KV (more standard)
-		return crypto.randomUUID();
-	}
-	// Use randomBytes for file-based (existing behavior)
-	return randomBytes(32).toString('hex');
+	// Always use crypto.randomUUID() since we're using KV exclusively
+	return crypto.randomUUID();
 }
