@@ -114,29 +114,41 @@ jobs:
                   git config --local user.name "GitHub Action"
 
                   if [ "$BUMP_TYPE" = "auto" ]; then
-                    # Auto-detect version bump type from commit messages
+                    # Use the enhanced commit analysis from version-extension.js
                     if git describe --tags --abbrev=0 >/dev/null 2>&1; then
                       LAST_TAG=$(git describe --tags --abbrev=0)
-                      COMMITS=$(git log $LAST_TAG..HEAD --oneline -- mio-session-extractor/)
+                      echo "Analyzing commits since $LAST_TAG using intelligent commit analysis..."
+                      ANALYSIS_OUTPUT=$(node scripts/version-extension.js analyze $LAST_TAG)
                     else
-                      COMMITS=$(git log --oneline -- mio-session-extractor/)
+                      echo "No previous tags found, analyzing all commits..."
+                      ANALYSIS_OUTPUT=$(node scripts/version-extension.js analyze)
                     fi
                     
-                    echo "Analyzing commits for version bump type:"
-                    echo "$COMMITS"
+                    echo "Analysis output:"
+                    echo "$ANALYSIS_OUTPUT"
                     
-                    # Check for breaking changes or major features
-                    if echo "$COMMITS" | grep -iE "(BREAKING|major:|feat!:|fix!:)" >/dev/null; then
-                      BUMP_TYPE="major"
-                      echo "🔥 Detected breaking changes - bumping major version"
-                    # Check for new features
-                    elif echo "$COMMITS" | grep -iE "(feat:|feature:|minor:)" >/dev/null; then
-                      BUMP_TYPE="minor"
-                      echo "✨ Detected new features - bumping minor version"
-                    # Default to patch for fixes and other changes
-                    else
+                    # Extract the recommended bump type from the analysis output
+                    BUMP_TYPE=$(echo "$ANALYSIS_OUTPUT" | grep "Recommended version bump:" | sed 's/.*Recommended version bump: //')
+                    
+                    if [ -z "$BUMP_TYPE" ]; then
+                      echo "⚠️ Could not determine bump type from analysis, defaulting to patch"
                       BUMP_TYPE="patch"
-                      echo "🐛 Detected fixes/improvements - bumping patch version"
+                    else
+                      case "$BUMP_TYPE" in
+                        "major")
+                          echo "🔥 Intelligent analysis detected major changes - bumping major version"
+                          ;;
+                        "minor")
+                          echo "✨ Intelligent analysis detected minor changes - bumping minor version"
+                          ;;
+                        "patch")
+                          echo "🐛 Intelligent analysis detected patch changes - bumping patch version"
+                          ;;
+                        *)
+                          echo "⚠️ Unknown bump type '$BUMP_TYPE', defaulting to patch"
+                          BUMP_TYPE="patch"
+                          ;;
+                      esac
                     fi
                   fi
 

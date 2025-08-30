@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Multi-Platform Session Extractor",
-  "version": "2.2.3",
+  "version": "2.3.0",
   "description": "Performance-optimized session extractor for MarketInOut and TradingView with adaptive polling and advanced caching",
   "permissions": [
     "cookies",
