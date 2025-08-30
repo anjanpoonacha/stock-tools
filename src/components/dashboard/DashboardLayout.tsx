@@ -11,14 +11,14 @@ import {
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import { Search, Zap, Menu } from 'lucide-react';
-import { ActionCard } from './ActionCard';
+import { ActionCard, Tool } from './ActionCard';
 import { StatusIndicator } from './StatusIndicator';
 import { MobileSidebar } from './MobileSidebar';
 import { DesktopSidebar } from './DesktopSidebar';
 import { ThemeToggle } from '../ThemeToggle';
 import { useRouter, usePathname } from 'next/navigation';
 
-const TOOLS = [
+const TOOLS: Tool[] = [
     {
         id: 'sync',
         title: 'Screener → TV',
@@ -73,6 +73,7 @@ const TOOLS = [
         href: '/mio-watchlist',
         icon: 'List' as const,
         category: 'Management',
+        featured: true,
         keywords: ['manage', 'watchlist', 'mio', 'marketinout'],
     },
     {
@@ -82,6 +83,7 @@ const TOOLS = [
         href: '/user-auth-test',
         icon: 'UserCheck' as const,
         category: 'Testing',
+        featured: true,
         keywords: ['auth', 'test', 'user', 'session'],
     },
     {
