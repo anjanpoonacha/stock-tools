@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSessionState } from './useSessionState';
-import type { AuthCredentials } from '@/types/session';
+import type { AuthCredentials, SessionStats } from '@/types/session';
 
 interface UseAuthSessionProps {
 	onCredentialsChange: (credentials: AuthCredentials | null) => void;
@@ -13,7 +13,7 @@ interface UseAuthSessionReturn {
 	userPassword: string;
 	showPassword: boolean;
 	isLoading: boolean;
-	sessionStats: any;
+	sessionStats: SessionStats | null;
 	error: string | null;
 	isLoggedIn: boolean;
 	setUserEmail: (email: string) => void;
@@ -40,7 +40,6 @@ export function useAuthSession({ onCredentialsChange }: UseAuthSessionProps): Us
 		login,
 		logout,
 		autoLogin,
-		clearError,
 	} = useSessionState();
 
 	// Sync local form state with global credentials
