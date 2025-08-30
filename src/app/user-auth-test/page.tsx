@@ -7,34 +7,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Users, Database, CheckCircle } from 'lucide-react';
+import { useSessionStateReader } from '@/hooks/useSessionState';
 
 interface UserCredentials {
     userEmail: string;
     userPassword: string;
 }
 
-interface SessionData {
-    message?: string;
-    availableUsers?: string[];
-    platforms?: {
-        marketinout?: {
-            sessionAvailable: boolean;
-        };
-        tradingview?: {
-            sessionAvailable: boolean;
-        };
-    };
-    sessionStats?: {
-        totalSessions: number;
-        platformCounts?: Record<string, number>;
-    };
-}
-
 export default function UserAuthTestPage() {
-    const [currentUser, setCurrentUser] = useState<UserCredentials | null>(null);
     const [availableUsers, setAvailableUsers] = useState<string[]>([]);
-    const [sessionData, setSessionData] = useState<SessionData | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+
+    // Use unified session state - no more duplicate API calls!
+    const { sessionStats, isLoading, credentials } = useSessionStateReader();
 
     const loadAvailableUsers = useCallback(async () => {
         try {
@@ -54,38 +38,17 @@ export default function UserAuthTestPage() {
         loadAvailableUsers();
     }, [loadAvailableUsers]);
 
-    const handleCredentialsChange = useCallback(
-        async (credentials: UserCredentials | null) => {
-            setCurrentUser(credentials);
+    // Refresh available users when session state changes
+    useEffect(() => {
+        if (credentials) {
+            loadAvailableUsers();
+        }
+    }, [credentials, loadAvailableUsers]);
 
-            if (credentials) {
-                setIsLoading(true);
-                try {
-                    // Test the user-specific session API
-                    const response = await fetch('/api/session/current', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(credentials),
-                    });
-
-                    const data = await response.json();
-                    setSessionData(data);
-
-                    // Refresh available users list
-                    await loadAvailableUsers();
-                } catch (error) {
-                    console.error('Error fetching session data:', error);
-                } finally {
-                    setIsLoading(false);
-                }
-            } else {
-                setSessionData(null);
-            }
-        },
-        [loadAvailableUsers]
-    );
+    const handleCredentialsChange = useCallback((newCredentials: UserCredentials | null) => {
+        // No need to make API calls here - the unified session state handles it
+        console.log('[UserAuthTestPage] Credentials changed:', newCredentials?.userEmail || 'logged out');
+    }, []);
 
     return (
         <DashboardLayout showHero={false} showSidebar={true}>
@@ -129,12 +92,12 @@ export default function UserAuthTestPage() {
 
                         {/* Session Data Section */}
                         <div className='space-y-4'>
-                            {currentUser ? (
+                            {credentials ? (
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className='flex items-center gap-2'>
                                             <Database className='h-5 w-5' />
-                                            Session Data for {currentUser.userEmail}
+                                            Session Data for {credentials.userEmail}
                                         </CardTitle>
                                         <CardDescription>Sessions filtered by user credentials</CardDescription>
                                     </CardHeader>
@@ -143,13 +106,13 @@ export default function UserAuthTestPage() {
                                             <div className='flex items-center justify-center py-8'>
                                                 <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
                                             </div>
-                                        ) : sessionData ? (
+                                        ) : sessionStats ? (
                                             <div className='space-y-4'>
                                                 <div className='grid grid-cols-2 gap-4'>
                                                     <div className='space-y-2'>
                                                         <h4 className='font-medium'>MarketInOut</h4>
                                                         <div className='flex items-center gap-2'>
-                                                            {sessionData.platforms?.marketinout?.sessionAvailable ? (
+                                                            {sessionStats.platforms?.marketinout?.sessionAvailable ? (
                                                                 <>
                                                                     <CheckCircle className='h-4 w-4 text-green-600' />
                                                                     <span className='text-sm text-green-600'>
@@ -170,7 +133,7 @@ export default function UserAuthTestPage() {
                                                     <div className='space-y-2'>
                                                         <h4 className='font-medium'>TradingView</h4>
                                                         <div className='flex items-center gap-2'>
-                                                            {sessionData.platforms?.tradingview?.sessionAvailable ? (
+                                                            {sessionStats.platforms?.tradingview?.sessionAvailable ? (
                                                                 <>
                                                                     <CheckCircle className='h-4 w-4 text-green-600' />
                                                                     <span className='text-sm text-green-600'>
@@ -190,27 +153,24 @@ export default function UserAuthTestPage() {
                                                 </div>
 
                                                 <Alert>
-                                                    <AlertDescription>{sessionData.message}</AlertDescription>
+                                                    <AlertDescription>{sessionStats.message}</AlertDescription>
                                                 </Alert>
 
-                                                {sessionData.sessionStats && (
+                                                {sessionStats.availableUsers && (
                                                     <div className='mt-4 p-3 bg-muted rounded-lg'>
                                                         <h4 className='font-medium mb-2'>Session Statistics</h4>
                                                         <div className='text-sm space-y-1'>
                                                             <div>
-                                                                Total Sessions: {sessionData.sessionStats.totalSessions}
+                                                                Session Available:{' '}
+                                                                {sessionStats.sessionAvailable ? 'Yes' : 'No'}
                                                             </div>
                                                             <div>
                                                                 Available Users:{' '}
-                                                                {sessionData.availableUsers?.length || 0}
+                                                                {sessionStats.availableUsers?.length || 0}
                                                             </div>
-                                                            {Object.entries(
-                                                                sessionData.sessionStats.platformCounts || {}
-                                                            ).map(([platform, count]) => (
-                                                                <div key={platform}>
-                                                                    {platform}: {count as number} sessions
-                                                                </div>
-                                                            ))}
+                                                            <div>
+                                                                Current User: {sessionStats.currentUser || 'None'}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}

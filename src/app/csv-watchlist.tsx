@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { downloadTextFile } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { ErrorDisplay } from '@/components/error';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
 // Helper to parse CSV

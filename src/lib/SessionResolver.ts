@@ -73,8 +73,12 @@ export class SessionResolver {
 		console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Cache invalidated`);
 	}
 
+	// Add loading state to prevent concurrent cache refreshes
+	private static isLoading = false;
+	private static loadingPromise: Promise<StoredSessions> | null = null;
+
 	/**
-	 * Loads all sessions from KV storage with caching
+	 * Loads all sessions from KV storage with caching and concurrency protection
 	 * @returns Parsed session data or empty object if no sessions exist
 	 */
 	private static async loadSessions(): Promise<StoredSessions> {
@@ -84,7 +88,29 @@ export class SessionResolver {
 			return this.sessionCache.data!;
 		}
 
-		// Cache miss - fetch from KV and update cache
+		// If already loading, wait for the existing promise
+		if (this.isLoading && this.loadingPromise) {
+			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Waiting for concurrent session load...`);
+			return await this.loadingPromise;
+		}
+
+		// Start loading
+		this.isLoading = true;
+		this.loadingPromise = this.performSessionLoad();
+
+		try {
+			const result = await this.loadingPromise;
+			return result;
+		} finally {
+			this.isLoading = false;
+			this.loadingPromise = null;
+		}
+	}
+
+	/**
+	 * Performs the actual session loading from KV storage
+	 */
+	private static async performSessionLoad(): Promise<StoredSessions> {
 		try {
 			// Get KV store directly since we're KV-only now
 			const kvStore = await import('./sessionStore.kv');

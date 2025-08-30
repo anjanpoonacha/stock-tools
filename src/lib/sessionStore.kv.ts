@@ -67,11 +67,16 @@ function sanitizeSessionData(data: PlatformSessionData): PlatformSessionData {
 }
 
 /**
- * Execute operation with cache invalidation
+ * Execute operation with delayed cache invalidation to prevent race conditions
  */
 async function withCacheInvalidation<T>(operation: () => Promise<T>): Promise<T> {
 	const result = await operation();
-	SessionResolver.invalidateCache();
+
+	// Delay cache invalidation slightly to allow concurrent operations to complete
+	setTimeout(() => {
+		SessionResolver.invalidateCache();
+	}, 100); // 100ms delay
+
 	return result;
 }
 
@@ -134,7 +139,7 @@ export async function getSession(internalId: string): Promise<SessionData | unde
 	for (const key of keys) {
 		const data = await kv.get(key);
 		const parsedData = parseKVData(data, key);
-		
+
 		if (parsedData) {
 			const platform = key.split(':')[2]; // Extract platform from key
 			sessionData[platform] = parsedData;
@@ -195,7 +200,7 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
 	for (const key of keys) {
 		const data = await kv.get(key);
 		const parsedData = parseKVData(data, key);
-		
+
 		if (parsedData) {
 			const [, internalId, platform] = key.split(':');
 			if (!sessions[internalId]) {
@@ -213,7 +218,7 @@ export async function getAllSessions(): Promise<Record<string, SessionData>> {
  */
 export async function deletePlatformSession(internalId: string, platform: string): Promise<void> {
 	const key = generateSessionKey(internalId, platform);
-	
+
 	await withCacheInvalidation(async () => {
 		await kv.del(key);
 		console.log(`[SessionStore-KV] Deleted ${platform} session: ${internalId}`);

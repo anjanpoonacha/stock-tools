@@ -11,7 +11,7 @@ import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
 import { useSessionBridge } from '../../lib/useSessionBridge';
 import { UsageGuide } from '../../components/UsageGuide';
-import { ErrorDisplay } from '../../components/ErrorDisplay';
+import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '../../components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '../../lib/sessionErrors';
 

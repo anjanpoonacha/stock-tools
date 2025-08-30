@@ -9,7 +9,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { useState } from 'react';
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '@/components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 

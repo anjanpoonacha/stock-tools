@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { ErrorDisplay } from '@/components/error';
 import { API_ENDPOINTS, UI_CONSTANTS, SUCCESS_MESSAGES } from '@/lib/constants';
 
 interface Watchlist {

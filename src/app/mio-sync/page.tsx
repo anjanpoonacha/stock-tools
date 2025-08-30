@@ -11,7 +11,7 @@ import { useSessionBridge } from '@/lib/useSessionBridge';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '@/components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
@@ -457,7 +457,7 @@ const MioSyncPage: React.FC = () => {
                                     <div className='text-sm text-gray-500'>Loading MIO watchlists...</div>
                                 </div>
                             ) : mioWatchlistsError ? (
-                                <div className='p-3 bg-red-50 border border-red-200 rounded-lg'>
+                                <div className=' border-red-200 rounded-lg'>
                                     <ErrorDisplay error={mioWatchlistsError} />
                                 </div>
                             ) : mioWatchlists.length === 0 ? (
