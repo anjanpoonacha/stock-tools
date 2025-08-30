@@ -1,5 +1,4 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { SmartEditor } from '@/components/dashboard/SmartEditor';
 
 export default function DashboardPage() {
     return (

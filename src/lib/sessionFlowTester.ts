@@ -4,7 +4,8 @@ import { MIOService } from './MIOService';
 import {
 	savePlatformSessionWithCleanup,
 	getPlatformSession,
-	getSession
+	getSession,
+	PlatformSessionData
 } from './sessionStore';
 import {
 	validateAndMonitorAllPlatforms,
@@ -72,7 +73,7 @@ class TestUtils {
 	static async executeSessionTest<T>(
 		testName: string,
 		sessionId: string,
-		sessionData: any,
+		sessionData: PlatformSessionData,
 		platform: 'marketinout' | 'tradingview',
 		testOperation: () => Promise<T>
 	): Promise<T> {

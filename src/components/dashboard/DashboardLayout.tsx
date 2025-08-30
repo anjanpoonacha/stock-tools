@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
 import { Search, Zap, Menu } from 'lucide-react';
-import { ActionCard, Tool } from './ActionCard';
+import { ActionCard } from './ActionCard';
 import { StatusIndicator } from './StatusIndicator';
 import { MobileSidebar } from './MobileSidebar';
 import { DesktopSidebar } from './DesktopSidebar';
@@ -102,7 +102,7 @@ interface DashboardLayoutProps {
     pageTitle?: string;
 }
 
-export function DashboardLayout({ children, showHero = true, showSidebar = true, pageTitle }: DashboardLayoutProps) {
+export function DashboardLayout({ children, showHero = true, showSidebar = true }: DashboardLayoutProps) {
     const [commandOpen, setCommandOpen] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const router = useRouter();
@@ -110,7 +110,6 @@ export function DashboardLayout({ children, showHero = true, showSidebar = true,
 
     // Get current tool info for dynamic header
     const currentTool = TOOLS.find((tool) => tool.href === pathname);
-    const displayTitle = pageTitle || currentTool?.title || 'Stock Tools';
     const fullTitle = currentTool ? currentTool.title : 'Stock Tools';
 
     // Command palette keyboard shortcut

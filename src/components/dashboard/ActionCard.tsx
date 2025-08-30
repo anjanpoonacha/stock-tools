@@ -15,7 +15,6 @@ import {
     UserCheck,
     TestTube,
     ArrowRight,
-    Zap,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';

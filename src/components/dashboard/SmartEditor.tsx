@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { ArrowLeftRight, Copy, Download, Upload, Zap, ChevronDown, ChevronUp, Settings, Sparkles } from 'lucide-react';
+import { ArrowLeftRight, Copy, Upload, Zap, ChevronDown, ChevronUp, Settings, Sparkles } from 'lucide-react';
 
 interface SmartEditorProps {
     title?: string;

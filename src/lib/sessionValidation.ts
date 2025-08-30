@@ -30,7 +30,7 @@ function validateSessionId(sessionId: string, functionName: string, platform: Pl
 async function cleanupInvalidSession(sessionId: string, platform?: string): Promise<void> {
 	const { deleteSession } = await import('./sessionStore');
 	deleteSession(sessionId);
-	
+
 	if (platform) {
 		sessionHealthMonitor.stopMonitoring(sessionId, platform);
 	}
@@ -41,13 +41,12 @@ function handleValidationError(
 	error: unknown,
 	sessionId: string,
 	platform: Platform,
-	functionName: string,
-	platformName?: string
+	functionName: string
 ): SessionError {
 	if (error instanceof SessionError) {
 		return error;
 	}
-	
+
 	return ErrorHandler.parseError(
 		error,
 		platform,
@@ -89,10 +88,10 @@ export async function validateAndCleanupMarketinoutSession(
 		return watchlists;
 	} catch (err: unknown) {
 		console.error(`[SessionValidation] Session validation failed for: ${internalSessionId}`, err);
-		
+
 		// Always cleanup on any error
 		await cleanupInvalidSession(internalSessionId, 'marketinout');
-		
+
 		// Handle and re-throw the error
 		const sessionError = handleValidationError(err, internalSessionId, Platform.MARKETINOUT, 'validateAndCleanupMarketinoutSession');
 		ErrorLogger.logError(sessionError);
@@ -147,7 +146,7 @@ async function validateTradingViewSession(internalSessionId: string): Promise<bo
 		return true;
 	} catch (error) {
 		await cleanupInvalidSession(internalSessionId, 'tradingview');
-		
+
 		const sessionError = handleValidationError(error, internalSessionId, Platform.TRADINGVIEW, 'validateTradingViewSession');
 		ErrorLogger.logError(sessionError);
 		throw sessionError;
@@ -429,7 +428,7 @@ export async function forceSessionRefreshAndValidation(
 ): Promise<{ success: boolean; newStatus?: string; error?: string }> {
 	try {
 		validateSessionId(internalSessionId, 'forceSessionRefreshAndValidation');
-		
+
 		if (!platform) {
 			throw new Error('Missing required parameter: platform');
 		}
@@ -679,7 +678,7 @@ export async function refreshSessionWithHealthCheck(
 }> {
 	try {
 		validateSessionId(internalSessionId, 'refreshSessionWithHealthCheck');
-		
+
 		if (!platform) {
 			const error = ErrorHandler.createGenericError(
 				Platform.UNKNOWN,

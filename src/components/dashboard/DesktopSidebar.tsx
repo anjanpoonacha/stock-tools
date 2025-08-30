@@ -87,8 +87,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => voi
 export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSidebarProps) {
     const [searchQuery, setSearchQuery] = useState('');
     const [isCollapsed, setIsCollapsed] = useLocalStorage('sidebar-collapsed', defaultCollapsed);
-    const [isHovered, setIsHovered] = useState(false);
-    const [hoverTimeout, setHoverTimeout] = useState<NodeJS.Timeout | null>(null);
+    const [isHovered] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
@@ -126,15 +125,6 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
     const handleMouseLeave = () => {
         // Do nothing - no hover expansion
     };
-
-    // Cleanup timeout on unmount
-    useEffect(() => {
-        return () => {
-            if (hoverTimeout) {
-                clearTimeout(hoverTimeout);
-            }
-        };
-    }, [hoverTimeout]);
 
     // Toggle collapse state
     const toggleCollapse = () => {

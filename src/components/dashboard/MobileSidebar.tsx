@@ -1,13 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { cn } from '@/lib/utils';
 import {
     ArrowLeftRight,
     FileSpreadsheet,
@@ -20,7 +19,6 @@ import {
     Search,
     ArrowRight,
     Zap,
-    Menu,
     Home,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
