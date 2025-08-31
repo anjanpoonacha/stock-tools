@@ -557,7 +557,7 @@ export default function TvSyncPage() {
                                     />
                                     <Button
                                         type='button'
-                                        variant='destructive-subtle'
+                                        variant='destructive'
                                         size='sm'
                                         onClick={() => removeUrl(i)}
                                         disabled={urls.length === 1}

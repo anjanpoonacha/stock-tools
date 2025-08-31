@@ -78,9 +78,9 @@ const TOOLS: Tool[] = [
     },
     {
         id: 'userauth',
-        title: 'User Auth Test',
-        description: 'Test user authentication and sessions',
-        href: '/user-auth-test',
+        title: 'User Authentication',
+        description: 'User authentication and sessions',
+        href: '/user-authentication',
         icon: 'UserCheck' as const,
         category: 'Testing',
         featured: true,

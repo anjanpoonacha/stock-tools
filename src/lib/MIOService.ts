@@ -230,9 +230,9 @@ export class MIOService {
 
 	/**
 	 * Fetch MIO watchlists using internalSessionId (handles session lookup and HTML parsing).
-	 * Now includes automatic session refresh on authentication failures and health monitoring integration.
+	 * Removed retry mechanism - fails immediately on session expiration.
 	 */
-	static async getWatchlistsWithSession(internalSessionId: string, retryCount = 0): Promise<{ id: string; name: string }[]> {
+	static async getWatchlistsWithSession(internalSessionId: string): Promise<{ id: string; name: string }[]> {
 		try {
 			// Validate input parameters
 			if (!internalSessionId) {
@@ -263,16 +263,6 @@ export class MIOService {
 				},
 			});
 
-			// Check for authentication failure and attempt session refresh
-			if (!res.ok && (res.status === 401 || res.status === 403) && retryCount === 0) {
-				console.log('[MIOService] Authentication failed, attempting session refresh...');
-				const refreshed = await MIOService.refreshSession(internalSessionId);
-				if (refreshed) {
-					console.log('[MIOService] Session refreshed, retrying request...');
-					return MIOService.getWatchlistsWithSession(internalSessionId, 1);
-				}
-			}
-
 			if (!res.ok) {
 				const error = ErrorHandler.parseError(
 					`Failed to fetch watchlist page (status: ${res.status})`,
@@ -289,14 +279,6 @@ export class MIOService {
 
 			// Check if we got a login page instead of watchlist page (indicates session expired)
 			if (html.includes('login') || html.includes('signin') || html.includes('password')) {
-				if (retryCount === 0) {
-					console.log('[MIOService] Detected login page, attempting session refresh...');
-					const refreshed = await MIOService.refreshSession(internalSessionId);
-					if (refreshed) {
-						console.log('[MIOService] Session refreshed, retrying request...');
-						return MIOService.getWatchlistsWithSession(internalSessionId, 1);
-					}
-				}
 				const error = ErrorHandler.createSessionExpiredError(
 					Platform.MARKETINOUT,
 					'getWatchlistsWithSession',
@@ -344,13 +326,13 @@ export class MIOService {
 
 	/**
 	 * Add watchlist using internalSessionId (fetches aspSessionId from session store).
-	 * Now includes automatic session refresh on authentication failures and health monitoring integration.
+	 * Removed retry mechanism - fails immediately on session expiration.
 	 */
 	static async addWatchlistWithSession({
 		internalSessionId,
 		mioWlid,
 		symbols,
-	}: AddWatchlistWithSessionParams, retryCount = 0): Promise<string> {
+	}: AddWatchlistWithSessionParams): Promise<string> {
 		const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
 
@@ -375,17 +357,6 @@ export class MIOService {
 			// Health status will be updated automatically during next scheduled check
 			// or when validation is called again
 			console.warn('[MIOService] Operation failed, health status will be updated on next check');
-
-			// Check if it's an authentication error and we haven't retried yet
-			if (retryCount === 0 && error instanceof Error &&
-				(error.message.includes('credentials') || error.message.includes('Failed to sync'))) {
-				console.log('[MIOService] Add watchlist failed, attempting session refresh...');
-				const refreshed = await MIOService.refreshSession(internalSessionId);
-				if (refreshed) {
-					console.log('[MIOService] Session refreshed, retrying add watchlist...');
-					return MIOService.addWatchlistWithSession({ internalSessionId, mioWlid, symbols }, 1);
-				}
-			}
 			throw error;
 		}
 	}
@@ -523,25 +494,15 @@ export class MIOService {
 
 	/**
 	 * Delete watchlists using internalSessionId (fetches aspSessionId from session store).
-	 * Now includes automatic session refresh on authentication failures.
+	 * Removed retry mechanism - fails immediately on session expiration.
 	 */
-	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[], retryCount = 0): Promise<string> {
+	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[]): Promise<string> {
 		const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
 		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
 
 		try {
 			return await MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 		} catch (error) {
-			// Check if it's an authentication error and we haven't retried yet
-			if (retryCount === 0 && error instanceof Error &&
-				(error.message.includes('Failed to delete') || error.message.includes('credentials'))) {
-				console.log('[MIOService] Delete watchlists failed, attempting session refresh...');
-				const refreshed = await MIOService.refreshSession(internalSessionId);
-				if (refreshed) {
-					console.log('[MIOService] Session refreshed, retrying delete watchlists...');
-					return MIOService.deleteWatchlistsWithSession(internalSessionId, deleteIds, 1);
-				}
-			}
 			throw error;
 		}
 	}

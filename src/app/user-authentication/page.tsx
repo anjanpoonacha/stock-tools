@@ -45,29 +45,19 @@ export default function UserAuthTestPage() {
         }
     }, [credentials, loadAvailableUsers]);
 
-    const handleCredentialsChange = useCallback((newCredentials: UserCredentials | null) => {
-        // No need to make API calls here - the unified session state handles it
-        console.log('[UserAuthTestPage] Credentials changed:', newCredentials?.userEmail || 'logged out');
-    }, []);
-
     return (
         <DashboardLayout showHero={false} showSidebar={true}>
             <div className='container mx-auto py-8 px-4'>
                 <div className='max-w-4xl mx-auto space-y-8'>
                     <div className='text-center space-y-4'>
-                        <h1 className='text-3xl font-bold'>User Authentication Test</h1>
-                        <p className='text-muted-foreground'>
-                            Test the user credential-based session segregation system
-                        </p>
+                        <h1 className='text-3xl font-bold'>User Authentication</h1>
+                        <p className='text-muted-foreground'>Use the password same as that in the Chrome extension</p>
                     </div>
 
                     <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
                         {/* User Credentials Section */}
                         <div className='space-y-4'>
-                            <UserCredentials
-                                onCredentialsChange={handleCredentialsChange}
-                                availableUsers={availableUsers}
-                            />
+                            <UserCredentials availableUsers={availableUsers} />
 
                             {availableUsers.length > 0 && (
                                 <Card>

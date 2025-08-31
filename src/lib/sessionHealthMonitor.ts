@@ -51,7 +51,7 @@ export class SessionHealthMonitor {
 	private healthMetrics: Map<string, SessionHealthMetrics> = new Map();
 	private monitoringIntervals: Map<string, NodeJS.Timeout> = new Map();
 	private isGlobalMonitoringActive = false;
-	
+
 	// Configuration constants
 	private readonly DEFAULT_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
 	private readonly WARNING_CHECK_INTERVAL = 1 * 60 * 1000; // 1 minute
@@ -76,7 +76,7 @@ export class SessionHealthMonitor {
 	 */
 	public startMonitoring(internalSessionId: string, platform: string): void {
 		const key = `${internalSessionId}:${platform}`;
-		
+
 		if (this.healthMetrics.has(key)) {
 			console.log(`[SessionHealthMonitor] Already monitoring ${platform} for session ${internalSessionId}`);
 			return;
@@ -103,9 +103,9 @@ export class SessionHealthMonitor {
 
 		this.healthMetrics.set(key, metrics);
 		this.scheduleHealthCheck(key);
-		
+
 		console.log(`[SessionHealthMonitor] Started monitoring ${platform} for session ${internalSessionId}`);
-		
+
 		// Start global monitoring if not already active
 		if (!this.isGlobalMonitoringActive) {
 			this.startGlobalMonitoring();
@@ -117,19 +117,19 @@ export class SessionHealthMonitor {
 	 */
 	public stopMonitoring(internalSessionId: string, platform: string): void {
 		const key = `${internalSessionId}:${platform}`;
-		
+
 		// Clear the interval
 		const intervalId = this.monitoringIntervals.get(key);
 		if (intervalId) {
 			clearTimeout(intervalId);
 			this.monitoringIntervals.delete(key);
 		}
-		
+
 		// Remove metrics
 		this.healthMetrics.delete(key);
-		
+
 		console.log(`[SessionHealthMonitor] Stopped monitoring ${platform} for session ${internalSessionId}`);
-		
+
 		// Stop global monitoring if no sessions are being monitored
 		if (this.healthMetrics.size === 0 && this.isGlobalMonitoringActive) {
 			this.stopGlobalMonitoring();
@@ -149,11 +149,11 @@ export class SessionHealthMonitor {
 	 */
 	public getSessionHealthReport(internalSessionId: string): SessionHealthReport | null {
 		const sessionPlatforms = this.collectSessionPlatforms(internalSessionId);
-		
+
 		if (Object.keys(sessionPlatforms).length === 0) {
 			return null;
 		}
-		
+
 		const overallStatus = this.determineOverallStatus(sessionPlatforms);
 		const { criticalErrors, recommendedActions, autoRecoveryAvailable } = this.analyzeSessionHealth(sessionPlatforms);
 
@@ -173,13 +173,13 @@ export class SessionHealthMonitor {
 	 */
 	private collectSessionPlatforms(internalSessionId: string): { [platform: string]: SessionHealthMetrics } {
 		const sessionPlatforms: { [platform: string]: SessionHealthMetrics } = {};
-		
+
 		for (const [, metrics] of this.healthMetrics.entries()) {
 			if (metrics.internalSessionId === internalSessionId) {
 				sessionPlatforms[metrics.platform] = metrics;
 			}
 		}
-		
+
 		return sessionPlatforms;
 	}
 
@@ -188,7 +188,7 @@ export class SessionHealthMonitor {
 	 */
 	private determineOverallStatus(sessionPlatforms: { [platform: string]: SessionHealthMetrics }): SessionHealthStatus {
 		let overallStatus: SessionHealthStatus = 'healthy';
-		
+
 		for (const metrics of Object.values(sessionPlatforms)) {
 			if (metrics.status === 'expired') {
 				overallStatus = 'expired';
@@ -198,7 +198,7 @@ export class SessionHealthMonitor {
 				overallStatus = 'warning';
 			}
 		}
-		
+
 		return overallStatus;
 	}
 
@@ -218,7 +218,7 @@ export class SessionHealthMonitor {
 			if (metrics.lastError && (metrics.status === 'critical' || metrics.status === 'expired')) {
 				criticalErrors.push(metrics.lastError);
 			}
-			
+
 			// Add recommended actions based on status
 			if (metrics.status === 'expired') {
 				recommendedActions.push(`Re-authenticate ${metrics.platform} session`);
@@ -238,12 +238,12 @@ export class SessionHealthMonitor {
 	 */
 	public getAllHealthReports(): SessionHealthReport[] {
 		const sessionIds = new Set<string>();
-		
+
 		// Collect all unique session IDs
 		for (const metrics of this.healthMetrics.values()) {
 			sessionIds.add(metrics.internalSessionId);
 		}
-		
+
 		// Generate reports for each session
 		const reports: SessionHealthReport[] = [];
 		for (const sessionId of sessionIds) {
@@ -252,7 +252,7 @@ export class SessionHealthMonitor {
 				reports.push(report);
 			}
 		}
-		
+
 		return reports;
 	}
 
@@ -262,27 +262,24 @@ export class SessionHealthMonitor {
 	public async checkSessionHealth(internalSessionId: string, platform: string): Promise<SessionHealthStatus> {
 		const key = `${internalSessionId}:${platform}`;
 		const metrics = this.healthMetrics.get(key);
-		
+
 		if (!metrics) {
 			console.warn(`[SessionHealthMonitor] No metrics found for ${key}`);
 			return 'expired';
 		}
 
 		console.log(`[SessionHealthMonitor] Checking health for ${platform} session ${internalSessionId}`);
-		
+
 		try {
 			const isHealthy = await this.performPlatformHealthCheck(platform, internalSessionId);
 			this.updateHealthMetrics(metrics, isHealthy);
 			this.healthMetrics.set(key, metrics);
-			
-			// Attempt automatic refresh if needed
-			if (this.shouldAttemptRefresh(metrics.status, isHealthy)) {
-				await this.attemptSessionRefresh(internalSessionId, platform);
-			}
-			
+
+			// Retry logic removed - no automatic refresh attempts
+
 			console.log(`[SessionHealthMonitor] Health check completed for ${platform}:${internalSessionId} - Status: ${metrics.status}`);
 			return metrics.status;
-			
+
 		} catch (error) {
 			console.error(`[SessionHealthMonitor] Health check failed for ${platform}:${internalSessionId}:`, error);
 			this.updateHealthMetricsOnError(metrics);
@@ -311,13 +308,13 @@ export class SessionHealthMonitor {
 	 */
 	private updateHealthMetrics(metrics: SessionHealthMetrics, isHealthy: boolean): void {
 		metrics.totalChecks++;
-		
+
 		if (isHealthy) {
 			this.updateHealthyMetrics(metrics);
 		} else {
 			this.updateUnhealthyMetrics(metrics);
 		}
-		
+
 		metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
 	}
 
@@ -327,7 +324,7 @@ export class SessionHealthMonitor {
 	private updateHealthyMetrics(metrics: SessionHealthMetrics): void {
 		metrics.lastSuccessfulCheck = new Date();
 		metrics.consecutiveFailures = 0;
-		
+
 		const failureRate = metrics.totalFailures / metrics.totalChecks;
 		if (failureRate < 0.1) {
 			metrics.status = 'healthy';
@@ -345,7 +342,7 @@ export class SessionHealthMonitor {
 		metrics.lastFailedCheck = new Date();
 		metrics.consecutiveFailures++;
 		metrics.totalFailures++;
-		
+
 		if (metrics.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
 			metrics.status = 'expired';
 			metrics.isMonitoring = false;
@@ -372,163 +369,7 @@ export class SessionHealthMonitor {
 		metrics.nextCheckTime = new Date(Date.now() + metrics.checkInterval);
 	}
 
-	/**
-	 * Determine if automatic refresh should be attempted
-	 */
-	private shouldAttemptRefresh(status: SessionHealthStatus, isHealthy: boolean): boolean {
-		return (status === 'warning' || status === 'critical') && isHealthy;
-	}
-
-	/**
-	 * Attempt to refresh a session automatically
-	 * Enhanced with detailed error handling and recovery tracking.
-	 */
-	private async attemptSessionRefresh(internalSessionId: string, platform: string): Promise<boolean> {
-		const key = `${internalSessionId}:${platform}`;
-		const metrics = this.healthMetrics.get(key);
-		
-		if (!metrics) {
-			this.logMissingMetricsError(internalSessionId, platform);
-			return false;
-		}
-		
-		if (!this.shouldAttemptRefreshNow(metrics, platform, internalSessionId)) {
-			return false;
-		}
-		
-		console.log(`[SessionHealthMonitor] Attempting automatic session refresh for ${platform}:${internalSessionId}`);
-		
-		try {
-			this.updateRefreshAttemptMetrics(metrics);
-			const refreshResult = await this.performPlatformRefresh(platform, internalSessionId);
-			this.handleRefreshResult(metrics, refreshResult, platform, internalSessionId);
-			this.healthMetrics.set(key, metrics);
-			return refreshResult.success;
-			
-		} catch (error) {
-			console.error(`[SessionHealthMonitor] Error during session refresh for ${platform}:${internalSessionId}:`, error);
-			this.handleRefreshError(metrics, error, platform);
-			this.healthMetrics.set(key, metrics);
-			return false;
-		}
-	}
-
-	/**
-	 * Log error for missing metrics
-	 */
-	private logMissingMetricsError(internalSessionId: string, platform: string): void {
-		const error = ErrorHandler.createGenericError(
-			Platform.UNKNOWN,
-			'attemptSessionRefresh',
-			`No metrics found for session ${internalSessionId} on platform ${platform}`
-		);
-		ErrorLogger.logError(error);
-	}
-
-	/**
-	 * Check if refresh should be attempted now (cooldown logic)
-	 */
-	private shouldAttemptRefreshNow(metrics: SessionHealthMetrics, platform: string, internalSessionId: string): boolean {
-		const timeSinceLastRefresh = metrics.lastRefreshAttempt
-			? Date.now() - metrics.lastRefreshAttempt.getTime()
-			: Infinity;
-			
-		if (timeSinceLastRefresh < 60000) { // 1 minute cooldown
-			console.log(`[SessionHealthMonitor] Skipping refresh attempt for ${platform}:${internalSessionId} - too recent`);
-			return false;
-		}
-		return true;
-	}
-
-	/**
-	 * Update metrics for refresh attempt
-	 */
-	private updateRefreshAttemptMetrics(metrics: SessionHealthMetrics): void {
-		metrics.lastRefreshAttempt = new Date();
-		metrics.lastRecoveryAttempt = new Date();
-		metrics.recoveryAttempts++;
-	}
-
-	/**
-	 * Perform platform-specific session refresh
-	 */
-	private async performPlatformRefresh(platform: string, internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
-		switch (platform) {
-			case 'marketinout':
-				return await this.refreshMarketInOutSession(internalSessionId);
-			case 'tradingview':
-				return await this.refreshTradingViewSessionSafe(internalSessionId);
-			default:
-				const error = ErrorHandler.createGenericError(
-					Platform.UNKNOWN,
-					'attemptSessionRefresh',
-					`Unknown platform for refresh: ${platform}`
-				);
-				console.warn(`[SessionHealthMonitor] Unknown platform for refresh: ${platform}`);
-				return { success: false, error };
-		}
-	}
-
-	/**
-	 * Safely refresh MarketInOut session with error handling
-	 */
-	private async refreshMarketInOutSession(internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
-		try {
-			const success = await MIOService.refreshSession(internalSessionId);
-			return { success };
-		} catch (error) {
-			const sessionError = error instanceof SessionError
-				? error
-				: ErrorHandler.parseError(error, Platform.MARKETINOUT, 'attemptSessionRefresh', undefined, undefined);
-			return { success: false, error: sessionError };
-		}
-	}
-
-	/**
-	 * Safely refresh TradingView session with error handling
-	 */
-	private async refreshTradingViewSessionSafe(internalSessionId: string): Promise<{ success: boolean; error?: SessionError }> {
-		try {
-			const success = await this.refreshTradingViewSession(internalSessionId);
-			return { success };
-		} catch (error) {
-			const sessionError = ErrorHandler.parseError(error, Platform.TRADINGVIEW, 'refreshTradingViewSession', undefined, undefined);
-			return { success: false, error: sessionError };
-		}
-	}
-
-	/**
-	 * Handle the result of a refresh attempt
-	 */
-	private handleRefreshResult(
-		metrics: SessionHealthMetrics,
-		result: { success: boolean; error?: SessionError },
-		platform: string,
-		internalSessionId: string
-	): void {
-		if (result.success) {
-			metrics.lastSuccessfulRefresh = new Date();
-			metrics.consecutiveFailures = Math.max(0, metrics.consecutiveFailures - 1);
-			metrics.lastError = undefined;
-			console.log(`[SessionHealthMonitor] Successfully refreshed session for ${platform}:${internalSessionId}`);
-		} else {
-			if (result.error) {
-				this.recordHealthCheckError(metrics, result.error);
-			}
-			console.warn(`[SessionHealthMonitor] Failed to refresh session for ${platform}:${internalSessionId}`);
-		}
-	}
-
-	/**
-	 * Handle errors during refresh attempt
-	 */
-	private handleRefreshError(metrics: SessionHealthMetrics, error: unknown, platform: string): void {
-		const platformEnum = platform === 'marketinout' ? Platform.MARKETINOUT :
-			platform === 'tradingview' ? Platform.TRADINGVIEW : Platform.UNKNOWN;
-		
-		const sessionError = ErrorHandler.parseError(error, platformEnum, 'attemptSessionRefresh', undefined, undefined);
-		this.recordHealthCheckError(metrics, sessionError);
-	}
+	// Retry/refresh logic removed - sessions fail immediately on expiration
 
 	/**
 	 * Schedule the next health check for a session/platform
@@ -536,13 +377,13 @@ export class SessionHealthMonitor {
 	private scheduleHealthCheck(key: string): void {
 		const metrics = this.healthMetrics.get(key);
 		if (!metrics || !metrics.isMonitoring) return;
-		
+
 		// Clear existing timeout
 		const existingTimeout = this.monitoringIntervals.get(key);
 		if (existingTimeout) {
 			clearTimeout(existingTimeout);
 		}
-		
+
 		// Calculate delay with exponential backoff for failed checks
 		let delay = metrics.checkInterval;
 		if (metrics.consecutiveFailures > 0) {
@@ -551,10 +392,10 @@ export class SessionHealthMonitor {
 				this.MAX_CHECK_INTERVAL
 			);
 		}
-		
+
 		const timeoutId = setTimeout(async () => {
 			await this.checkSessionHealth(metrics.internalSessionId, metrics.platform);
-			
+
 			// Schedule next check if still monitoring
 			if (metrics.isMonitoring && metrics.status !== 'expired') {
 				this.scheduleHealthCheck(key);
@@ -563,9 +404,9 @@ export class SessionHealthMonitor {
 				this.cleanupExpiredSession(metrics.internalSessionId, metrics.platform);
 			}
 		}, delay);
-		
+
 		this.monitoringIntervals.set(key, timeoutId);
-		
+
 		console.log(`[SessionHealthMonitor] Scheduled next health check for ${key} in ${Math.round(delay / 1000)}s`);
 	}
 
@@ -574,14 +415,14 @@ export class SessionHealthMonitor {
 	 */
 	private cleanupExpiredSession(internalSessionId: string, platform: string): void {
 		console.log(`[SessionHealthMonitor] Cleaning up expired session for ${platform}:${internalSessionId}`);
-		
+
 		// Remove from monitoring
 		this.stopMonitoring(internalSessionId, platform);
-		
+
 		// Delete session data if all platforms are expired
 		const remainingPlatforms = Array.from(this.healthMetrics.values())
 			.filter(m => m.internalSessionId === internalSessionId && m.status !== 'expired');
-			
+
 		if (remainingPlatforms.length === 0) {
 			console.log(`[SessionHealthMonitor] All platforms expired for session ${internalSessionId}, deleting session`);
 			deleteSession(internalSessionId);
@@ -593,10 +434,10 @@ export class SessionHealthMonitor {
 	 */
 	private startGlobalMonitoring(): void {
 		if (this.isGlobalMonitoringActive) return;
-		
+
 		this.isGlobalMonitoringActive = true;
 		console.log('[SessionHealthMonitor] Started global session health monitoring');
-		
+
 		// Discover existing sessions and start monitoring them
 		this.discoverAndMonitorExistingSessions();
 	}
@@ -606,14 +447,14 @@ export class SessionHealthMonitor {
 	 */
 	private stopGlobalMonitoring(): void {
 		if (!this.isGlobalMonitoringActive) return;
-		
+
 		// Clear all intervals
 		for (const [, intervalId] of this.monitoringIntervals.entries()) {
 			clearTimeout(intervalId);
 		}
 		this.monitoringIntervals.clear();
 		this.healthMetrics.clear();
-		
+
 		this.isGlobalMonitoringActive = false;
 		console.log('[SessionHealthMonitor] Stopped global session health monitoring');
 	}
@@ -655,7 +496,7 @@ export class SessionHealthMonitor {
 			if (error instanceof SessionError) {
 				throw error;
 			}
-			
+
 			const sessionError = ErrorHandler.parseError(
 				error,
 				Platform.TRADINGVIEW,
@@ -692,7 +533,7 @@ export class SessionHealthMonitor {
 			if (error instanceof SessionError) {
 				throw error;
 			}
-			
+
 			const sessionError = ErrorHandler.parseError(
 				error,
 				Platform.TRADINGVIEW,
@@ -738,23 +579,23 @@ export class SessionHealthMonitor {
 
 		for (const metrics of this.healthMetrics.values()) {
 			if (metrics.isMonitoring) stats.activeSessions++;
-			
+
 			// Count errors and recovery attempts
 			stats.totalErrors += metrics.errorHistory.length;
 			stats.totalRecoveryAttempts += metrics.recoveryAttempts;
-			
+
 			// Count successful recoveries (sessions that had errors but are now healthy)
 			if (metrics.errorHistory.length > 0 && metrics.status === 'healthy') {
 				stats.successfulRecoveries++;
 			}
-			
+
 			// Collect recent errors (from last 24 hours)
 			const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-			const recentErrors = metrics.errorHistory.filter(error => 
+			const recentErrors = metrics.errorHistory.filter(error =>
 				error.timestamp && new Date(error.timestamp) > oneDayAgo
 			);
 			stats.recentErrors.push(...recentErrors);
-			
+
 			switch (metrics.status) {
 				case 'healthy': stats.healthySessions++; break;
 				case 'warning': stats.warningSessions++; break;
@@ -783,16 +624,16 @@ export class SessionHealthMonitor {
 	private recordHealthCheckError(metrics: SessionHealthMetrics, error: SessionError): void {
 		// Update last error
 		metrics.lastError = error;
-		
+
 		// Add to error history (keep last 100 errors)
 		metrics.errorHistory.push(error);
 		if (metrics.errorHistory.length > 100) {
 			metrics.errorHistory = metrics.errorHistory.slice(-100);
 		}
-		
+
 		// Log the error for monitoring
 		ErrorLogger.logError(error);
-		
+
 		console.error(`[SessionHealthMonitor] Recorded error for ${metrics.platform}:${metrics.internalSessionId}:`, {
 			errorType: error.type,
 			errorCode: error.code,

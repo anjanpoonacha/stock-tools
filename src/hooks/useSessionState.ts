@@ -43,7 +43,6 @@ let activeSessionRequest: Promise<SessionStats> | null = null;
 async function fetchSessionData(credentials: AuthCredentials, signal?: AbortSignal): Promise<SessionStats> {
 	// If there's already an active request, wait for it
 	if (activeSessionRequest) {
-		console.log('[SessionState] Reusing active session request');
 		return activeSessionRequest;
 	}
 
@@ -139,11 +138,12 @@ export function useSessionState() {
 				credentials,
 				isLoggedIn: true,
 			});
-
-			console.log('[SessionState] Login successful:', sessionStats);
 		} catch (error) {
 			if (error instanceof Error && error.name === 'AbortError') {
-				console.log('[SessionState] Login request aborted');
+				// IMPORTANT: Reset loading state even when aborted
+				updateGlobalSessionState({
+					isLoading: false,
+				});
 				return;
 			}
 
@@ -154,8 +154,6 @@ export function useSessionState() {
 				error: errorMessage,
 				isLoggedIn: false,
 			});
-
-			console.error('[SessionState] Login failed:', errorMessage);
 		}
 	}, []);
 
@@ -177,29 +175,58 @@ export function useSessionState() {
 			credentials: null,
 			isLoggedIn: false,
 		});
-
-		console.log('[SessionState] Logged out');
 	}, []);
 
 	const refreshSession = useCallback(async () => {
 		if (!globalSessionState.credentials) {
-			console.warn('[SessionState] Cannot refresh session - no credentials available');
 			return;
 		}
 
 		await login(globalSessionState.credentials);
 	}, [login]);
 
-	// Auto-login with saved credentials
+	// Auto-login with saved credentials - simplified
 	const autoLogin = useCallback(async () => {
 		const savedEmail = localStorage.getItem('userEmail');
 		const savedPassword = localStorage.getItem('userPassword');
 
+		// Only auto-login if we have credentials and are not already logged in
 		if (savedEmail && savedPassword && !globalSessionState.isLoggedIn && !globalSessionState.isLoading) {
-			console.log('[SessionState] Auto-login with saved credentials');
-			await login({ userEmail: savedEmail, userPassword: savedPassword });
+			// Set loading state immediately
+			updateGlobalSessionState({
+				isLoading: true,
+				error: null,
+				credentials: { userEmail: savedEmail, userPassword: savedPassword },
+			});
+
+			try {
+				const sessionStats = await performSessionFetch(
+					{ userEmail: savedEmail, userPassword: savedPassword }
+				);
+
+				// Update success state
+				updateGlobalSessionState({
+					sessionStats,
+					isLoading: false,
+					error: null,
+					credentials: { userEmail: savedEmail, userPassword: savedPassword },
+					isLoggedIn: true,
+				});
+
+			} catch (error) {
+				// Clear saved credentials on failure
+				localStorage.removeItem('userEmail');
+				localStorage.removeItem('userPassword');
+
+				updateGlobalSessionState({
+					isLoading: false,
+					error: null, // Don't show auto-login errors to user
+					credentials: null,
+					isLoggedIn: false,
+				});
+			}
 		}
-	}, [login]);
+	}, []);
 
 	return {
 		// State

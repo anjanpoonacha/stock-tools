@@ -94,7 +94,29 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
 	try {
-		const body = await request.json();
+		// Get content type and handle charset parameters
+		const contentType = request.headers.get('content-type') || '';
+		if (!contentType.startsWith('application/json')) {
+			return NextResponse.json({
+				error: 'Invalid content type',
+				details: 'Only application/json content type is supported',
+				success: false,
+				receivedContentType: contentType
+			}, { status: 400 });
+		}
+
+		let body;
+		try {
+			body = await request.json();
+		} catch (jsonError) {
+			console.error('[SESSION-API] Failed to parse JSON body:', jsonError);
+			return NextResponse.json({
+				error: 'Invalid JSON body',
+				details: 'Request body must be valid JSON',
+				success: false
+			}, { status: 400 });
+		}
+
 		const { userEmail, userPassword, platform } = body;
 
 		if (!userEmail || !userPassword) {

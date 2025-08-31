@@ -1,33 +1,64 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { SessionDisplay, UserSelector } from '@/components/auth';
 import { LoginForm } from '@/components/auth/LoginForm';
-import { useAuthSession } from '@/hooks/useAuthSession';
+import { useSessionState } from '@/hooks/useSessionState';
+import type { AuthCredentials } from '@/types/session';
 
 interface UserCredentialsProps {
-    onCredentialsChange: (credentials: { userEmail: string; userPassword: string } | null) => void;
     availableUsers?: string[];
 }
 
-export function UserCredentials({ onCredentialsChange, availableUsers = [] }: UserCredentialsProps) {
-    const {
-        userEmail,
-        userPassword,
-        showPassword,
-        isLoading,
-        sessionStats,
-        error,
-        isLoggedIn,
-        setUserEmail,
-        setUserPassword,
-        setShowPassword,
-        handleLogin,
-        handleLogout,
-        handleUserSelect,
-    } = useAuthSession({ onCredentialsChange });
+export function UserCredentials({ availableUsers = [] }: UserCredentialsProps) {
+    const [userEmail, setUserEmail] = useState('');
+    const [userPassword, setUserPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+
+    const { sessionStats, isLoading, error, isLoggedIn, login, logout, autoLogin } = useSessionState();
+
+    const handleLogin = async () => {
+        if (!userEmail || !userPassword) {
+            console.error('Please enter both email and password');
+            return;
+        }
+        await login({ userEmail, userPassword });
+    };
+
+    const handleLogout = () => {
+        logout();
+        setUserEmail('');
+        setUserPassword('');
+    };
+
+    const handleUserSelect = (selectedEmail: string) => {
+        setUserEmail(selectedEmail);
+        setUserPassword('');
+    };
+
+    // Populate form fields immediately on component mount (before autologin)
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('userEmail');
+        const savedPassword = localStorage.getItem('userPassword');
+
+        if (savedEmail) {
+            setUserEmail(savedEmail);
+        }
+        if (savedPassword) {
+            setUserPassword(savedPassword);
+        }
+    }, []); // Run only once on mount
+
+    useEffect(() => {
+        autoLogin();
+    }, [autoLogin]);
 
     if (isLoggedIn && sessionStats) {
-        return <SessionDisplay sessionStats={sessionStats} onLogout={handleLogout} />;
+        return (
+            <div className='w-full max-w-md'>
+                <SessionDisplay sessionStats={sessionStats} onLogout={handleLogout} />
+            </div>
+        );
     }
 
     return (
@@ -64,7 +95,7 @@ export function UserCredentials({ onCredentialsChange, availableUsers = [] }: Us
                         onEmailChange={setUserEmail}
                         onPasswordChange={setUserPassword}
                         onTogglePassword={() => setShowPassword(!showPassword)}
-                        onSubmit={() => handleLogin()}
+                        onSubmit={handleLogin}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 handleLogin();
