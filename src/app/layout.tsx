@@ -1,4 +1,5 @@
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { AuthProvider } from '@/contexts/AuthContext';
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
@@ -29,7 +30,9 @@ export default function RootLayout({
         <html lang='en' suppressHydrationWarning>
             <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
                 <ThemeProvider>
-                    <ToastProvider>{children}</ToastProvider>
+                    <AuthProvider>
+                        <ToastProvider>{children}</ToastProvider>
+                    </AuthProvider>
                 </ThemeProvider>
             </body>
         </html>

@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react';
 import { SessionDisplay, UserSelector } from '@/components/auth';
 import { LoginForm } from '@/components/auth/LoginForm';
 import { useSessionState } from '@/hooks/useSessionState';
-import type { AuthCredentials } from '@/types/session';
 
 interface UserCredentialsProps {
     availableUsers?: string[];

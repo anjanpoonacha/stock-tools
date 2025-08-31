@@ -225,7 +225,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                     {isExpanded ? (
                         <Button
                             variant={pathname === '/' ? 'secondary' : 'ghost'}
-                            className='w-full justify-start gap-3 h-10 transition-opacity duration-200 opacity-100'
+                            className={cn(
+                                'w-full justify-start gap-3 h-10 transition-all duration-200',
+                                pathname === '/'
+                                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 border-primary/30 hover:bg-primary/90'
+                                    : 'hover:bg-muted/50'
+                            )}
                             onClick={() => router.push('/')}
                         >
                             <Home className='w-4 h-4 flex-shrink-0' />
@@ -237,7 +242,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                             <TooltipTrigger asChild>
                                 <Button
                                     variant={pathname === '/' ? 'secondary' : 'ghost'}
-                                    className='w-full h-10 p-0 justify-center'
+                                    className={cn(
+                                        'w-full h-10 p-0 justify-center transition-all duration-200',
+                                        pathname === '/'
+                                            ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 scale-105 hover:bg-primary/90'
+                                            : 'hover:bg-muted/50'
+                                    )}
                                     onClick={() => router.push('/')}
                                 >
                                     <Home className='w-4 h-4' />
@@ -271,7 +281,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                                                         <Button
                                                             key={tool.id}
                                                             variant={isActive ? 'secondary' : 'ghost'}
-                                                            className='w-full h-auto p-3 justify-start hover:bg-muted/50 rounded-lg'
+                                                            className={cn(
+                                                                'w-full h-auto p-3 justify-start rounded-lg transition-all duration-200',
+                                                                isActive
+                                                                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 border-primary/30 hover:bg-primary/90'
+                                                                    : 'hover:bg-muted/50'
+                                                            )}
                                                             onClick={() => router.push(tool.href)}
                                                         >
                                                             <div className='flex items-center gap-3 w-full'>
@@ -313,7 +328,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                                                     <Button
                                                         key={tool.id}
                                                         variant={isActive ? 'secondary' : 'ghost'}
-                                                        className='w-full h-auto p-3 justify-start hover:bg-muted/50 rounded-lg'
+                                                        className={cn(
+                                                            'w-full h-auto p-3 justify-start rounded-lg transition-all duration-200',
+                                                            isActive
+                                                                ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 border-primary/30 hover:bg-primary/90'
+                                                                : 'hover:bg-muted/50'
+                                                        )}
                                                         onClick={() => router.push(tool.href)}
                                                     >
                                                         <div className='flex items-center gap-3 w-full'>
@@ -358,7 +378,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                                                     <TooltipTrigger asChild>
                                                         <Button
                                                             variant={isActive ? 'secondary' : 'ghost'}
-                                                            className='w-full h-10 p-0 justify-center border border-primary/20 bg-gradient-to-r from-primary/5 to-primary/10 hover:from-primary/10 hover:to-primary/20'
+                                                            className={cn(
+                                                                'w-full h-10 p-0 justify-center transition-all duration-200',
+                                                                isActive
+                                                                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 scale-105 hover:bg-primary/90'
+                                                                    : 'hover:bg-muted/50'
+                                                            )}
                                                             onClick={() => router.push(tool.href)}
                                                         >
                                                             <div className='w-6 h-6 bg-gradient-to-br from-primary to-primary/80 rounded-md flex items-center justify-center'>
@@ -392,7 +417,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
                                                     <TooltipTrigger asChild>
                                                         <Button
                                                             variant={isActive ? 'secondary' : 'ghost'}
-                                                            className='w-full h-10 p-0 justify-center hover:bg-muted/50'
+                                                            className={cn(
+                                                                'w-full h-10 p-0 justify-center transition-all duration-200',
+                                                                isActive
+                                                                    ? 'bg-primary text-primary-foreground shadow-md ring-2 ring-primary/20 dark:ring-primary/30 scale-105 hover:bg-primary/90'
+                                                                    : 'hover:bg-muted/50'
+                                                            )}
                                                             onClick={() => router.push(tool.href)}
                                                         >
                                                             <div className='w-6 h-6 flex items-center justify-center'>

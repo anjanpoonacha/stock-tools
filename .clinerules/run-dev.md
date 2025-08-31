@@ -1,3 +1,5 @@
+DONT RUN dev server again
+`pnpm run dev` is already running.
 Don't ask for running dev server.
 user has already run `pnpm run dev`
 Assume it is already running and continue with the process like opening the page.

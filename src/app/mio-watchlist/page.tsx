@@ -4,6 +4,8 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { AuthGuard } from '@/components/auth/AuthGuard';
+import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -11,6 +13,7 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/error';
+import { SessionStatus } from '@/components/SessionStatus';
 import { API_ENDPOINTS, UI_CONSTANTS, SUCCESS_MESSAGES } from '@/lib/constants';
 
 interface Watchlist {
@@ -23,7 +26,7 @@ interface APIResponse {
     error?: string;
 }
 
-export default function MioWatchlistPage() {
+function MioWatchlistPageContent() {
     // Watchlist state
     const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
     const [watchlistsLoading, setWatchlistsLoading] = useState(false);
@@ -52,32 +55,32 @@ export default function MioWatchlistPage() {
      * Makes API request with standardized error handling and authentication
      */
     const makeAPIRequest = async (method: string, body: object): Promise<APIResponse> => {
-        // Get authentication token from localStorage
-        const storedTokenData = localStorage.getItem('mio-auth-token');
-        let token = null;
+        // Get stored credentials from localStorage (set by AuthContext)
+        const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
 
-        if (storedTokenData) {
-            try {
-                const tokenData = JSON.parse(storedTokenData);
-                token = tokenData.token;
-            } catch (error) {
-                console.error('Failed to parse token data from localStorage', error);
-            }
+        if (!storedCredentials) {
+            throw new Error('Authentication required. Please log in first.');
         }
 
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
+        let credentials;
+        try {
+            credentials = JSON.parse(storedCredentials);
+        } catch (error) {
+            throw new Error('Invalid authentication data. Please log in again.');
+        }
+
+        const requestBody = {
+            ...body,
+            userEmail: credentials.userEmail,
+            userPassword: credentials.userPassword,
         };
-
-        // Add authentication token if available
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
 
         const response = await fetch(API_ENDPOINTS.MIO_ACTION, {
             method,
-            headers,
-            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody),
         });
 
         const data: APIResponse = await response.json();
@@ -194,114 +197,128 @@ export default function MioWatchlistPage() {
     };
 
     return (
-        <DashboardLayout showHero={false} showSidebar={true}>
-            <div className='max-w-xl mx-auto py-8'>
-                <h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
-                <UsageGuide
-                    title='How to manage your MIO watchlists'
-                    steps={[
-                        'Install the browser extension from the extension folder',
-                        'Visit marketinout.com and log in to your account',
-                        'The extension will automatically capture your session',
-                        'Return to this page - everything will work automatically!',
-                        'Use the tools below to manage your watchlists',
-                    ]}
-                    tips={[
-                        'Symbols should be in MIO format (e.g., TCS.NS, INFY.BO)',
-                        'Use comma-separated format for multiple symbols',
-                        'Group By field helps organize symbols in watchlists',
-                        'If you get session errors, just visit MIO website again',
-                    ]}
-                    className='mb-4'
-                />
-                <Separator className='mb-4' />
+        <div className='max-w-xl mx-auto py-8'>
+            <h1 className='text-2xl font-bold mb-4'>MIO Watchlist Management</h1>
+            <UsageGuide
+                title='How to manage your MIO watchlists'
+                steps={[
+                    'Install the browser extension from the extension folder',
+                    'Visit marketinout.com and log in to your account',
+                    'The extension will automatically capture your session',
+                    'Return to this page - everything will work automatically!',
+                    'Use the tools below to manage your watchlists',
+                ]}
+                tips={[
+                    'Symbols should be in MIO format (e.g., TCS.NS, INFY.BO)',
+                    'Use comma-separated format for multiple symbols',
+                    'Group By field helps organize symbols in watchlists',
+                    'If you get session errors, just visit MIO website again',
+                ]}
+                className='mb-4'
+            />
+            <SessionStatus
+                platform='MarketInOut'
+                sessionId={watchlists.length > 0 ? 'connected' : null}
+                loading={watchlistsLoading}
+                error={
+                    watchlistsError
+                        ? typeof watchlistsError === 'string'
+                            ? watchlistsError
+                            : watchlistsError.message
+                        : null
+                }
+                className='mb-6'
+            />
 
-                <div className='mb-6'>
-                    <h2 className='font-semibold mb-2'>Add to Watchlist</h2>
-                    {watchlistsLoading ? (
-                        <div className='mb-2 text-sm text-muted-foreground'>{UI_CONSTANTS.LOADING_TEXT}</div>
-                    ) : watchlistsError ? (
-                        <div className='mb-2'>
-                            <ErrorDisplay error={watchlistsError} />
-                        </div>
-                    ) : watchlists.length === 0 ? (
-                        <div className='mb-2 text-sm text-muted-foreground'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
-                    ) : (
-                        <div className='mb-2'>
-                            <label className='block mb-1 font-medium'>MIO Watchlist</label>
-                            <Select value={mioWlid} onValueChange={setMioWlid} disabled={watchlists.length === 0}>
-                                <SelectTrigger className='w-full'>
-                                    <SelectValue placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLIST} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {watchlists.map((w) => (
-                                        <SelectItem key={w.id} value={w.id}>
-                                            {w.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                    <Input
-                        className='mb-2'
-                        value={symbols}
-                        onChange={(e) => setSymbols(e.target.value)}
-                        placeholder={UI_CONSTANTS.PLACEHOLDER_SYMBOLS}
-                    />
-                    <Input
-                        className='mb-2'
-                        value={groupBy}
-                        onChange={(e) => setGroupBy(e.target.value)}
-                        placeholder={UI_CONSTANTS.PLACEHOLDER_GROUP_BY}
-                    />
-                    <Button onClick={handleAddWatchlist} disabled={loading}>
-                        Add to Watchlist
-                    </Button>
-                </div>
-
-                <Separator className='mb-4' />
-
-                <div className='mb-6'>
-                    <h2 className='font-semibold mb-2'>Create New Watchlist</h2>
-                    <Input
-                        className='mb-2'
-                        value={watchlistName}
-                        onChange={(e) => setWatchlistName(e.target.value)}
-                        placeholder={UI_CONSTANTS.PLACEHOLDER_WATCHLIST_NAME}
-                    />
-                    <Button onClick={handleCreateWatchlist} disabled={loading}>
-                        Create Watchlist
-                    </Button>
-                </div>
-
-                <Separator className='mb-4' />
-
-                <div className='mb-6'>
-                    <h2 className='font-semibold mb-2'>Delete Watchlists</h2>
-                    <MultiSelect
-                        options={watchlists.map((w) => ({ label: w.name, value: w.id }))}
-                        onValueChange={setDeleteIds}
-                        value={deleteIds}
-                        placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLISTS_DELETE}
-                        className='mb-2'
-                    />
-                    <Button
-                        variant='destructive'
-                        onClick={handleDeleteWatchlists}
-                        disabled={loading || deleteIds.length === 0}
-                    >
-                        Delete Watchlists
-                    </Button>
-                </div>
-
-                {result && <div className='text-green-600 dark:text-green-400 font-medium mb-2'>{result}</div>}
-                {error && (
+            <div className='mb-6'>
+                <h2 className='font-semibold mb-2'>Add to Watchlist</h2>
+                {watchlists.length === 0 && !watchlistsLoading && !watchlistsError ? (
+                    <div className='mb-2 text-sm text-muted-foreground'>{UI_CONSTANTS.NO_WATCHLISTS_FOUND}</div>
+                ) : (
                     <div className='mb-2'>
-                        <ErrorDisplay error={error} />
+                        <label className='block mb-1 font-medium'>MIO Watchlist</label>
+                        <Select value={mioWlid} onValueChange={setMioWlid} disabled={watchlists.length === 0}>
+                            <SelectTrigger className='w-full'>
+                                <SelectValue placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLIST} />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {watchlists.map((w) => (
+                                    <SelectItem key={w.id} value={w.id}>
+                                        {w.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                 )}
+                <Input
+                    className='mb-2'
+                    value={symbols}
+                    onChange={(e) => setSymbols(e.target.value)}
+                    placeholder={UI_CONSTANTS.PLACEHOLDER_SYMBOLS}
+                />
+                <Input
+                    className='mb-2'
+                    value={groupBy}
+                    onChange={(e) => setGroupBy(e.target.value)}
+                    placeholder={UI_CONSTANTS.PLACEHOLDER_GROUP_BY}
+                />
+                <Button onClick={handleAddWatchlist} disabled={loading}>
+                    Add to Watchlist
+                </Button>
             </div>
+
+            <Separator className='mb-4' />
+
+            <div className='mb-6'>
+                <h2 className='font-semibold mb-2'>Create New Watchlist</h2>
+                <Input
+                    className='mb-2'
+                    value={watchlistName}
+                    onChange={(e) => setWatchlistName(e.target.value)}
+                    placeholder={UI_CONSTANTS.PLACEHOLDER_WATCHLIST_NAME}
+                />
+                <Button onClick={handleCreateWatchlist} disabled={loading}>
+                    Create Watchlist
+                </Button>
+            </div>
+
+            <Separator className='mb-4' />
+
+            <div className='mb-6'>
+                <h2 className='font-semibold mb-2'>Delete Watchlists</h2>
+                <MultiSelect
+                    options={watchlists.map((w) => ({ label: w.name, value: w.id }))}
+                    onValueChange={setDeleteIds}
+                    value={deleteIds}
+                    placeholder={UI_CONSTANTS.PLACEHOLDER_SELECT_WATCHLISTS_DELETE}
+                    className='mb-2'
+                />
+                <Button
+                    variant='destructive'
+                    onClick={handleDeleteWatchlists}
+                    disabled={loading || deleteIds.length === 0}
+                >
+                    Delete Watchlists
+                </Button>
+            </div>
+
+            {result && <div className='text-green-600 dark:text-green-400 font-medium mb-2'>{result}</div>}
+            {error && (
+                <div className='mb-2'>
+                    <ErrorDisplay error={error} />
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default function MioWatchlistPage() {
+    return (
+        <DashboardLayout showHero={false} showSidebar={true}>
+            <AuthGuard>
+                <MioWatchlistPageContent />
+            </AuthGuard>
         </DashboardLayout>
     );
 }

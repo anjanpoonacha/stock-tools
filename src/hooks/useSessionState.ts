@@ -1,278 +1,137 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import type { SessionStats, AuthCredentials } from '@/types/session';
-
-interface SessionStateManager {
-	sessionStats: SessionStats | null;
-	isLoading: boolean;
-	error: string | null;
-	credentials: AuthCredentials | null;
-	isLoggedIn: boolean;
-	lastUpdated: number;
-}
-
-// Global session state - shared across all components
-let globalSessionState: SessionStateManager = {
-	sessionStats: null,
-	isLoading: false,
-	error: null,
-	credentials: null,
-	isLoggedIn: false,
-	lastUpdated: 0,
-};
-
-// Subscribers for state changes
-const subscribers = new Set<() => void>();
-
-// Session state update function
-function updateGlobalSessionState(updates: Partial<SessionStateManager>) {
-	globalSessionState = {
-		...globalSessionState,
-		...updates,
-		lastUpdated: Date.now(),
-	};
-
-	// Notify all subscribers
-	subscribers.forEach(callback => callback());
-}
-
-// Session API call with deduplication
-let activeSessionRequest: Promise<SessionStats> | null = null;
-
-async function fetchSessionData(credentials: AuthCredentials, signal?: AbortSignal): Promise<SessionStats> {
-	// If there's already an active request, wait for it
-	if (activeSessionRequest) {
-		return activeSessionRequest;
-	}
-
-	// Create new request
-	activeSessionRequest = performSessionFetch(credentials, signal);
-
-	try {
-		const result = await activeSessionRequest;
-		return result;
-	} finally {
-		// Clear the active request
-		activeSessionRequest = null;
-	}
-}
-
-async function performSessionFetch(credentials: AuthCredentials, signal?: AbortSignal): Promise<SessionStats> {
-	const response = await fetch('/api/session/current', {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify(credentials),
-		signal,
-	});
-
-	const data = await response.json();
-
-	if (!response.ok) {
-		throw new Error(data.details || data.error || 'Session fetch failed');
-	}
-
-	return data;
-}
+import { useCallback, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import type { AuthCredentials } from '@/types/session';
 
 /**
  * Hook for managing unified session state across components
- * Prevents race conditions and ensures consistent data
+ * Now delegates to AuthContext for unified authentication
  */
 export function useSessionState() {
-	const [, forceUpdate] = useState({});
-	const abortControllerRef = useRef<AbortController | null>(null);
+	const auth = useAuth();
 
-	// Force re-render when global state changes
-	const triggerUpdate = useCallback(() => {
-		forceUpdate({});
-	}, []);
-
-	// Subscribe to global state changes
-	useEffect(() => {
-		subscribers.add(triggerUpdate);
-		return () => {
-			subscribers.delete(triggerUpdate);
-		};
-	}, [triggerUpdate]);
-
-	// Cleanup abort controller on unmount
-	useEffect(() => {
-		return () => {
-			if (abortControllerRef.current) {
-				abortControllerRef.current.abort();
-			}
-		};
-	}, []);
+	// Migration is now handled by AuthContext automatically
 
 	const login = useCallback(async (credentials: AuthCredentials) => {
-		// Cancel any existing request
-		if (abortControllerRef.current) {
-			abortControllerRef.current.abort();
-		}
-
-		// Create new abort controller
-		abortControllerRef.current = new AbortController();
-
-		// Update loading state
-		updateGlobalSessionState({
-			isLoading: true,
-			error: null,
-			credentials,
-		});
-
-		try {
-			const sessionStats = await fetchSessionData(credentials, abortControllerRef.current.signal);
-
-			// Save credentials to localStorage
-			localStorage.setItem('userEmail', credentials.userEmail);
-			localStorage.setItem('userPassword', credentials.userPassword);
-
-			// Update success state
-			updateGlobalSessionState({
-				sessionStats,
-				isLoading: false,
-				error: null,
-				credentials,
-				isLoggedIn: true,
-			});
-		} catch (error) {
-			if (error instanceof Error && error.name === 'AbortError') {
-				// IMPORTANT: Reset loading state even when aborted
-				updateGlobalSessionState({
-					isLoading: false,
-				});
-				return;
-			}
-
-			const errorMessage = error instanceof Error ? error.message : 'Login failed';
-
-			updateGlobalSessionState({
-				isLoading: false,
-				error: errorMessage,
-				isLoggedIn: false,
-			});
-		}
-	}, []);
+		console.log('[useSessionState] Delegating login to AuthContext');
+		return await auth.login(credentials);
+	}, [auth]);
 
 	const logout = useCallback(() => {
-		// Cancel any active request
-		if (abortControllerRef.current) {
-			abortControllerRef.current.abort();
-		}
-
-		// Clear localStorage
+		console.log('[useSessionState] Delegating logout to AuthContext');
+		// Clean up any remaining old keys
 		localStorage.removeItem('userEmail');
 		localStorage.removeItem('userPassword');
-
-		// Reset state
-		updateGlobalSessionState({
-			sessionStats: null,
-			isLoading: false,
-			error: null,
-			credentials: null,
-			isLoggedIn: false,
-		});
-	}, []);
+		auth.logout();
+	}, [auth]);
 
 	const refreshSession = useCallback(async () => {
-		if (!globalSessionState.credentials) {
-			return;
-		}
+		console.log('[useSessionState] Delegating refresh to AuthContext');
+		await auth.checkAuthStatus();
+	}, [auth]);
 
-		await login(globalSessionState.credentials);
-	}, [login]);
-
-	// Auto-login with saved credentials - simplified
+	// Auto-login now handled by AuthContext
 	const autoLogin = useCallback(async () => {
-		const savedEmail = localStorage.getItem('userEmail');
-		const savedPassword = localStorage.getItem('userPassword');
-
-		// Only auto-login if we have credentials and are not already logged in
-		if (savedEmail && savedPassword && !globalSessionState.isLoggedIn && !globalSessionState.isLoading) {
-			// Set loading state immediately
-			updateGlobalSessionState({
-				isLoading: true,
-				error: null,
-				credentials: { userEmail: savedEmail, userPassword: savedPassword },
-			});
-
-			try {
-				const sessionStats = await performSessionFetch(
-					{ userEmail: savedEmail, userPassword: savedPassword }
-				);
-
-				// Update success state
-				updateGlobalSessionState({
-					sessionStats,
-					isLoading: false,
-					error: null,
-					credentials: { userEmail: savedEmail, userPassword: savedPassword },
-					isLoggedIn: true,
-				});
-
-			} catch (error) {
-				// Clear saved credentials on failure
-				localStorage.removeItem('userEmail');
-				localStorage.removeItem('userPassword');
-
-				updateGlobalSessionState({
-					isLoading: false,
-					error: null, // Don't show auto-login errors to user
-					credentials: null,
-					isLoggedIn: false,
-				});
-			}
-		}
+		// AuthContext handles auto-login in its useEffect
+		// This is kept for API compatibility but does nothing
+		console.log('[useSessionState] Auto-login handled by AuthContext');
 	}, []);
 
-	return {
-		// State
-		sessionStats: globalSessionState.sessionStats,
-		isLoading: globalSessionState.isLoading,
-		error: globalSessionState.error,
-		credentials: globalSessionState.credentials,
-		isLoggedIn: globalSessionState.isLoggedIn,
-		lastUpdated: globalSessionState.lastUpdated,
+	// Map AuthContext state to useSessionState API
+	const mapSessionStats = (authStatus: typeof auth.authStatus) => {
+		if (!authStatus?.sessionStats) return null;
 
-		// Actions
+		const authSessionStats = authStatus.sessionStats;
+		return {
+			hasSession: authSessionStats.platforms ?
+				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+			sessionAvailable: authSessionStats.platforms ?
+				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+			availableUsers: authSessionStats.availableUsers || [],
+			currentUser: authSessionStats.currentUser,
+			platforms: authSessionStats.platforms ? {
+				marketinout: authSessionStats.platforms.marketinout ? {
+					hasSession: authSessionStats.platforms.marketinout.sessionAvailable,
+					sessionAvailable: authSessionStats.platforms.marketinout.sessionAvailable
+				} : undefined,
+				tradingview: authSessionStats.platforms.tradingview ? {
+					hasSession: authSessionStats.platforms.tradingview.sessionAvailable,
+					sessionAvailable: authSessionStats.platforms.tradingview.sessionAvailable
+				} : undefined
+			} : undefined,
+			message: authSessionStats.message
+		};
+	};
+
+	return {
+		// State - mapped from AuthContext
+		sessionStats: mapSessionStats(auth.authStatus),
+		isLoading: auth.isLoading,
+		error: auth.error,
+		credentials: auth.authStatus ? {
+			userEmail: auth.authStatus.userEmail,
+			userPassword: '' // Don't expose password
+		} : null,
+		isLoggedIn: auth.isAuthenticated(),
+		lastUpdated: Date.now(), // AuthContext doesn't track this, so use current time
+
+		// Actions - delegated to AuthContext
 		login,
 		logout,
 		refreshSession,
 		autoLogin,
 
 		// Utilities
-		clearError: () => updateGlobalSessionState({ error: null }),
+		clearError: () => {
+			// AuthContext doesn't have clearError, so this is a no-op
+			console.log('[useSessionState] clearError called - handled by AuthContext');
+		},
 	};
 }
 
 /**
  * Hook for components that only need to read session state
+ * Now delegates to AuthContext
  */
 export function useSessionStateReader() {
-	const [, forceUpdate] = useState({});
+	const auth = useAuth();
 
-	// Force re-render when global state changes
-	const triggerUpdate = useCallback(() => {
-		forceUpdate({});
-	}, []);
+	// Map AuthContext state to useSessionStateReader API
+	const mapSessionStats = (authStatus: typeof auth.authStatus) => {
+		if (!authStatus?.sessionStats) return null;
 
-	// Subscribe to global state changes
-	useEffect(() => {
-		subscribers.add(triggerUpdate);
-		return () => {
-			subscribers.delete(triggerUpdate);
+		const authSessionStats = authStatus.sessionStats;
+		return {
+			hasSession: authSessionStats.platforms ?
+				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+			sessionAvailable: authSessionStats.platforms ?
+				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+			availableUsers: authSessionStats.availableUsers || [],
+			currentUser: authSessionStats.currentUser,
+			platforms: authSessionStats.platforms ? {
+				marketinout: authSessionStats.platforms.marketinout ? {
+					hasSession: authSessionStats.platforms.marketinout.sessionAvailable,
+					sessionAvailable: authSessionStats.platforms.marketinout.sessionAvailable
+				} : undefined,
+				tradingview: authSessionStats.platforms.tradingview ? {
+					hasSession: authSessionStats.platforms.tradingview.sessionAvailable,
+					sessionAvailable: authSessionStats.platforms.tradingview.sessionAvailable
+				} : undefined
+			} : undefined,
+			message: authSessionStats.message
 		};
-	}, [triggerUpdate]);
+	};
 
 	return {
-		sessionStats: globalSessionState.sessionStats,
-		isLoading: globalSessionState.isLoading,
-		error: globalSessionState.error,
-		credentials: globalSessionState.credentials,
-		isLoggedIn: globalSessionState.isLoggedIn,
-		lastUpdated: globalSessionState.lastUpdated,
+		sessionStats: mapSessionStats(auth.authStatus),
+		isLoading: auth.isLoading,
+		error: auth.error,
+		credentials: auth.authStatus ? {
+			userEmail: auth.authStatus.userEmail,
+			userPassword: '' // Don't expose password
+		} : null,
+		isLoggedIn: auth.isAuthenticated(),
+		lastUpdated: Date.now(), // AuthContext doesn't track this, so use current time
 	};
 }

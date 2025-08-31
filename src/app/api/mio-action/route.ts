@@ -113,33 +113,28 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 
 		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, { mioWlid, symbols, userEmail: userEmail ? '[PROVIDED]' : '[MISSING]' });
 
-		let sessionInfo: MIOSessionInfo | null = null;
-
-		// Try credential-based authentication first (if credentials provided)
-		if (userEmail && userPassword) {
-			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
-			}
-		}
-
-		// If no credentials provided or credential auth failed, try session-based authentication
-		if (!sessionInfo) {
-			// Try to get the latest available MIO session (fallback)
-			sessionInfo = await SessionResolver.getLatestMIOSession();
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
-			}
-		}
-
-		// If still no session found, return error
-		if (!sessionInfo) {
+		// Require user credentials for authentication
+		if (!userEmail || !userPassword) {
 			return createErrorResponse(
-				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				'Authentication required - userEmail and userPassword must be provided',
 				HTTP_STATUS.UNAUTHORIZED,
 				true
 			);
 		}
+
+		// Try credential-based authentication for the specific user
+		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+
+		if (!sessionInfo) {
+			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+			return createErrorResponse(
+				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
+		}
+
+		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 
 		// If no specific action requested, treat as "get watchlists"
 		if (!mioWlid && !symbols) {
@@ -164,34 +159,28 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 			return createErrorResponse(ERROR_MESSAGES.NAME_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		let sessionInfo: MIOSessionInfo | null = null;
-
-		// Try credential-based authentication first (if credentials provided)
-		if (userEmail && userPassword) {
-			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
-			}
-		}
-
-		// If no credentials provided or credential auth failed, try session-based authentication
-		if (!sessionInfo) {
-			// Try to get the latest available MIO session (fallback)
-			sessionInfo = await SessionResolver.getLatestMIOSession();
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
-			}
-		}
-
-		// If still no session found, return error
-		if (!sessionInfo) {
+		// Require user credentials for authentication
+		if (!userEmail || !userPassword) {
 			return createErrorResponse(
-				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				'Authentication required - userEmail and userPassword must be provided',
 				HTTP_STATUS.UNAUTHORIZED,
 				true
 			);
 		}
 
+		// Try credential-based authentication for the specific user
+		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+
+		if (!sessionInfo) {
+			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+			return createErrorResponse(
+				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
+		}
+
+		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 		console.log(`${LOG_PREFIXES.API} Creating watchlist with session: ${sessionInfo.internalId}`);
 
 		try {
@@ -222,34 +211,28 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 			return createErrorResponse(ERROR_MESSAGES.DELETE_IDS_REQUIRED, HTTP_STATUS.BAD_REQUEST);
 		}
 
-		let sessionInfo: MIOSessionInfo | null = null;
-
-		// Try credential-based authentication first (if credentials provided)
-		if (userEmail && userPassword) {
-			sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
-			}
-		}
-
-		// If no credentials provided or credential auth failed, try session-based authentication
-		if (!sessionInfo) {
-			// Try to get the latest available MIO session (fallback)
-			sessionInfo = await SessionResolver.getLatestMIOSession();
-			if (sessionInfo) {
-				console.log(`${LOG_PREFIXES.API} Using session-based authentication with session: ${sessionInfo.internalId}`);
-			}
-		}
-
-		// If still no session found, return error
-		if (!sessionInfo) {
+		// Require user credentials for authentication
+		if (!userEmail || !userPassword) {
 			return createErrorResponse(
-				'Authentication required - either provide userEmail and userPassword, or ensure a valid session exists',
+				'Authentication required - userEmail and userPassword must be provided',
 				HTTP_STATUS.UNAUTHORIZED,
 				true
 			);
 		}
 
+		// Try credential-based authentication for the specific user
+		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
+
+		if (!sessionInfo) {
+			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+			return createErrorResponse(
+				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
+				HTTP_STATUS.UNAUTHORIZED,
+				true
+			);
+		}
+
+		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 		console.log(`${LOG_PREFIXES.API} Deleting watchlists with session: ${sessionInfo.internalId}`);
 
 		try {
