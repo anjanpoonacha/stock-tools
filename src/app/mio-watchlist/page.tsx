@@ -5,7 +5,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
-import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -15,6 +14,7 @@ import { UsageGuide } from '@/components/UsageGuide';
 import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '@/components/SessionStatus';
 import { API_ENDPOINTS, UI_CONSTANTS, SUCCESS_MESSAGES } from '@/lib/constants';
+import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 
 interface Watchlist {
     id: string;
@@ -27,6 +27,9 @@ interface APIResponse {
 }
 
 function MioWatchlistPageContent() {
+    // Session availability
+    const { mioSessionAvailable, loading: sessionAvailabilityLoading } = useSessionAvailability();
+    
     // Watchlist state
     const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
     const [watchlistsLoading, setWatchlistsLoading] = useState(false);
@@ -65,7 +68,7 @@ function MioWatchlistPageContent() {
         let credentials;
         try {
             credentials = JSON.parse(storedCredentials);
-        } catch (error) {
+        } catch {
             throw new Error('Invalid authentication data. Please log in again.');
         }
 
@@ -149,10 +152,27 @@ function MioWatchlistPageContent() {
         setLoading(false);
     };
 
-    // Fetch watchlists on component mount
+    // Fetch watchlists only when MIO session is available
     useEffect(() => {
+        // Only fetch watchlists if session availability check is complete and MIO session is available
+        if (sessionAvailabilityLoading) {
+            // Still checking session availability
+            setWatchlistsLoading(true);
+            return;
+        }
+
+        if (!mioSessionAvailable) {
+            // No MIO session available - don't make API call
+            setWatchlistsLoading(false);
+            setWatchlistsError('No MarketInOut session found. Please use the browser extension to capture sessions from marketinout.com');
+            console.log('[MIO-WATCHLIST] Skipping watchlists fetch - no session available');
+            return;
+        }
+
+        // MIO session is available - proceed with fetching watchlists
+        console.log('[MIO-WATCHLIST] Fetching watchlists - session available');
         fetchWatchlists();
-    }, [fetchWatchlists]);
+    }, [mioSessionAvailable, sessionAvailabilityLoading, fetchWatchlists]);
 
     /**
      * Adds symbols to selected watchlist

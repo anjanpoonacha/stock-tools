@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { UserCredentials, AuthStatus, UserCredentialsSchema } from '@/types/auth';
 
 interface AuthContextType {
@@ -107,14 +107,77 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     // Validate stored credentials
                     const validatedCredentials = UserCredentialsSchema.safeParse(credentials);
                     if (validatedCredentials.success) {
-                        // For now, just trust stored credentials without verification to avoid loops
-                        // Verification can happen on actual API calls
-                        const validatedStatus = {
-                            ...status,
-                            isAuthenticated: true,
-                            userEmail: validatedCredentials.data.userEmail,
-                        };
-                        setAuthStatus(validatedStatus);
+                        console.log('[AuthContext] Validating stored credentials with backend');
+                        
+                        // CRITICAL FIX: Always validate stored credentials against backend
+                        // This prevents stale session state when KV data is removed
+                        try {
+                            const response = await fetch('/api/session/current', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(validatedCredentials.data),
+                            });
+
+                            if (response.ok) {
+                                const data = await response.json();
+                                const platforms = data.platforms || data.sessionStats?.platforms;
+
+                                // CRITICAL: Check if the response actually contains valid session data
+                                // API returns 200 OK even when no sessions exist, so we need to check the data
+                                const hasValidSessions = data.hasSession || data.sessionAvailable || 
+                                    (platforms && Object.values(platforms).some((p: any) => p?.sessionAvailable));
+
+                                if (hasValidSessions) {
+                                    // Update with fresh session data from backend
+                                    const freshAuthStatus: AuthStatus = {
+                                        isAuthenticated: true,
+                                        userEmail: validatedCredentials.data.userEmail,
+                                        sessionStats: {
+                                            platforms: platforms || {},
+                                            message: data.message || 'User authenticated',
+                                            availableUsers: data.availableUsers,
+                                            currentUser: data.currentUser || validatedCredentials.data.userEmail,
+                                        },
+                                    };
+
+                                    // Update stored auth status with fresh data
+                                    localStorage.setItem(AUTH_STATUS_KEY, JSON.stringify(freshAuthStatus));
+                                    setAuthStatus(freshAuthStatus);
+                                    console.log('[AuthContext] Stored credentials validated and updated with fresh session data');
+                                } else {
+                                    // Credentials are valid but no sessions exist - update with no-session state
+                                    const noSessionAuthStatus: AuthStatus = {
+                                        isAuthenticated: true,
+                                        userEmail: validatedCredentials.data.userEmail,
+                                        sessionStats: {
+                                            platforms: platforms || {},
+                                            message: data.message || 'No sessions found',
+                                            availableUsers: data.availableUsers,
+                                            currentUser: data.currentUser || validatedCredentials.data.userEmail,
+                                        },
+                                    };
+
+                                    // Update stored auth status with no-session state
+                                    localStorage.setItem(AUTH_STATUS_KEY, JSON.stringify(noSessionAuthStatus));
+                                    setAuthStatus(noSessionAuthStatus);
+                                    console.log('[AuthContext] Stored credentials valid but no sessions found - updated with fresh no-session state');
+                                }
+                            } else {
+                                // Credentials are no longer valid, clear them
+                                console.log('[AuthContext] Stored credentials are invalid, clearing');
+                                localStorage.removeItem(AUTH_STORAGE_KEY);
+                                localStorage.removeItem(AUTH_STATUS_KEY);
+                                setAuthStatus(null);
+                            }
+                        } catch (error) {
+                            console.error('[AuthContext] Error validating stored credentials:', error);
+                            // On validation error, clear stored credentials to be safe
+                            localStorage.removeItem(AUTH_STORAGE_KEY);
+                            localStorage.removeItem(AUTH_STATUS_KEY);
+                            setAuthStatus(null);
+                        }
                     } else {
                         // Clear invalid stored credentials
                         localStorage.removeItem(AUTH_STORAGE_KEY);
@@ -135,52 +198,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         loadStoredAuth();
     }, []); // Empty dependency array - run only once on mount
 
-    type VerificationResult = {
-        isValid: boolean;
-        shouldClearAuth: boolean;
-        error?: string;
-    };
-
-    const verifyCredentials = async (credentials: UserCredentials): Promise<VerificationResult> => {
-        try {
-            const response = await fetch('/api/session/current', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(credentials),
-            });
-
-            if (response.ok) {
-                return { isValid: true, shouldClearAuth: false };
-            }
-
-            // Check specific error codes
-            if (response.status === 401 || response.status === 403) {
-                // Invalid credentials - should clear auth
-                return {
-                    isValid: false,
-                    shouldClearAuth: true,
-                    error: 'Invalid credentials',
-                };
-            }
-
-            // Server errors, network issues - keep auth but mark as unverified
-            return {
-                isValid: false,
-                shouldClearAuth: false,
-                error: `Server error: ${response.status}`,
-            };
-        } catch (error) {
-            console.error('[AuthContext] Error verifying credentials:', error);
-            // Network errors - keep auth
-            return {
-                isValid: false,
-                shouldClearAuth: false,
-                error: 'Network error - will retry later',
-            };
-        }
-    };
 
     const login = async (credentials: UserCredentials): Promise<boolean> => {
         try {
@@ -308,7 +325,7 @@ export function useRequireAuth() {
             // This hook can be used to trigger auth requirements
             // Components can use this to show auth prompts
         }
-    }, [auth.isLoading, auth.requiresAuth]);
+    }, [auth.isLoading, auth.requiresAuth, auth]);
 
     return {
         ...auth,

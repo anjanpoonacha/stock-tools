@@ -9,6 +9,7 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { EditorWithClipboard } from '@/components/EditorWithClipboard';
 import { regroupTVWatchlist, RegroupOption } from '@/lib/utils';
 import { useSessionBridge } from '@/lib/useSessionBridge';
+import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { Badge } from '@/components/ui/badge';
 import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
@@ -25,6 +26,7 @@ const MioSyncPageContent: React.FC = () => {
     const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
     const [mioWatchlistsError, setMioWatchlistsError] = useState<Error | string | null>(null);
     const [sessionId, sessionLoading, sessionError] = useSessionBridge('tradingview');
+    const { mioSessionAvailable, loading: sessionAvailabilityLoading } = useSessionAvailability();
     const [symbols, setSymbols] = useState('');
     const regroupOptions: { value: RegroupOption; label: string }[] = [
         { value: 'Industry', label: 'Industry' },
@@ -56,11 +58,26 @@ const MioSyncPageContent: React.FC = () => {
     }, []);
 
     React.useEffect(() => {
-        // Fetch MIO watchlists automatically on component mount
+        // Only fetch MIO watchlists if session availability check is complete and MIO session is available
+        if (sessionAvailabilityLoading) {
+            // Still checking session availability
+            setMioWatchlistsLoading(true);
+            return;
+        }
+
+        if (!mioSessionAvailable) {
+            // No MIO session available - don't make API call
+            setMioWatchlistsLoading(false);
+            setMioWatchlistsError('No MarketInOut session found. Please use the browser extension to capture sessions from marketinout.com');
+            console.log('[SYNC] Skipping MIO watchlists fetch - no session available');
+            return;
+        }
+
+        // MIO session is available - proceed with fetching watchlists
         setMioWatchlistsLoading(true);
         setMioWatchlistsError(null);
 
-        console.log('[SYNC] Fetching MIO watchlists automatically');
+        console.log('[SYNC] Fetching MIO watchlists - session available');
 
         // Get stored credentials from localStorage (set by AuthContext)
         const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
@@ -74,7 +91,7 @@ const MioSyncPageContent: React.FC = () => {
         let credentials;
         try {
             credentials = JSON.parse(storedCredentials);
-        } catch (error) {
+        } catch {
             setMioWatchlistsError('Invalid authentication data. Please log in again.');
             setMioWatchlistsLoading(false);
             return;
@@ -103,7 +120,7 @@ const MioSyncPageContent: React.FC = () => {
                 setMioWatchlistsError(message);
             })
             .finally(() => setMioWatchlistsLoading(false));
-    }, []);
+    }, [mioSessionAvailable, sessionAvailabilityLoading]);
 
     React.useEffect(() => {
         // Inline fetchWatchlists to avoid dependency warning
@@ -330,7 +347,7 @@ const MioSyncPageContent: React.FC = () => {
             let credentials;
             try {
                 credentials = JSON.parse(storedCredentials);
-            } catch (error) {
+            } catch {
                 throw new Error('Invalid authentication data. Please log in again.');
             }
 

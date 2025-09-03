@@ -26,7 +26,7 @@ async function testSessionBridgeFetch(platform) {
         let credentials;
         try {
             credentials = JSON.parse(storedCredentials);
-        } catch (error) {
+        } catch {
             throw new Error('Invalid authentication data. Please log in again.');
         }
 

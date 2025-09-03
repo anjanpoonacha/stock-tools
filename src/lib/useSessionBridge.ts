@@ -39,7 +39,7 @@ export function useSessionBridge(platform: Platform): [string | null, boolean, s
 				let credentials;
 				try {
 					credentials = JSON.parse(storedCredentials);
-				} catch (error) {
+				} catch {
 					throw new Error('Invalid authentication data. Please log in again.');
 				}
 

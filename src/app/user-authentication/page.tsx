@@ -15,35 +15,11 @@ interface UserCredentials {
 }
 
 export default function UserAuthTestPage() {
-    const [availableUsers, setAvailableUsers] = useState<string[]>([]);
-
     // Use unified session state - no more duplicate API calls!
     const { sessionStats, isLoading, credentials } = useSessionStateReader();
 
-    const loadAvailableUsers = useCallback(async () => {
-        try {
-            const response = await fetch('/api/session/current');
-            const data = await response.json();
-
-            if (data.availableUsers) {
-                setAvailableUsers(data.availableUsers);
-            }
-        } catch (error) {
-            console.error('Error loading available users:', error);
-        }
-    }, []);
-
-    // Load available users on component mount
-    useEffect(() => {
-        loadAvailableUsers();
-    }, [loadAvailableUsers]);
-
-    // Refresh available users when session state changes
-    useEffect(() => {
-        if (credentials) {
-            loadAvailableUsers();
-        }
-    }, [credentials, loadAvailableUsers]);
+    // Get available users from authenticated session stats instead of insecure GET call
+    const availableUsers = sessionStats?.availableUsers || [];
 
     return (
         <DashboardLayout showHero={false} showSidebar={true}>

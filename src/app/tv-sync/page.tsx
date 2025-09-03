@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
-import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '../../components/ui/input';
 import { EditorWithClipboard } from '../../components/EditorWithClipboard';
 import { Button } from '../../components/ui/button';
@@ -12,8 +11,8 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '.
 import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
 import { useSessionBridge } from '../../lib/useSessionBridge';
+import { useSessionAvailability } from '../../hooks/useSessionAvailability';
 import { UsageGuide } from '../../components/UsageGuide';
-import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '../../components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '../../lib/sessionErrors';
 
@@ -71,6 +70,7 @@ function TvSyncPageContent() {
     const [grouping, setGrouping] = useState<'Sector' | 'Industry' | 'None'>('None');
     const [output, setOutput] = useState('');
     const [sessionid, sessionLoading, sessionError] = useSessionBridge('tradingview');
+    const { tvSessionAvailable } = useSessionAvailability();
     const [watchlistId, setWatchlistId] = useState('');
     const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
     const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
@@ -82,6 +82,10 @@ function TvSyncPageContent() {
 
     useEffect(() => {
         if (!sessionid) return;
+        if (!tvSessionAvailable) {
+            console.log('[TV-SYNC] Skipping TradingView watchlists fetch - no session available');
+            return;
+        }
         if (fetchingRef.current) return;
         fetchingRef.current = true;
         async function fetchWatchlists() {
@@ -181,7 +185,7 @@ function TvSyncPageContent() {
             }
         }
         fetchWatchlists();
-    }, [sessionid, toast]);
+    }, [sessionid, tvSessionAvailable, toast]);
 
     const handleUrlChange = (i: number, value: string) => {
         const next = [...urls];

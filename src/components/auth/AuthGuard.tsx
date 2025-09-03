@@ -19,7 +19,7 @@ interface AuthGuardProps {
  * Shows authentication prompt if user is not authenticated
  */
 export function AuthGuard({ children, fallback, showLoginPrompt = true }: AuthGuardProps) {
-    const { isAuthenticated, isLoading, error, authStatus } = useAuth();
+    const { isAuthenticated, isLoading, error } = useAuth();
 
     // Show loading state
     if (isLoading) {
