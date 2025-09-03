@@ -24,7 +24,7 @@ const ROUTES = [
     },
     { path: '/mio-watchlist', label: 'Manage MIO Lists', value: 'miowatchlist', icon: List },
     // { path: '/mio-auth', label: 'Authenticator', value: 'mioauth', icon: LogIn },
-    { path: '/user-auth-test', label: 'User Auth Test', value: 'userauth', icon: UserCheck },
+    { path: '/user-authentication', label: 'User Authentication', value: 'userauth', icon: UserCheck },
     { path: '/test-session-flow', label: 'Session Tests', value: 'sessiontest', icon: TestTube },
 ];
 

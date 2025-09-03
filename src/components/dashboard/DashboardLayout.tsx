@@ -12,7 +12,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Search, Zap, Menu } from 'lucide-react';
 import { ActionCard, Tool } from './ActionCard';
-import { StatusIndicator } from './StatusIndicator';
 import { MobileSidebar } from './MobileSidebar';
 import { DesktopSidebar } from './DesktopSidebar';
 import { ThemeToggle } from '../ThemeToggle';
@@ -50,12 +49,12 @@ const TOOLS: Tool[] = [
     },
     {
         id: 'fetch',
-        title: 'Fetch TV Watchlists',
+        title: 'TV Shortlist Fetcher',
         description: 'Download watchlists from TradingView',
         href: '/shortlist-fetcher',
         icon: 'Download' as const,
         category: 'Import/Export',
-        keywords: ['fetch', 'download', 'watchlist', 'tradingview'],
+        keywords: ['fetch', 'download', 'watchlist', 'tradingview', 'shortlist'],
     },
     {
         id: 'converter',
@@ -78,9 +77,9 @@ const TOOLS: Tool[] = [
     },
     {
         id: 'userauth',
-        title: 'User Auth Test',
-        description: 'Test user authentication and sessions',
-        href: '/user-auth-test',
+        title: 'User Authentication',
+        description: 'User authentication and sessions',
+        href: '/user-authentication',
         icon: 'UserCheck' as const,
         category: 'Testing',
         featured: true,
@@ -178,7 +177,6 @@ export function DashboardLayout({ children, showHero = true, showSidebar = true 
 
                         <div className='flex items-center gap-4'>
                             <ThemeToggle />
-                            <StatusIndicator />
 
                             {/* Command Palette Trigger - Hidden on desktop with sidebar */}
                             <Button

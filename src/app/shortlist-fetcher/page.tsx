@@ -1,4 +1,5 @@
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 import ShortlistFetcherClient from './ShortlistFetcherClient';
 
 export const metadata = {
@@ -9,9 +10,11 @@ export const metadata = {
 export default function Page() {
     return (
         <DashboardLayout showHero={false} showSidebar={true}>
-            <div className='max-w-7xl mx-auto'>
-                <ShortlistFetcherClient />
-            </div>
+            <AuthGuard>
+                <div className='max-w-7xl mx-auto'>
+                    <ShortlistFetcherClient />
+                </div>
+            </AuthGuard>
         </DashboardLayout>
     );
 }

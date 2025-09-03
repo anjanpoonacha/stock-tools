@@ -29,7 +29,30 @@ export function useSessionBridge(platform: Platform): [string | null, boolean, s
 				setLoading(true);
 				setError(null);
 
-				const response = await fetch(`/api/session/current?platform=${platform}`);
+				// Get stored credentials from localStorage (same as ShortlistFetcherClient)
+				const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+
+				if (!storedCredentials) {
+					throw new Error('Authentication required. Please log in first.');
+				}
+
+				let credentials;
+				try {
+					credentials = JSON.parse(storedCredentials);
+				} catch {
+					throw new Error('Invalid authentication data. Please log in again.');
+				}
+
+				// Use POST with user credentials instead of GET
+				const response = await fetch(`/api/session/current`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						platform,
+						userEmail: credentials.userEmail,
+						userPassword: credentials.userPassword,
+					}),
+				});
 
 				if (!response.ok) {
 					throw new Error(`Failed to fetch session: ${response.status}`);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { UserCredentials } from '@/components/UserCredentials';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,59 +15,25 @@ interface UserCredentials {
 }
 
 export default function UserAuthTestPage() {
-    const [availableUsers, setAvailableUsers] = useState<string[]>([]);
-
     // Use unified session state - no more duplicate API calls!
     const { sessionStats, isLoading, credentials } = useSessionStateReader();
 
-    const loadAvailableUsers = useCallback(async () => {
-        try {
-            const response = await fetch('/api/session/current');
-            const data = await response.json();
-
-            if (data.availableUsers) {
-                setAvailableUsers(data.availableUsers);
-            }
-        } catch (error) {
-            console.error('Error loading available users:', error);
-        }
-    }, []);
-
-    // Load available users on component mount
-    useEffect(() => {
-        loadAvailableUsers();
-    }, [loadAvailableUsers]);
-
-    // Refresh available users when session state changes
-    useEffect(() => {
-        if (credentials) {
-            loadAvailableUsers();
-        }
-    }, [credentials, loadAvailableUsers]);
-
-    const handleCredentialsChange = useCallback((newCredentials: UserCredentials | null) => {
-        // No need to make API calls here - the unified session state handles it
-        console.log('[UserAuthTestPage] Credentials changed:', newCredentials?.userEmail || 'logged out');
-    }, []);
+    // Get available users from authenticated session stats instead of insecure GET call
+    const availableUsers = sessionStats?.availableUsers || [];
 
     return (
         <DashboardLayout showHero={false} showSidebar={true}>
             <div className='container mx-auto py-8 px-4'>
                 <div className='max-w-4xl mx-auto space-y-8'>
                     <div className='text-center space-y-4'>
-                        <h1 className='text-3xl font-bold'>User Authentication Test</h1>
-                        <p className='text-muted-foreground'>
-                            Test the user credential-based session segregation system
-                        </p>
+                        <h1 className='text-3xl font-bold'>User Authentication</h1>
+                        <p className='text-muted-foreground'>Use the password same as that in the Chrome extension</p>
                     </div>
 
                     <div className='grid grid-cols-1 lg:grid-cols-2 gap-8'>
                         {/* User Credentials Section */}
                         <div className='space-y-4'>
-                            <UserCredentials
-                                onCredentialsChange={handleCredentialsChange}
-                                availableUsers={availableUsers}
-                            />
+                            <UserCredentials availableUsers={availableUsers} />
 
                             {availableUsers.length > 0 && (
                                 <Card>

@@ -9,7 +9,6 @@ import { MultiSelect } from '@/components/ui/multi-select';
 import { useState } from 'react';
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { UsageGuide } from '@/components/UsageGuide';
-import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '@/components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
 
@@ -34,10 +33,33 @@ export default function ShortlistFetcherClient() {
         setWatchlists([]);
         setSelectedIds([]);
         try {
+            // Get stored credentials from localStorage (set by AuthContext)
+            const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+
+            if (!storedCredentials) {
+                throw new Error('Authentication required. Please log in first.');
+            }
+
+            let credentials;
+            try {
+                credentials = JSON.parse(storedCredentials);
+            } catch {
+                throw new Error('Invalid authentication data. Please log in again.');
+            }
+
+            if (!cookie) {
+                throw new Error('TradingView session not available. Please visit TradingView first.');
+            }
+
             const res = await fetch('/api/tv-shortlist', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url, sessionid: cookie }),
+                body: JSON.stringify({
+                    url,
+                    sessionid: cookie,
+                    userEmail: credentials.userEmail,
+                    userPassword: credentials.userPassword,
+                }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -122,7 +144,15 @@ export default function ShortlistFetcherClient() {
                 platform='TradingView'
                 sessionId={cookie}
                 loading={sessionLoading}
-                error={sessionError}
+                error={
+                    error
+                        ? error instanceof Error
+                            ? error.message
+                            : typeof error === 'string'
+                            ? error
+                            : 'Unknown error'
+                        : sessionError
+                }
                 className='mb-6'
             />
 
@@ -142,11 +172,6 @@ export default function ShortlistFetcherClient() {
                 <Button onClick={handleFetch} disabled={loading || !cookie} className='w-full'>
                     {loading ? 'Fetching...' : 'Fetch Watchlists'}
                 </Button>
-                {error && (
-                    <div className='p-3 bg-destructive/10 border border-destructive/20 rounded-lg'>
-                        <ErrorDisplay error={error} />
-                    </div>
-                )}
 
                 {watchlists.length > 0 && (
                     <div className='space-y-4'>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Test useSessionBridge Fix</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            .container {
+                border: 1px solid #ccc;
+                padding: 20px;
+                border-radius: 5px;
+                margin-bottom: 20px;
+            }
+            .log {
+                background-color: #f5f5f5;
+                padding: 10px;
+                border-radius: 5px;
+                max-height: 300px;
+                overflow-y: auto;
+                font-family: monospace;
+                margin-top: 10px;
+            }
+            .success {
+                color: green;
+            }
+            .error {
+                color: red;
+            }
+            button {
+                padding: 10px 15px;
+                background-color: #4caf50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                margin-right: 10px;
+            }
+            button:hover {
+                background-color: #45a049;
+            }
+            input {
+                padding: 8px;
+                margin: 5px 0;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            label {
+                display: block;
+                margin-top: 10px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Test useSessionBridge Fix</h1>
+
+        <div class="container">
+            <h2>User Credentials</h2>
+            <label for="userEmail">Email:</label>
+            <input type="text" id="userEmail" value="anjan" />
+
+            <label for="userPassword">Password:</label>
+            <input type="password" id="userPassword" value="password123" />
+
+            <button id="saveCredentials">Save to localStorage</button>
+        </div>
+
+        <div class="container">
+            <h2>Test Session Bridge</h2>
+            <button id="testTradingView">Test TradingView Session</button>
+            <button id="testMarketInOut">Test MarketInOut Session</button>
+            <button id="clearLog">Clear Log</button>
+
+            <div class="log" id="logOutput"></div>
+        </div>
+
+        <script>
+            // Log function
+            function log(message, isError = false) {
+                const logElement = document.getElementById('logOutput');
+                const logEntry = document.createElement('div');
+                logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logEntry.className = isError ? 'error' : '';
+                logElement.appendChild(logEntry);
+                logElement.scrollTop = logElement.scrollHeight;
+            }
+
+            // Save credentials to localStorage
+            document.getElementById('saveCredentials').addEventListener('click', function () {
+                const userEmail = document.getElementById('userEmail').value;
+                const userPassword = document.getElementById('userPassword').value;
+
+                if (!userEmail || !userPassword) {
+                    log('Please enter both email and password', true);
+                    return;
+                }
+
+                const credentials = {
+                    userEmail,
+                    userPassword,
+                };
+
+                try {
+                    localStorage.setItem('mio-tv-auth-credentials', JSON.stringify(credentials));
+                    log(`Credentials saved for user: ${userEmail}`, false);
+                } catch (error) {
+                    log(`Error saving credentials: ${error.message}`, true);
+                }
+            });
+
+            // Test session bridge function
+            async function testSessionBridge(platform) {
+                log(`Testing useSessionBridge for platform: ${platform}`);
+
+                try {
+                    // Get stored credentials from localStorage
+                    const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+
+                    if (!storedCredentials) {
+                        throw new Error('Authentication required. Please log in first.');
+                    }
+
+                    let credentials;
+                    try {
+                        credentials = JSON.parse(storedCredentials);
+                    } catch (error) {
+                        throw new Error('Invalid authentication data. Please log in again.');
+                    }
+
+                    log(`Using credentials for user: ${credentials.userEmail}`);
+
+                    // Use POST with user credentials
+                    log(`Sending POST request to /api/session/current with platform=${platform}`);
+                    const response = await fetch(`/api/session/current`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            platform,
+                            userEmail: credentials.userEmail,
+                            userPassword: credentials.userPassword,
+                        }),
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch session: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    log(`Response received: ${JSON.stringify(data, null, 2)}`);
+
+                    if (data.hasSession && data.sessionId) {
+                        log(`Success! Session ID found: ${data.sessionId}`, false);
+                        return data.sessionId;
+                    } else {
+                        log(`No session ID found for platform: ${platform}`, true);
+                        return null;
+                    }
+                } catch (err) {
+                    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+                    log(`Error: ${errorMessage}`, true);
+                    return null;
+                }
+            }
+
+            // Test TradingView session
+            document.getElementById('testTradingView').addEventListener('click', function () {
+                testSessionBridge('tradingview');
+            });
+
+            // Test MarketInOut session
+            document.getElementById('testMarketInOut').addEventListener('click', function () {
+                testSessionBridge('marketinout');
+            });
+
+            // Clear log
+            document.getElementById('clearLog').addEventListener('click', function () {
+                document.getElementById('logOutput').innerHTML = '';
+            });
+
+            // Initialize
+            document.addEventListener('DOMContentLoaded', function () {
+                // Check if credentials exist
+                const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+                if (storedCredentials) {
+                    try {
+                        const credentials = JSON.parse(storedCredentials);
+                        document.getElementById('userEmail').value = credentials.userEmail || '';
+                        document.getElementById('userPassword').value = credentials.userPassword || '';
+                        log(`Found existing credentials for user: ${credentials.userEmail}`);
+                    } catch (error) {
+                        log('Found invalid credentials in localStorage', true);
+                    }
+                } else {
+                    log('No credentials found in localStorage', true);
+                }
+            });
+        </script>
+    </body>
+</html>
