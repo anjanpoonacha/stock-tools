@@ -19,7 +19,16 @@ import { GET, POST } from '@/app/api/session/current/route';
 import { SessionResolver } from '@/lib/SessionResolver';
 
 // Get the mocked SessionResolver
-const mockSessionResolver = SessionResolver as any;
+const mockSessionResolver = SessionResolver as {
+  getSessionStats: ReturnType<typeof vi.fn>;
+  hasSessionsForPlatform: ReturnType<typeof vi.fn>;
+  getLatestSession: ReturnType<typeof vi.fn>;
+  getLatestMIOSession: ReturnType<typeof vi.fn>;
+  hasSessionsForPlatformAndUser: ReturnType<typeof vi.fn>;
+  getLatestSessionForUser: ReturnType<typeof vi.fn>;
+  getLatestMIOSessionForUser: ReturnType<typeof vi.fn>;
+  getAvailableUsers: ReturnType<typeof vi.fn>;
+};
 
 /**
  * Test suite to verify session API properly filters by user credentials
@@ -28,7 +37,7 @@ const mockSessionResolver = SessionResolver as any;
 describe('Session API User Filtering Security', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    
+
     // Mock session stats with multiple users
     mockSessionResolver.getSessionStats.mockResolvedValue({
       totalSessions: 4,
@@ -76,7 +85,7 @@ describe('Session API User Filtering Security', () => {
       expect(data.sessionAvailable).toBe(true);
       expect(data.platforms.marketinout.hasSession).toBe(true);
       expect(data.platforms.tradingview.hasSession).toBe(true);
-      
+
       // Verify it returns sessions from all users (security concern)
       expect(mockSessionResolver.hasSessionsForPlatform).toHaveBeenCalledWith('marketinout');
       expect(mockSessionResolver.hasSessionsForPlatform).toHaveBeenCalledWith('tradingview');
@@ -106,7 +115,7 @@ describe('Session API User Filtering Security', () => {
 
       // Mock user-specific session data
       mockSessionResolver.hasSessionsForPlatformAndUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user1@test.com') {
             return Promise.resolve(platform === 'marketinout');
           }
@@ -114,7 +123,7 @@ describe('Session API User Filtering Security', () => {
         }
       );
 
-      mockSessionResolver.getLatestMIOSessionForUser.mockImplementation((credentials: any) => {
+      mockSessionResolver.getLatestMIOSessionForUser.mockImplementation((credentials: { userEmail: string; userPassword: string }) => {
         if (credentials.userEmail === 'user1@test.com') {
           return Promise.resolve({
             internalId: 'mio-user1-session',
@@ -125,7 +134,7 @@ describe('Session API User Filtering Security', () => {
       });
 
       mockSessionResolver.getLatestSessionForUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user1@test.com' && platform === 'tradingview') {
             return Promise.resolve(null); // No TV session for user1
           }
@@ -169,7 +178,7 @@ describe('Session API User Filtering Security', () => {
 
       // Mock different session data for each user
       mockSessionResolver.hasSessionsForPlatformAndUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user1@test.com') {
             return Promise.resolve(platform === 'marketinout'); // User1 has MIO only
           }
@@ -180,7 +189,7 @@ describe('Session API User Filtering Security', () => {
         }
       );
 
-      mockSessionResolver.getLatestMIOSessionForUser.mockImplementation((credentials: any) => {
+      mockSessionResolver.getLatestMIOSessionForUser.mockImplementation((credentials: { userEmail: string; userPassword: string }) => {
         if (credentials.userEmail === 'user1@test.com') {
           return Promise.resolve({
             internalId: 'mio-user1-session',
@@ -191,7 +200,7 @@ describe('Session API User Filtering Security', () => {
       });
 
       mockSessionResolver.getLatestSessionForUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user2@test.com' && platform === 'tradingview') {
             return Promise.resolve({
               internalId: 'tv-user2-session',
@@ -220,10 +229,10 @@ describe('Session API User Filtering Security', () => {
       vi.clearAllMocks();
       mockSessionResolver.getSessionStats.mockResolvedValue({});
       mockSessionResolver.getAvailableUsers.mockResolvedValue(['user1@test.com', 'user2@test.com']);
-      
+
       // Re-setup mocks for user2
       mockSessionResolver.hasSessionsForPlatformAndUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user2@test.com') {
             return Promise.resolve(platform === 'tradingview');
           }
@@ -233,7 +242,7 @@ describe('Session API User Filtering Security', () => {
 
       mockSessionResolver.getLatestMIOSessionForUser.mockResolvedValue(null);
       mockSessionResolver.getLatestSessionForUser.mockImplementation(
-        (platform: string, credentials: any) => {
+        (platform: string, credentials: { userEmail: string; userPassword: string }) => {
           if (credentials.userEmail === 'user2@test.com' && platform === 'tradingview') {
             return Promise.resolve({
               internalId: 'tv-user2-session',

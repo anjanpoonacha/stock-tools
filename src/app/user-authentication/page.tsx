@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { UserCredentials } from '@/components/UserCredentials';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -102,7 +102,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
                 if (storedCredentials && storedAuthStatus) {
                     const credentials = JSON.parse(storedCredentials);
-                    const status = JSON.parse(storedAuthStatus);
 
                     // Validate stored credentials
                     const validatedCredentials = UserCredentialsSchema.safeParse(credentials);
@@ -127,7 +126,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
                                 // CRITICAL: Check if the response actually contains valid session data
                                 // API returns 200 OK even when no sessions exist, so we need to check the data
                                 const hasValidSessions = data.hasSession || data.sessionAvailable || 
-                                    (platforms && Object.values(platforms).some((p: any) => p?.sessionAvailable));
+                                    (platforms && Object.values(platforms).some((p: unknown) => 
+                                        typeof p === 'object' && p !== null && 'sessionAvailable' in p && 
+                                        (p as { sessionAvailable?: boolean }).sessionAvailable
+                                    ));
 
                                 if (hasValidSessions) {
                                     // Update with fresh session data from backend
