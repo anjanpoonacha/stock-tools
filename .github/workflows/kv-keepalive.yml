@@ -17,32 +17,60 @@ jobs:
           TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           echo "Timestamp: $TIMESTAMP"
           
+          # Check if required secrets are set
+          if [ -z "${{ secrets.VERCEL_APP_URL }}" ]; then
+            echo "❌ VERCEL_APP_URL secret is not set!"
+            echo "Please add your Vercel app URL to GitHub secrets"
+            exit 1
+          fi
+          
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "❌ CRON_SECRET secret is not set!"
+            echo "Please add the cron secret to GitHub secrets"
+            exit 1
+          fi
+          
+          echo "🌐 Using URL: ${{ secrets.VERCEL_APP_URL }}"
+          
           # Step 1: Write operation to KV
           echo "📝 Writing to KV storage..."
-          WRITE_RESPONSE=$(curl -s -w "%{http_code}" \
+          WRITE_RESPONSE=$(curl -s -w "\n%{http_code}" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
             "${{ secrets.VERCEL_APP_URL }}/api/kv-health")
           
-          WRITE_CODE="${WRITE_RESPONSE: -3}"
+          # Extract HTTP status code (last line)
+          WRITE_CODE=$(echo "$WRITE_RESPONSE" | tail -n1)
+          WRITE_BODY=$(echo "$WRITE_RESPONSE" | head -n -1)
+          
+          echo "Write Response Code: $WRITE_CODE"
+          echo "Write Response Body: $WRITE_BODY"
           
           if [ "$WRITE_CODE" = "200" ]; then
             echo "✅ KV write operation successful"
           else
             echo "❌ KV write failed with code: $WRITE_CODE"
+            echo "Response: $WRITE_BODY"
             exit 1
           fi
           
           # Step 2: Read operation from KV
           echo "📖 Reading from KV storage..."
-          READ_RESPONSE=$(curl -s -w "%{http_code}" \
+          READ_RESPONSE=$(curl -s -w "\n%{http_code}" \
             "${{ secrets.VERCEL_APP_URL }}/api/kv-status")
           
-          READ_CODE="${READ_RESPONSE: -3}"
+          # Extract HTTP status code (last line)
+          READ_CODE=$(echo "$READ_RESPONSE" | tail -n1)
+          READ_BODY=$(echo "$READ_RESPONSE" | head -n -1)
+          
+          echo "Read Response Code: $READ_CODE"
+          echo "Read Response Body: $READ_BODY"
           
           if [ "$READ_CODE" = "200" ]; then
             echo "✅ KV read operation successful"
             echo "🎉 KV storage is active and healthy!"
           else
             echo "❌ KV read failed with code: $READ_CODE"
+            echo "Response: $READ_BODY"
             exit 1
           fi
