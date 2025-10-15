@@ -1,0 +1,48 @@
+name: Keep Vercel KV Active
+
+on:
+  schedule:
+    # Run every 12 hours (at 00:00 and 12:00 UTC)
+    - cron: '0 0,12 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  kv-keepalive:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: KV Write and Read Operations
+        run: |
+          echo "🚀 Starting KV keep-alive operations..."
+          TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          echo "Timestamp: $TIMESTAMP"
+          
+          # Step 1: Write operation to KV
+          echo "📝 Writing to KV storage..."
+          WRITE_RESPONSE=$(curl -s -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.VERCEL_APP_URL }}/api/kv-health")
+          
+          WRITE_CODE="${WRITE_RESPONSE: -3}"
+          
+          if [ "$WRITE_CODE" = "200" ]; then
+            echo "✅ KV write operation successful"
+          else
+            echo "❌ KV write failed with code: $WRITE_CODE"
+            exit 1
+          fi
+          
+          # Step 2: Read operation from KV
+          echo "📖 Reading from KV storage..."
+          READ_RESPONSE=$(curl -s -w "%{http_code}" \
+            "${{ secrets.VERCEL_APP_URL }}/api/kv-status")
+          
+          READ_CODE="${READ_RESPONSE: -3}"
+          
+          if [ "$READ_CODE" = "200" ]; then
+            echo "✅ KV read operation successful"
+            echo "🎉 KV storage is active and healthy!"
+          else
+            echo "❌ KV read failed with code: $READ_CODE"
+            exit 1
+          fi
