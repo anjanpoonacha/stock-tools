@@ -1,7 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
 	try {
 		// Get health check data
 		const healthKey = 'kv-health-check';
@@ -18,7 +18,9 @@ export async function GET(request: NextRequest) {
 
 		// Calculate uptime based on health history
 		const now = new Date();
-		const lastCheck = healthData ? new Date((healthData as any).lastCheck) : null;
+		const lastCheck = healthData && typeof healthData === 'object' && 'lastCheck' in healthData
+			? new Date((healthData as { lastCheck: string }).lastCheck)
+			: null;
 		const timeSinceLastCheck = lastCheck ? now.getTime() - lastCheck.getTime() : null;
 
 		// Determine KV status
