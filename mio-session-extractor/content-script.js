@@ -319,12 +319,10 @@
             const result = await chrome.storage.sync.get(['extensionSettings']);
             const settings = result.extensionSettings || {};
 
-            // Update APP_URLS from settings - use only quickSettings for simplicity
             const quickUrls = settings.quickSettings?.appUrls || [];
 
-            // Handle only quickSettings URL objects with enabled/disabled state
             CONFIG.APP_URLS = quickUrls
-                .filter((item) => item && typeof item === 'object' && item.url && item.enabled === true)
+                .filter((item) => item.enabled === true)
                 .map((item) => item.url.trim())
                 .filter((url) => url.length > 0);
 
@@ -529,7 +527,8 @@
         // Method 2: Optimized API calls with authentication token
         const promises = CONFIG.APP_URLS.map(async (appUrl) => {
             try {
-                const response = await fetch(`${appUrl}/api/extension/session`, {
+                const cleanUrl = appUrl.endsWith('/') ? appUrl.slice(0, -1) : appUrl;
+                const response = await fetch(`${cleanUrl}/api/extension/session`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

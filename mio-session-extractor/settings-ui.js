@@ -289,8 +289,14 @@
             elements.quickUserPassword.value = settings.quickSettings?.userPassword || '';
         }
 
-        // Update quick URLs
-        quickUrls = [...(settings.quickSettings?.appUrls ?? [])];
+        // Update quick URLs - ensure object format
+        const appUrls = settings.quickSettings?.appUrls ?? [];
+        quickUrls = appUrls.map(item => {
+            if (typeof item === 'string') {
+                return { url: item, enabled: true };
+            }
+            return item;
+        });
         updateQuickUrlsList();
 
         // Update all slider values
@@ -632,8 +638,13 @@
         const input = elements.quickUrlInput;
         if (!input) return;
 
-        const url = input.value.trim();
+        let url = input.value.trim();
         if (!url) return;
+
+        // Remove trailing slash
+        if (url.endsWith('/')) {
+            url = url.slice(0, -1);
+        }
 
         // Validate URL
         try {
@@ -643,14 +654,17 @@
             return;
         }
 
-        // Check for duplicates
-        if (quickUrls.includes(url)) {
+        const isDuplicate = quickUrls.some((urlData) => {
+            return urlData.url === url;
+        });
+        
+        if (isDuplicate) {
             updateStatus('URL already exists', 'warning');
             return;
         }
 
-        // Add URL
-        quickUrls.push(url);
+        // Add URL in object format
+        quickUrls.push({ url: url, enabled: true });
         updateQuickUrlsList();
         input.value = '';
         markDirty();
@@ -700,9 +714,8 @@
         container.innerHTML = '';
 
         quickUrls.forEach((urlData, index) => {
-            // Handle both string URLs (legacy) and object URLs (new format)
-            const url = typeof urlData === 'string' ? urlData : urlData.url;
-            const enabled = typeof urlData === 'string' ? true : urlData.enabled !== false;
+            const url = urlData.url;
+            const enabled = urlData.enabled !== false;
 
             const urlItem = document.createElement('div');
             urlItem.className = `url-item ${enabled ? '' : 'url-disabled'}`;
@@ -1007,15 +1020,20 @@
      */
     function handleEditQuickUrl(index) {
         const urlData = quickUrls[index];
-        const currentUrl = typeof urlData === 'string' ? urlData : urlData.url;
+        const currentUrl = urlData.url;
 
         const newUrl = prompt('Edit URL:', currentUrl);
         if (newUrl === null) return; // User cancelled
 
-        const trimmedUrl = newUrl.trim();
+        let trimmedUrl = newUrl.trim();
         if (!trimmedUrl) {
             updateStatus('URL cannot be empty', 'error');
             return;
+        }
+
+        // Remove trailing slash
+        if (trimmedUrl.endsWith('/')) {
+            trimmedUrl = trimmedUrl.slice(0, -1);
         }
 
         // Validate URL
@@ -1026,11 +1044,9 @@
             return;
         }
 
-        // Check for duplicates (excluding current URL)
         const isDuplicate = quickUrls.some((existingUrlData, existingIndex) => {
             if (existingIndex === index) return false;
-            const existingUrl = typeof existingUrlData === 'string' ? existingUrlData : existingUrlData.url;
-            return existingUrl === trimmedUrl;
+            return existingUrlData.url === trimmedUrl;
         });
 
         if (isDuplicate) {
@@ -1038,12 +1054,7 @@
             return;
         }
 
-        // Update URL while preserving enabled state
-        if (typeof urlData === 'string') {
-            quickUrls[index] = trimmedUrl;
-        } else {
-            quickUrls[index] = { ...urlData, url: trimmedUrl };
-        }
+        quickUrls[index] = { ...urlData, url: trimmedUrl };
 
         updateQuickUrlsList();
         markDirty();
@@ -1056,12 +1067,7 @@
     function handleToggleQuickUrl(index) {
         const urlData = quickUrls[index];
 
-        // Convert string URL to object format if needed
-        if (typeof urlData === 'string') {
-            quickUrls[index] = { url: urlData, enabled: false };
-        } else {
-            quickUrls[index] = { ...urlData, enabled: !urlData.enabled };
-        }
+        quickUrls[index] = { ...urlData, enabled: !urlData.enabled };
 
         updateQuickUrlsList();
         markDirty();
