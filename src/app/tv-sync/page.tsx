@@ -15,6 +15,11 @@ import { useSessionAvailability } from '../../hooks/useSessionAvailability';
 import { UsageGuide } from '../../components/UsageGuide';
 import { SessionStatus } from '../../components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '../../lib/sessionErrors';
+import { useUserScreenerUrls } from '../../hooks/useUserScreenerUrls';
+import { ScreenerUrlDialog } from '../../components/ScreenerUrlDialog';
+import { ConfirmationDialog } from '../../components/ConfirmationDialog';
+import { UserScreenerUrl } from '../api/screener-urls/route';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 
 function parseMioSymbols(raw: string): string[] {
     return raw
@@ -76,6 +81,15 @@ function TvSyncPageContent() {
     const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
     const [error, setError] = useState<SessionError | Error | string | null>(null);
     const toast = useToast();
+
+    // User screener URLs management
+    const { urls: userUrls, loading: userUrlsLoading, error: userUrlsError, addUrl: addUserUrl, updateUrl: updateUserUrl, deleteUrl: deleteUserUrl } = useUserScreenerUrls();
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editingUrl, setEditingUrl] = useState<UserScreenerUrl | null>(null);
+    
+    // Confirmation dialog state
+    const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+    const [urlToDelete, setUrlToDelete] = useState<UserScreenerUrl | null>(null);
 
     const fetchedRef = React.useRef<string | null>(null);
     const fetchingRef = React.useRef(false);
@@ -409,6 +423,36 @@ function TvSyncPageContent() {
         }
     }
 
+    // Handle adding/editing user URLs
+    const handleSaveUrl = async (name: string, url: string): Promise<boolean> => {
+        try {
+            let success = false;
+            
+            if (editingUrl) {
+                // Update existing URL
+                success = await updateUserUrl(editingUrl.id, name, url);
+                if (success) {
+                    // Update current URLs if the edited URL is being used
+                    const updatedUrls = urls.map(u => u === editingUrl.url ? url : u);
+                    setUrls(updatedUrls);
+                    toast('Screener URL updated successfully.', 'success');
+                }
+            } else {
+                // Add new URL
+                success = await addUserUrl(name, url);
+                if (success) {
+                    toast('Screener URL added successfully.', 'success');
+                }
+            }
+            
+            return success;
+        } catch (error) {
+            console.error('Error saving URL:', error);
+            toast('Failed to save screener URL.', 'error');
+            return false;
+        }
+    };
+
     // Fetch and group symbols when URLs or grouping changes
     useEffect(() => {
         const abortController = new AbortController();
@@ -537,39 +581,109 @@ function TvSyncPageContent() {
                     </Select>
                 </div>
                 <div>
-                    <Label className='text-sm font-medium'>Screener URLs</Label>
+                    <div className='flex items-center justify-between mb-2'>
+                        <Label className='text-sm font-medium'>Screener URLs</Label>
+                        <Button
+                            type='button'
+                            variant='outline'
+                            size='sm'
+                            onClick={() => {
+                                setEditingUrl(null);
+                                setDialogOpen(true);
+                            }}
+                            className='flex items-center gap-2'
+                        >
+                            <Plus className='h-4 w-4' />
+                            Add Custom URL
+                        </Button>
+                    </div>
+                    
+                    {/* Show user URLs error if any */}
+                    {userUrlsError && (
+                        <div className='mb-3 p-3 bg-red-50 border border-red-200 rounded-md'>
+                            <p className='text-sm text-red-600'>{userUrlsError}</p>
+                        </div>
+                    )}
+                    
                     <div className='mt-2 space-y-3'>
-                        {urls.map((url, i) => (
-                            <div key={i} className='flex items-center gap-2'>
-                                <Select value={url} onValueChange={(val) => handleUrlChange(i, val)}>
-                                    <SelectTrigger className='w-48'>
-                                        <SelectValue placeholder='Select preset' />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {DEFAULT_URLS.map((opt) => (
-                                            <SelectItem key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Input
-                                    value={url}
-                                    onChange={(e) => handleUrlChange(i, e.target.value)}
-                                    className='flex-1'
-                                    placeholder='Paste or edit API URL'
-                                />
-                                <Button
-                                    type='button'
-                                    variant='destructive'
-                                    size='sm'
-                                    onClick={() => removeUrl(i)}
-                                    disabled={urls.length === 1}
-                                >
-                                    Remove
-                                </Button>
-                            </div>
-                        ))}
+                        {urls.map((url, i) => {
+                            // Check if this URL is a user-defined URL
+                            const userUrl = userUrls.find(u => u.url === url);
+                            const isPreset = DEFAULT_URLS.some(preset => preset.value === url);
+                            
+                            return (
+                                <div key={i} className='flex items-center gap-2'>
+                                    <Select value={url} onValueChange={(val) => handleUrlChange(i, val)}>
+                                        <SelectTrigger className='w-48'>
+                                            <SelectValue placeholder='Select URL' />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {/* Preset URLs */}
+                                            {DEFAULT_URLS.map((opt) => (
+                                                <SelectItem key={opt.value} value={opt.value}>
+                                                    {opt.label} (Preset)
+                                                </SelectItem>
+                                            ))}
+                                            {/* User URLs */}
+                                            {userUrls.map((userUrl) => (
+                                                <SelectItem key={userUrl.id} value={userUrl.url}>
+                                                    {userUrl.name} (Custom)
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Input
+                                        value={url}
+                                        onChange={(e) => handleUrlChange(i, e.target.value)}
+                                        className='flex-1'
+                                        placeholder='Paste or edit API URL'
+                                    />
+                                    
+                                    {/* Edit button for user URLs */}
+                                    {userUrl && (
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            size='sm'
+                                            onClick={() => {
+                                                setEditingUrl(userUrl);
+                                                setDialogOpen(true);
+                                            }}
+                                            className='flex items-center gap-1'
+                                        >
+                                            <Edit className='h-3 w-3' />
+                                        </Button>
+                                    )}
+                                    
+                                    {/* Delete button for user URLs */}
+                                    {userUrl && (
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            size='sm'
+                                            onClick={() => {
+                                                setUrlToDelete(userUrl);
+                                                setConfirmDialogOpen(true);
+                                            }}
+                                            className='flex items-center gap-1 text-red-600 hover:text-red-700'
+                                        >
+                                            <Trash2 className='h-3 w-3' />
+                                        </Button>
+                                    )}
+                                    
+                                    {/* Remove from current selection */}
+                                    <Button
+                                        type='button'
+                                        variant='destructive'
+                                        size='sm'
+                                        onClick={() => removeUrl(i)}
+                                        disabled={urls.length === 1}
+                                    >
+                                        Remove
+                                    </Button>
+                                </div>
+                            );
+                        })}
                         <Button type='button' variant='outline' onClick={addUrl} className='w-full'>
                             Add Another URL
                         </Button>
@@ -606,6 +720,44 @@ function TvSyncPageContent() {
                     </Button>
                 </div>
             </div>
+
+            {/* Screener URL Dialog */}
+            <ScreenerUrlDialog
+                open={dialogOpen}
+                onOpenChange={setDialogOpen}
+                onSave={handleSaveUrl}
+                editingUrl={editingUrl}
+            />
+
+            {/* Confirmation Dialog */}
+            <ConfirmationDialog
+                open={confirmDialogOpen}
+                onOpenChange={setConfirmDialogOpen}
+                title="Delete Screener URL"
+                description={`Are you sure you want to delete "${urlToDelete?.name}"? This action cannot be undone.`}
+                confirmText="Delete"
+                cancelText="Cancel"
+                variant="destructive"
+                onConfirm={async () => {
+                    if (urlToDelete) {
+                        const success = await deleteUserUrl(urlToDelete.id);
+                        if (success) {
+                            // Remove from current URLs if it's being used
+                            const updatedUrls = urls.filter(u => u !== urlToDelete.url);
+                            if (updatedUrls.length === 0) {
+                                setUrls([DEFAULT_URLS[0].value]);
+                            } else {
+                                setUrls(updatedUrls);
+                            }
+                            toast('Screener URL deleted successfully.', 'success');
+                        } else {
+                            toast('Failed to delete screener URL.', 'error');
+                        }
+                        setUrlToDelete(null);
+                        setConfirmDialogOpen(false);
+                    }
+                }}
+            />
         </div>
     );
 }
