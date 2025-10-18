@@ -83,7 +83,7 @@ function TvSyncPageContent() {
     const toast = useToast();
 
     // User screener URLs management
-    const { urls: userUrls, loading: userUrlsLoading, error: userUrlsError, addUrl: addUserUrl, updateUrl: updateUserUrl, deleteUrl: deleteUserUrl } = useUserScreenerUrls();
+    const { urls: userUrls, error: userUrlsError, addUrl: addUserUrl, updateUrl: updateUserUrl, deleteUrl: deleteUserUrl } = useUserScreenerUrls();
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingUrl, setEditingUrl] = useState<UserScreenerUrl | null>(null);
     
@@ -609,7 +609,6 @@ function TvSyncPageContent() {
                         {urls.map((url, i) => {
                             // Check if this URL is a user-defined URL
                             const userUrl = userUrls.find(u => u.url === url);
-                            const isPreset = DEFAULT_URLS.some(preset => preset.value === url);
                             
                             return (
                                 <div key={i} className='flex items-center gap-2'>
