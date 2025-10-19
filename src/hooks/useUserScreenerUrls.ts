@@ -46,12 +46,15 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 	const fetchUrls = useCallback(async () => {
 		if (!userEmail || !isAuthenticated()) {
 			setUrls([]);
+			setError(null); // Clear any previous errors when not authenticated
 			return;
 		}
 
 		const credentials = getUserCredentials();
 		if (!credentials) {
-			setError('User credentials not available');
+			setUrls([]);
+			setError(null); // Don't show error when credentials aren't available yet
+			console.log('[useUserScreenerUrls] User credentials not available, skipping fetch');
 			return;
 		}
 
