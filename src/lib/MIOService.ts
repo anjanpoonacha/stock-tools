@@ -293,14 +293,11 @@ export class MIOService {
 			const $ = cheerio.load(html);
 
 			const watchlists: { id: string; name: string }[] = [];
-			let count = 0;
 			$('#sel_wlid option').each((_, el) => {
-				if (count >= 8) return false;
 				const id = $(el).attr('value')?.trim() || '';
 				const name = $(el).text().trim();
 				if (/^\d+$/.test(id) && name) {
 					watchlists.push({ id, name });
-					count++;
 				}
 			});
 
