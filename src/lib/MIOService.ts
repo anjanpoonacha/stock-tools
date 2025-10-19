@@ -292,17 +292,24 @@ export class MIOService {
 			const cheerio = await import('cheerio');
 			const $ = cheerio.load(html);
 
+			// Optimized: Direct element selection and batch processing
+			const optionElements = $('#sel_wlid option').get();
 			const watchlists: { id: string; name: string }[] = [];
-			let count = 0;
-			$('#sel_wlid option').each((_, el) => {
-				if (count >= 8) return false;
-				const id = $(el).attr('value')?.trim() || '';
-				const name = $(el).text().trim();
-				if (/^\d+$/.test(id) && name) {
+
+			// Pre-compile regex for better performance
+			const numericIdRegex = /^\d+$/;
+
+			// Process elements in a single pass without jQuery wrapper overhead
+			for (let i = 0; i < optionElements.length; i++) {
+				const element = optionElements[i];
+				const id = (element.attribs?.value || '').trim();
+				const name = ($(element).text() || '').trim();
+
+				// Early exit conditions for better performance
+				if (id && name && numericIdRegex.test(id)) {
 					watchlists.push({ id, name });
-					count++;
 				}
-			});
+			}
 
 			return watchlists;
 		} catch (error) {

@@ -10,7 +10,7 @@
         quickSettings: {
             userEmail: '', // User email for session identification
             userPassword: '', // User password for session authentication
-            appUrls: ['https://stock-tools-jet.vercel.app'], // Default app URL
+            appUrls: [{ url: 'https://stock-tools-jet.vercel.app', enabled: true }], // Default app URL with enabled state
             enabledPlatforms: {
                 marketinout: true,
                 tradingview: true,
@@ -538,8 +538,6 @@
         }
 
         async migrateSettings() {
-            // Future migration logic can be added here
-            // For now, just ensure we have the current version
             if (!this.settings._version) {
                 this.settings._version = this.migrationVersion;
                 await this.saveSettings();
