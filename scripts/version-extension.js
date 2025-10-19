@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'fs';
+import path from 'path';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const EXTENSION_DIR = 'mio-session-extractor';
 const MANIFEST_PATH = path.join(EXTENSION_DIR, 'manifest.json');
@@ -358,11 +362,12 @@ function main() {
     }
 }
 
-if (require.main === module) {
+// ES module equivalent of require.main === module
+if (import.meta.url === `file://${process.argv[1]}`) {
     main();
 }
 
-module.exports = {
+export {
     getCurrentVersion,
     updateVersion,
     incrementVersion,
