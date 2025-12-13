@@ -34,17 +34,21 @@ function parseRequestBody(body: unknown): unknown {
 	}
 
 	// Fallback: split by comma for legacy comma-separated strings
-	const arr = body
-		.split(',')
-		.map((s) =>
-			s
-				.trim()
-				.replace(/^"+|"+$/g, '')
-				.replace(/^'+|'+$/g, '')
-				.replace(/^\[+|\]+$/g, '')  // Also remove brackets
-		)
-		.filter((s) => s.length > 0 && s !== '""' && s !== "''");
-	return arr;
+	if (typeof body === 'string') {
+		const arr = body
+			.split(',')
+			.map((s) =>
+				s
+					.trim()
+					.replace(/^"+|"+$/g, '')
+					.replace(/^'+|'+$/g, '')
+					.replace(/^\[+|\]+$/g, '')  // Also remove brackets
+			)
+			.filter((s) => s.length > 0 && s !== '""' && s !== "''");
+		return arr;
+	}
+
+	return body;
 }
 
 /**

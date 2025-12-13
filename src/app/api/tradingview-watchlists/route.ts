@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchWatchlistsWithAuth } from '@/lib/tradingview';
-import { validateAndStartMonitoring, getHealthAwareSessionData } from '@/lib/sessionValidation';
+import { validateAndStartMonitoring, getHealthAwareSessionData } from '@/lib/validation';
 import { getSession } from '@/lib/sessionStore';
 
 export async function POST(req: NextRequest) {

@@ -1,20 +1,18 @@
 /**
- * Enhanced session validation with proactive health monitoring integration.
- * Validates sessions and automatically starts health monitoring for valid sessions.
- * Now includes comprehensive error handling with SessionError system.
+ * Platform-specific session validation functions.
+ * Contains validation logic for MarketInOut and TradingView platforms.
  */
-import { MIOService } from './MIOService';
-import { sessionHealthMonitor } from './sessionHealthMonitor';
-import { getSession } from './sessionStore';
+import { MIOService } from '../mio';
+import { getSession } from '../sessionStore';
 import {
 	SessionError,
 	ErrorHandler,
 	Platform,
 	ErrorLogger
-} from './sessionErrors';
+} from '../errors';
 
 // Helper function to validate session ID parameter
-function validateSessionId(sessionId: string, functionName: string, platform: Platform = Platform.UNKNOWN): void {
+export function validateSessionId(sessionId: string, functionName: string, platform: Platform = Platform.UNKNOWN): void {
 	if (!sessionId) {
 		const error = ErrorHandler.createGenericError(
 			platform,
@@ -27,17 +25,18 @@ function validateSessionId(sessionId: string, functionName: string, platform: Pl
 }
 
 // Helper function to cleanup invalid session
-async function cleanupInvalidSession(sessionId: string, platform?: string): Promise<void> {
-	const { deleteSession } = await import('./sessionStore');
+export async function cleanupInvalidSession(sessionId: string, platform?: string): Promise<void> {
+	const { deleteSession } = await import('../sessionStore');
 	deleteSession(sessionId);
 
 	if (platform) {
+		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.stopMonitoring(sessionId, platform);
 	}
 }
 
 // Helper function to handle validation errors consistently
-function handleValidationError(
+export function handleValidationError(
 	error: unknown,
 	sessionId: string,
 	platform: Platform,
@@ -84,6 +83,7 @@ export async function validateAndCleanupMarketinoutSession(
 		}
 
 		console.log(`[SessionValidation] Session validation successful for: ${internalSessionId}`);
+		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.startMonitoring(internalSessionId, 'marketinout');
 		return watchlists;
 	} catch (err: unknown) {
@@ -103,7 +103,7 @@ export async function validateAndCleanupMarketinoutSession(
  * Validate TradingView session using the custom watchlists API endpoint.
  * Uses the new validateTradingViewSession function from tradingview.ts.
  */
-async function validateTradingViewSession(internalSessionId: string): Promise<boolean> {
+export async function validateTradingViewSession(internalSessionId: string): Promise<boolean> {
 	try {
 		validateSessionId(internalSessionId, 'validateTradingViewSession', Platform.TRADINGVIEW);
 
@@ -118,7 +118,7 @@ async function validateTradingViewSession(internalSessionId: string): Promise<bo
 			throw error;
 		}
 
-		const { validateTradingViewSession: validateTVSession } = await import('./tradingview');
+		const { validateTradingViewSession: validateTVSession } = await import('../tradingview');
 		const cookie = `sessionid=${session.tradingview.sessionId}`;
 
 		console.log(`[SessionValidation] Validating TradingView session: ${internalSessionId}`);
@@ -142,6 +142,7 @@ async function validateTradingViewSession(internalSessionId: string): Promise<bo
 			hasValidIds: validationResult.hasValidIds
 		});
 
+		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.startMonitoring(internalSessionId, 'tradingview');
 		return true;
 	} catch (error) {
@@ -200,6 +201,8 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 		const platforms = Object.keys(session);
 		results.summary.totalPlatforms = platforms.length;
 		console.log(`[SessionValidation] Validating ${platforms.length} platforms for session: ${internalSessionId}`);
+
+		const { sessionHealthMonitor } = await import('../health');
 
 		for (const platform of platforms) {
 			try {
@@ -311,160 +314,6 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 }
 
 /**
- * Get session health status with validation context
- * Enhanced with error handling and detailed health information.
- */
-export async function getSessionHealthWithValidation(internalSessionId: string): Promise<{
-	healthReport: {
-		sessionId: string;
-		platforms: {
-			[platform: string]: {
-				internalSessionId: string;
-				platform: string;
-				status: 'healthy' | 'warning' | 'critical' | 'expired';
-				lastSuccessfulCheck: Date | null;
-				lastFailedCheck: Date | null;
-				consecutiveFailures: number;
-				totalChecks: number;
-				totalFailures: number;
-				lastRefreshAttempt: Date | null;
-				lastSuccessfulRefresh: Date | null;
-				nextCheckTime: Date;
-				checkInterval: number;
-				isMonitoring: boolean;
-				lastError?: SessionError;
-				errorHistory: SessionError[];
-				recoveryAttempts: number;
-				lastRecoveryAttempt: Date | null;
-			};
-		};
-		overallStatus: 'healthy' | 'warning' | 'critical' | 'expired';
-		lastUpdated: Date;
-		criticalErrors: SessionError[];
-		recommendedActions: string[];
-		autoRecoveryAvailable: boolean;
-	} | null;
-	sessionExists: boolean;
-	platforms: string[];
-	isBeingMonitored: boolean;
-	timestamp: string;
-	errors?: SessionError[];
-	recommendations?: string[];
-}> {
-	try {
-		validateSessionId(internalSessionId, 'getSessionHealthWithValidation');
-
-		const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
-		const session = await getSession(internalSessionId);
-
-		const result = {
-			healthReport,
-			sessionExists: !!session,
-			platforms: session ? Object.keys(session) : [],
-			isBeingMonitored: !!healthReport,
-			timestamp: new Date().toISOString(),
-			errors: [] as SessionError[],
-			recommendations: [] as string[]
-		};
-
-		// Add recommendations based on health status
-		if (!session) {
-			const error = ErrorHandler.createSessionExpiredError(
-				Platform.UNKNOWN,
-				'getSessionHealthWithValidation',
-				internalSessionId
-			);
-			result.errors.push(error);
-			result.recommendations.push(...error.getRecoveryInstructions());
-		} else if (!healthReport) {
-			result.recommendations.push('Consider starting health monitoring for this session');
-		} else if (healthReport.overallStatus === 'critical' || healthReport.overallStatus === 'expired') {
-			result.recommendations.push('Session appears unhealthy - consider refreshing or re-authenticating');
-		}
-
-		return result;
-	} catch (error) {
-		// If it's already a SessionError, include it in the response
-		if (error instanceof SessionError) {
-			return {
-				healthReport: null,
-				sessionExists: false,
-				platforms: [],
-				isBeingMonitored: false,
-				timestamp: new Date().toISOString(),
-				errors: [error],
-				recommendations: error.getRecoveryInstructions()
-			};
-		}
-
-		// Parse and wrap the error
-		const sessionError = ErrorHandler.parseError(
-			error,
-			Platform.UNKNOWN,
-			'getSessionHealthWithValidation',
-			undefined,
-			undefined
-		);
-		ErrorLogger.logError(sessionError);
-
-		return {
-			healthReport: null,
-			sessionExists: false,
-			platforms: [],
-			isBeingMonitored: false,
-			timestamp: new Date().toISOString(),
-			errors: [sessionError],
-			recommendations: sessionError.getRecoveryInstructions()
-		};
-	}
-}
-
-/**
- * Force refresh and revalidate a session
- */
-export async function forceSessionRefreshAndValidation(
-	internalSessionId: string,
-	platform: string
-): Promise<{ success: boolean; newStatus?: string; error?: string }> {
-	try {
-		validateSessionId(internalSessionId, 'forceSessionRefreshAndValidation');
-
-		if (!platform) {
-			throw new Error('Missing required parameter: platform');
-		}
-
-		console.log(`[SessionValidation] Force refresh and validation for ${platform}:${internalSessionId}`);
-
-		let refreshSuccess = false;
-
-		switch (platform) {
-			case 'marketinout':
-				refreshSuccess = await MIOService.refreshSession(internalSessionId);
-				break;
-			case 'tradingview':
-				// TODO: Implement TradingView refresh
-				refreshSuccess = true;
-				break;
-			default:
-				throw new Error(`Unknown platform: ${platform}`);
-		}
-
-		if (refreshSuccess) {
-			// Perform health check after refresh
-			const newStatus = await sessionHealthMonitor.checkSessionHealth(internalSessionId, platform);
-			return { success: true, newStatus };
-		} else {
-			return { success: false, error: 'Session refresh failed' };
-		}
-
-	} catch (error) {
-		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[SessionValidation] Force refresh failed for ${platform}:${internalSessionId}:`, errorMessage);
-		return { success: false, error: errorMessage };
-	}
-}
-
-/**
  * Validate session and start health monitoring automatically.
  * This is the new unified validation function that combines validation with health monitoring.
  */
@@ -549,6 +398,8 @@ export async function validateAndStartMonitoring(
 		let monitoringStarted = false;
 		let healthStatus: string | undefined;
 
+		const { sessionHealthMonitor } = await import('../health');
+
 		if (isValid) {
 			// Start health monitoring for valid session
 			sessionHealthMonitor.startMonitoring(internalSessionId, platform);
@@ -591,6 +442,7 @@ export async function validateAndStartMonitoring(
 		ErrorLogger.logError(sessionError);
 
 		// Ensure monitoring is stopped on error
+		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
 
 		return {
@@ -598,215 +450,5 @@ export async function validateAndStartMonitoring(
 			error: sessionError,
 			monitoringStarted: false
 		};
-	}
-}
-
-/**
- * Get session data with integrated health status.
- * This provides a unified view of session data including health information.
- */
-export async function getHealthAwareSessionData(internalSessionId: string): Promise<{
-	sessionExists: boolean;
-	platforms: string[];
-	healthReport: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-	overallStatus: 'healthy' | 'warning' | 'critical' | 'expired' | 'unknown';
-	recommendations: string[];
-	canAutoRecover: boolean;
-	timestamp: string;
-}> {
-	try {
-		validateSessionId(internalSessionId, 'getHealthAwareSessionData');
-
-		const session = await getSession(internalSessionId);
-		const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
-
-		const result = {
-			sessionExists: !!session,
-			platforms: session ? Object.keys(session) : [],
-			healthReport,
-			overallStatus: healthReport?.overallStatus || (session ? 'unknown' : 'expired') as any, // eslint-disable-line @typescript-eslint/no-explicit-any
-			recommendations: [] as string[],
-			canAutoRecover: healthReport?.autoRecoveryAvailable || false,
-			timestamp: new Date().toISOString()
-		};
-
-		// Add recommendations based on session and health status
-		if (!session) {
-			result.recommendations.push('Session not found - please re-authenticate');
-		} else if (!healthReport) {
-			result.recommendations.push('Health monitoring not active - consider starting monitoring');
-		} else {
-			result.recommendations.push(...healthReport.recommendedActions);
-		}
-
-		return result;
-
-	} catch (error) {
-		const sessionError = ErrorHandler.parseError(
-			error,
-			Platform.UNKNOWN,
-			'getHealthAwareSessionData',
-			undefined,
-			undefined
-		);
-		ErrorLogger.logError(sessionError);
-
-		return {
-			sessionExists: false,
-			platforms: [],
-			healthReport: null,
-			overallStatus: 'unknown',
-			recommendations: ['Error retrieving session data'],
-			canAutoRecover: false,
-			timestamp: new Date().toISOString()
-		};
-	}
-}
-
-/**
- * Refresh session with integrated health check.
- * This combines session refresh with immediate health validation.
- */
-export async function refreshSessionWithHealthCheck(
-	internalSessionId: string,
-	platform: string
-): Promise<{
-	refreshSuccess: boolean;
-	healthStatus?: string;
-	error?: SessionError;
-	monitoringActive: boolean;
-}> {
-	try {
-		validateSessionId(internalSessionId, 'refreshSessionWithHealthCheck');
-
-		if (!platform) {
-			const error = ErrorHandler.createGenericError(
-				Platform.UNKNOWN,
-				'refreshSessionWithHealthCheck',
-				`Missing required parameter: platform=${platform}`
-			);
-			ErrorLogger.logError(error);
-			return { refreshSuccess: false, error, monitoringActive: false };
-		}
-
-		console.log(`[SessionValidation] Refreshing session with health check for ${platform}:${internalSessionId}`);
-
-		let refreshSuccess = false;
-		let refreshError: SessionError | undefined;
-
-		// Perform platform-specific refresh
-		switch (platform) {
-			case 'marketinout':
-				try {
-					refreshSuccess = await MIOService.refreshSession(internalSessionId);
-				} catch (error) {
-					if (error instanceof SessionError) {
-						refreshError = error;
-					} else {
-						refreshError = ErrorHandler.parseError(
-							error,
-							Platform.MARKETINOUT,
-							'refreshSessionWithHealthCheck',
-							undefined,
-							undefined
-						);
-					}
-				}
-				break;
-
-			case 'tradingview':
-				// TODO: Implement TradingView refresh
-				refreshSuccess = true;
-				break;
-
-			default:
-				refreshError = ErrorHandler.createGenericError(
-					Platform.UNKNOWN,
-					'refreshSessionWithHealthCheck',
-					`Unknown platform: ${platform}`
-				);
-		}
-
-		let healthStatus: string | undefined;
-		let monitoringActive = false;
-
-		if (refreshSuccess) {
-			// Perform health check after successful refresh
-			try {
-				healthStatus = await sessionHealthMonitor.checkSessionHealth(internalSessionId, platform);
-				monitoringActive = sessionHealthMonitor.getSessionHealth(internalSessionId, platform)?.isMonitoring || false;
-
-				console.log(`[SessionValidation] Session refreshed and health checked for ${platform}:${internalSessionId} - Status: ${healthStatus}`);
-			} catch (error) {
-				console.warn(`[SessionValidation] Health check failed after refresh for ${platform}:${internalSessionId}:`, error);
-				// Don't fail the entire operation if health check fails
-			}
-		} else {
-			// Stop monitoring for failed refresh
-			sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
-
-			if (refreshError) {
-				ErrorLogger.logError(refreshError);
-			}
-
-			console.log(`[SessionValidation] Session refresh failed for ${platform}:${internalSessionId}`);
-		}
-
-		return {
-			refreshSuccess,
-			healthStatus,
-			error: refreshError,
-			monitoringActive
-		};
-
-	} catch (error) {
-		const sessionError = ErrorHandler.parseError(
-			error,
-			platform === 'marketinout' ? Platform.MARKETINOUT :
-				platform === 'tradingview' ? Platform.TRADINGVIEW : Platform.UNKNOWN,
-			'refreshSessionWithHealthCheck',
-			undefined,
-			undefined
-		);
-		ErrorLogger.logError(sessionError);
-
-		// Ensure monitoring is stopped on error
-		sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
-
-		return {
-			refreshSuccess: false,
-			error: sessionError,
-			monitoringActive: false
-		};
-	}
-}
-
-/**
- * Stop monitoring for invalid sessions.
- * This is used to clean up monitoring when sessions become invalid.
- */
-export function stopMonitoringOnInvalidSession(
-	internalSessionId: string,
-	platform?: string
-): void {
-	try {
-		validateSessionId(internalSessionId, 'stopMonitoringOnInvalidSession');
-
-		if (platform) {
-			// Stop monitoring for specific platform
-			sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
-			console.log(`[SessionValidation] Stopped monitoring for ${platform}:${internalSessionId}`);
-		} else {
-			// Stop monitoring for all platforms of this session
-			const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
-			if (healthReport) {
-				for (const platformName of Object.keys(healthReport.platforms)) {
-					sessionHealthMonitor.stopMonitoring(internalSessionId, platformName);
-				}
-				console.log(`[SessionValidation] Stopped monitoring for all platforms of session ${internalSessionId}`);
-			}
-		}
-	} catch (error) {
-		console.error(`[SessionValidation] Error stopping monitoring for ${internalSessionId}:`, error);
 	}
 }

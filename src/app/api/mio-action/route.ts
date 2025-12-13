@@ -1,7 +1,7 @@
 // src/app/api/mio-action/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { MIOService } from '@/lib/MIOService';
+import { MIOService } from '@/lib/mio';
 import { SessionResolver, MIOSessionInfo } from '@/lib/SessionResolver';
 import { HTTP_STATUS, ERROR_MESSAGES, LOG_PREFIXES } from '@/lib/constants';
 

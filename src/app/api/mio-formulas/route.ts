@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
-import { MIOService } from '@/lib/MIOService';
+import { MIOService } from '@/lib/mio';
 import { SessionResolver } from '@/lib/SessionResolver';
 import type { MIOFormula, StoredFormulas } from '@/types/formula';
 

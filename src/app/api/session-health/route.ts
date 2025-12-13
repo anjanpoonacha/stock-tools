@@ -1,7 +1,7 @@
 // src/app/api/session-health/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { sessionHealthMonitor } from '@/lib/sessionHealthMonitor';
+import { sessionHealthMonitor } from '@/lib/health';
 import { getSession } from '@/lib/sessionStore';
 
 export async function GET(req: NextRequest) {

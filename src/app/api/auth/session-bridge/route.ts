@@ -3,7 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { savePlatformSession, generateSessionId } from '@/lib/sessionStore';
 import { CookieParser } from '@/lib/cookieParser';
-import { validateAndStartMonitoring } from '@/lib/sessionValidation';
+import { validateAndStartMonitoring } from '@/lib/validation';
 
 /**
  * Validate MIO session by making a test request to the watchlist endpoint
