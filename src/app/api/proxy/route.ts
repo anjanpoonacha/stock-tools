@@ -5,7 +5,19 @@ function parseRequestBody(body: unknown): unknown {
 	if (typeof body !== 'string') return body;
 	const trimmed = body.trim();
 	if (trimmed === '[]') return [];
-	const arr = body
+
+	// First, try to JSON.parse if it's a JSON-encoded string
+	let stringToParse = body;
+	try {
+		const parsed = JSON.parse(body);
+		if (typeof parsed === 'string') {
+			stringToParse = parsed;
+		}
+	} catch {
+		// Not JSON-encoded, continue with original string
+	}
+
+	const arr = stringToParse
 		.split(',')
 		.map((s) =>
 			s
@@ -71,15 +83,26 @@ export async function POST(req: NextRequest) {
 			fetchOptions.headers = normalizeHeaders(headers, setJson);
 		}
 
-		const res = await fetch(url, fetchOptions);
+	const res = await fetch(url, fetchOptions);
+	let data;
+
+	try {
 		const contentType = res.headers.get('content-type') || '';
-		let data;
 		if (contentType.includes('application/json')) {
 			data = await res.json();
 		} else {
 			data = await res.text();
 		}
-		return NextResponse.json({ data, status: res.status });
+	} catch (parseError) {
+		console.error('[PROXY] Failed to parse response:', parseError);
+		data = {
+			error: 'Invalid response format from TradingView',
+			parseError: parseError instanceof Error ? parseError.message : String(parseError),
+		};
+	}
+
+	// Pass through the original HTTP status code from TradingView
+	return NextResponse.json({ data, status: res.status }, { status: res.status });
 	} catch (error) {
 		console.error('[PROXY] Error:', error);
 		const message = error instanceof Error ? error.message : 'An unknown error occurred';

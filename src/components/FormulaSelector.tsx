@@ -65,9 +65,9 @@ export function FormulaSelector({
 				</Badge>
 			</div>
 			<Select
-				value={selectedFormulaId || ''}
+				value={selectedFormulaId || '__none__'}
 				onValueChange={(value) => {
-					if (value === '') {
+					if (value === '__none__') {
 						onFormulaSelect(null);
 					} else {
 						const formula = formulas.find((f) => f.id === value);
@@ -80,7 +80,7 @@ export function FormulaSelector({
 					<SelectValue placeholder={placeholder} />
 				</SelectTrigger>
 				<SelectContent>
-					<SelectItem value=''>None (Manual Entry)</SelectItem>
+					<SelectItem value='__none__'>None (Manual Entry)</SelectItem>
 					{formulas.map((formula) => (
 						<SelectItem key={formula.id} value={formula.id}>
 							<div className='flex items-center gap-2'>

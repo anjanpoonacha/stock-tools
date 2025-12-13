@@ -15,6 +15,9 @@ import { XCircle } from 'lucide-react';
 import { UsageGuide } from '@/components/UsageGuide';
 import { SessionStatus } from '@/components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
+// Error categorization will be used when adding error handling logic
+// import { categorizeHttpError, extractTradingViewError, extractMarketInOutError } from '@/lib/errorCategorization';
+import { ErrorDisplay } from '@/components/error/ErrorDisplay';
 
 const MioSyncPageContent: React.FC = () => {
     const [tvWlid, setTvWlid] = useState('');
@@ -25,7 +28,9 @@ const MioSyncPageContent: React.FC = () => {
     >([]);
     const [mioWatchlistsLoading, setMioWatchlistsLoading] = useState(false);
     const [mioWatchlistsError, setMioWatchlistsError] = useState<Error | string | null>(null);
-    const [sessionId, sessionLoading, sessionError] = useSessionBridge('tradingview');
+    const [sessionId, sessionLoading] = useSessionBridge('tradingview');
+    // Separate error states: session errors vs operation errors
+    const [operationError, setOperationError] = useState<SessionError | null>(null);
     const { mioSessionAvailable, loading: sessionAvailabilityLoading } = useSessionAvailability();
     const [symbols, setSymbols] = useState('');
     const regroupOptions: { value: RegroupOption; label: string }[] = [
@@ -143,7 +148,7 @@ const MioSyncPageContent: React.FC = () => {
                 );
                 showToast('Fetched TradingView watchlists.', 'success');
             } catch (err) {
-                const sessionError = new SessionError(
+                const fetchError = new SessionError(
                     SessionErrorType.SESSION_EXPIRED,
                     'Failed to fetch TradingView watchlists',
                     err instanceof Error ? err.message : 'Unable to connect to TradingView',
@@ -164,6 +169,7 @@ const MioSyncPageContent: React.FC = () => {
                         },
                     ]
                 );
+                setOperationError(fetchError);
             } finally {
                 setLoading(false);
             }
@@ -463,11 +469,12 @@ const MioSyncPageContent: React.FC = () => {
             />
 
             <div className='space-y-4 mb-6'>
+                {/* Session connectivity status - authentication layer */}
                 <SessionStatus
                     platform='TradingView'
                     sessionId={sessionId}
                     loading={sessionLoading}
-                    error={sessionError}
+                    error={null}
                 />
                 <SessionStatus
                     platform='MarketInOut'
@@ -481,6 +488,14 @@ const MioSyncPageContent: React.FC = () => {
                             : null
                     }
                 />
+                
+                {/* Operation errors - application layer */}
+                {operationError && (
+                    <ErrorDisplay
+                        error={operationError}
+                        onDismiss={() => setOperationError(null)}
+                    />
+                )}
             </div>
 
             <form onSubmit={handleSubmit} className='space-y-6'>

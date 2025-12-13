@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Input } from '../../components/ui/input';
@@ -16,14 +16,17 @@ import { useSessionAvailability } from '../../hooks/useSessionAvailability';
 import { UsageGuide } from '../../components/UsageGuide';
 import { SessionStatus } from '../../components/SessionStatus';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '../../lib/sessionErrors';
+import { categorizeHttpError, extractTradingViewError } from '../../lib/errorCategorization';
+import { ErrorDisplay } from '../../components/error/ErrorDisplay';
 import { useUserScreenerUrls } from '../../hooks/useUserScreenerUrls';
 import { ScreenerUrlDialog } from '../../components/ScreenerUrlDialog';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { UserScreenerUrl } from '../api/screener-urls/route';
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, ChevronRight, ChevronDown, Zap, Loader2 } from 'lucide-react';
 import { useFormulas } from '../../hooks/useFormulas';
-import { FormulaSelector } from '../../components/FormulaSelector';
-import type { MIOFormula } from '@/types/formula';
+import { MultiSelect } from '../../components/ui/multi-select';
+import { Alert, AlertDescription } from '../../components/ui/alert';
+// MIOFormula type removed - not used in this component
 
 function parseMioSymbols(raw: string): string[] {
     return raw
@@ -82,14 +85,18 @@ function TvSyncPageContent() {
     const { tvSessionAvailable } = useSessionAvailability();
     const [watchlistId, setWatchlistId] = useState('');
     const [watchlists, setWatchlists] = useState<{ id: string; name: string }[]>([]);
-    const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
+    // Separate error states: session errors vs operation errors
+    const [operationError, setOperationError] = useState<SessionError | null>(null);
     const [error, setError] = useState<SessionError | Error | string | null>(null);
     const toast = useToast();
 
-    // Formula integration state
+    // Formula multi-select state
     const { formulas, loading: formulasLoading, error: formulasError } = useFormulas();
-    const [selectedFormulaIds, setSelectedFormulaIds] = useState<(string | null)[]>([null]);
-    const [formulaUrlMap, setFormulaUrlMap] = useState<Map<number, string>>(new Map());
+    const [selectedFormulaIds, setSelectedFormulaIds] = useState<string[]>([]);
+
+    // Custom URLs state (collapsed by default)
+    const [customUrlsExpanded, setCustomUrlsExpanded] = useState(false);
+    const [customUrls, setCustomUrls] = useState<string[]>([]);
 
     // User screener URLs management
     const { urls: userUrls, error: userUrlsError, addUrl: addUserUrl, updateUrl: updateUserUrl, deleteUrl: deleteUserUrl } = useUserScreenerUrls();
@@ -102,6 +109,30 @@ function TvSyncPageContent() {
 
     const fetchedRef = React.useRef<string | null>(null);
     const fetchingRef = React.useRef(false);
+
+    // Compute effective URLs from selected formulas + custom URLs
+    const effectiveUrls = useMemo(() => {
+        const urlsToFetch: string[] = [];
+
+        // Get URLs from selected formulas
+        if (selectedFormulaIds.length > 0) {
+            selectedFormulaIds.forEach(id => {
+                const formula = formulas.find(f => f.id === id);
+                if (formula?.apiUrl) {
+                    urlsToFetch.push(formula.apiUrl);
+                }
+            });
+        }
+
+        // Add valid custom URLs
+        customUrls.forEach(url => {
+            if (url.trim()) {
+                urlsToFetch.push(url);
+            }
+        });
+
+        return urlsToFetch;
+    }, [selectedFormulaIds, formulas, customUrls]);
 
     useEffect(() => {
         if (!sessionid) return;
@@ -210,64 +241,19 @@ function TvSyncPageContent() {
         fetchWatchlists();
     }, [sessionid, tvSessionAvailable, toast]);
 
-    const handleUrlChange = (i: number, value: string) => {
-        const next = [...urls];
-        next[i] = value;
-        setUrls(next);
-
-        // Clear formula selection if user manually edits URL
-        const newSelectedIds = [...selectedFormulaIds];
-        if (newSelectedIds[i] !== null && formulaUrlMap.get(i) !== value) {
-            newSelectedIds[i] = null;
-            setSelectedFormulaIds(newSelectedIds);
-        }
+    // Custom URL handlers
+    const handleCustomUrlChange = (index: number, value: string) => {
+        const newUrls = [...customUrls];
+        newUrls[index] = value;
+        setCustomUrls(newUrls);
     };
 
-    const handleFormulaSelect = (index: number, formula: MIOFormula | null) => {
-        const newSelectedIds = [...selectedFormulaIds];
-        newSelectedIds[index] = formula ? formula.id : null;
-        setSelectedFormulaIds(newSelectedIds);
-
-        if (formula && formula.apiUrl) {
-            // Update URL with formula's API URL
-            const newUrls = [...urls];
-            newUrls[index] = formula.apiUrl;
-            setUrls(newUrls);
-
-            // Track which URLs came from formulas
-            const newMap = new Map(formulaUrlMap);
-            newMap.set(index, formula.apiUrl);
-            setFormulaUrlMap(newMap);
-        } else {
-            // Clear formula URL mapping
-            const newMap = new Map(formulaUrlMap);
-            newMap.delete(index);
-            setFormulaUrlMap(newMap);
-        }
+    const addCustomUrl = () => {
+        setCustomUrls([...customUrls, '']);
     };
 
-    const addUrl = () => {
-        setUrls([...urls, '']);
-        setSelectedFormulaIds([...selectedFormulaIds, null]);
-    };
-
-    const removeUrl = (i: number) => {
-        setUrls(urls.filter((_, idx) => idx !== i));
-        setSelectedFormulaIds(selectedFormulaIds.filter((_, idx) => idx !== i));
-
-        // Clean up formula URL mapping
-        const newMap = new Map(formulaUrlMap);
-        newMap.delete(i);
-        // Adjust indices for remaining URLs
-        const adjustedMap = new Map();
-        Array.from(newMap.entries()).forEach(([key, value]) => {
-            if (key > i) {
-                adjustedMap.set(key - 1, value);
-            } else {
-                adjustedMap.set(key, value);
-            }
-        });
-        setFormulaUrlMap(adjustedMap);
+    const removeCustomUrl = (index: number) => {
+        setCustomUrls(customUrls.filter((_, i) => i !== index));
     };
 
     async function fetchMioSymbols(url: string, signal?: AbortSignal): Promise<string[]> {
@@ -389,9 +375,19 @@ function TvSyncPageContent() {
     async function appendToWatchlist(symbols: string[]) {
         try {
             setError(null);
+            setOperationError(null);
+            
+            // Remove duplicate symbols before sending to TradingView API
+            const uniqueSymbols = [...new Set(symbols)];
+            const duplicateCount = symbols.length - uniqueSymbols.length;
+            
+            if (duplicateCount > 0) {
+                console.log(`Removed ${duplicateCount} duplicate symbol(s) before sending to TradingView`);
+            }
+            
             // Always send a flat array of symbols to TradingView append API
-            console.log({ symbols });
-            const payload = output;
+            console.log({ symbols: uniqueSymbols, originalCount: symbols.length, uniqueCount: uniqueSymbols.length });
+            const payload = uniqueSymbols;
             /* Removed toast: Appending symbols to TradingView */
             const res = await fetch('/api/proxy', {
                 method: 'POST',
@@ -410,10 +406,31 @@ function TvSyncPageContent() {
             });
             /* Removed toast: TradingView response */
             if (!res.ok) {
-                const sessionError = new SessionError(
-                    SessionErrorType.OPERATION_FAILED,
-                    'Failed to append symbols to TradingView watchlist',
-                    `HTTP ${res.status}: ${res.statusText}`,
+                // Parse the response body to get detailed error
+                let detailedError = res.statusText;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let errorData: any = null;
+
+                try {
+                    const responseData = await res.json();
+                    errorData = responseData.data || responseData;
+
+                    // Extract TradingView error details using helper
+                    detailedError = extractTradingViewError(errorData);
+                } catch (parseError) {
+                    // If parsing fails, use statusText
+                    console.error('Failed to parse error response:', parseError);
+                }
+
+                // Categorize error to separate session errors from operation errors
+                const category = categorizeHttpError(res.status, detailedError);
+                
+                const error = new SessionError(
+                    category.errorType,
+                    category.isSessionError 
+                        ? 'Session authentication failed' 
+                        : `Failed to append symbols: ${detailedError}`,
+                    `HTTP ${res.status}: ${detailedError}`,
                     {
                         operation: 'append_to_tv_watchlist',
                         platform: Platform.TRADINGVIEW,
@@ -423,34 +440,49 @@ function TvSyncPageContent() {
                             symbolCount: symbols.length,
                             status: res.status,
                             statusText: res.statusText,
+                            apiError: errorData,
                         },
                     },
-                    ErrorSeverity.ERROR,
-                    [
+                    category.isSessionError ? ErrorSeverity.ERROR : ErrorSeverity.WARNING,
+                    category.isSessionError ? [
                         {
                             action: RecoveryAction.RE_AUTHENTICATE,
-                            description: 'Verify you have permission to modify this watchlist',
+                            description: 'Verify your TradingView session is valid',
                             priority: 1,
                             automated: false,
                             estimatedTime: '1 minute',
                         },
                         {
+                            action: RecoveryAction.REFRESH_SESSION,
+                            description: 'Refresh your session and try again',
+                            priority: 2,
+                            automated: false,
+                            estimatedTime: '2 minutes',
+                        },
+                    ] : [
+                        {
                             action: RecoveryAction.RETRY,
+                            description: 'Check data format and try again',
+                            priority: 1,
+                            automated: false,
+                            estimatedTime: '1 minute',
+                        },
+                        {
+                            action: RecoveryAction.CHECK_NETWORK,
                             description: 'Ensure symbols are in correct TradingView format (e.g., NSE:RELIANCE)',
                             priority: 2,
                             automated: false,
                             estimatedTime: '2 minutes',
                         },
-                        {
-                            action: RecoveryAction.REFRESH_SESSION,
-                            description: 'Your session may have expired - refresh and try again',
-                            priority: 3,
-                            automated: false,
-                            estimatedTime: '3 minutes',
-                        },
                     ]
                 );
-                setError(sessionError);
+                
+                // Route to appropriate error state based on categorization
+                if (category.isSessionError) {
+                    setError(error);
+                } else {
+                    setOperationError(error);
+                }
                 return;
             }
             toast('Symbols appended successfully.', 'success');
@@ -487,14 +519,14 @@ function TvSyncPageContent() {
     const handleSaveUrl = async (name: string, url: string): Promise<boolean> => {
         try {
             let success = false;
-            
+
             if (editingUrl) {
                 // Update existing URL
                 success = await updateUserUrl(editingUrl.id, name, url);
                 if (success) {
-                    // Update current URLs if the edited URL is being used
-                    const updatedUrls = urls.map(u => u === editingUrl.url ? url : u);
-                    setUrls(updatedUrls);
+                    // Update custom URLs if the edited URL is being used
+                    const updatedUrls = customUrls.map(u => u === editingUrl.url ? url : u);
+                    setCustomUrls(updatedUrls);
                     toast('Screener URL updated successfully.', 'success');
                 }
             } else {
@@ -504,7 +536,7 @@ function TvSyncPageContent() {
                     toast('Screener URL added successfully.', 'success');
                 }
             }
-            
+
             return success;
         } catch (error) {
             console.error('Error saving URL:', error);
@@ -521,7 +553,7 @@ function TvSyncPageContent() {
         async function updateSymbolsAndOutput() {
             try {
                 let allSymbols: string[] = [];
-                const validUrls = urls.filter((u) => u.trim());
+                const validUrls = effectiveUrls;
 
                 // Don't make API calls if no valid URLs
                 if (validUrls.length === 0) {
@@ -564,7 +596,7 @@ function TvSyncPageContent() {
             isMounted = false;
             abortController.abort();
         };
-    }, [urls, grouping]);
+    }, [effectiveUrls, grouping]);
 
     return (
         <div className='font-sans max-w-xl mx-auto py-8'>
@@ -591,13 +623,16 @@ function TvSyncPageContent() {
                 className='mb-6'
             />
 
+            {/* Session connectivity status - authentication layer */}
             <SessionStatus
                 platform='TradingView'
                 sessionId={sessionid}
                 loading={sessionLoading}
                 error={
                     error
-                        ? error instanceof Error
+                        ? error instanceof SessionError
+                            ? error.userMessage
+                            : error instanceof Error
                             ? error.message
                             : typeof error === 'string'
                             ? error
@@ -606,6 +641,15 @@ function TvSyncPageContent() {
                 }
                 className='mb-6'
             />
+
+            {/* Operation errors - application layer */}
+            {operationError && (
+                <ErrorDisplay
+                    error={operationError}
+                    onDismiss={() => setOperationError(null)}
+                    className='mb-6'
+                />
+            )}
             <div className='space-y-6'>
                 <div>
                     <Label htmlFor='watchlist' className='text-sm font-medium'>
@@ -641,142 +685,209 @@ function TvSyncPageContent() {
                     </Select>
                 </div>
                 <div>
-                    <div className='flex items-center justify-between mb-4'>
-                        <div>
-                            <Label className='text-base font-semibold'>Screener Sources</Label>
-                            <p className='text-sm text-muted-foreground mt-1'>
-                                Select from your extracted formulas or enter custom URLs
-                            </p>
+                    <Label className='text-base font-semibold'>Screener Sources</Label>
+                    <p className='text-sm text-muted-foreground mt-1 mb-4'>
+                        Select formulas from MIO or add custom URLs
+                    </p>
+
+                    {/* SECTION 1: Formula Multi-Select */}
+                    <div className='mb-6 space-y-2'>
+                        <div className='flex items-center gap-2'>
+                            <Zap className='h-4 w-4 text-primary' />
+                            <Label className='text-sm font-medium'>MIO Formulas</Label>
+                            {formulas.length > 0 && (
+                                <Badge variant='secondary' className='text-xs'>
+                                    {formulas.length} available
+                                </Badge>
+                            )}
                         </div>
-                        <Button
-                            type='button'
-                            variant='outline'
-                            size='sm'
-                            onClick={() => {
-                                setEditingUrl(null);
-                                setDialogOpen(true);
-                            }}
-                            className='flex items-center gap-2'
-                        >
-                            <Plus className='h-4 w-4' />
-                            Add Custom URL
-                        </Button>
+
+                        {formulasLoading ? (
+                            <div className='flex items-center gap-2 p-3 border rounded-lg bg-muted/20'>
+                                <Loader2 className='h-4 w-4 animate-spin' />
+                                <span className='text-sm text-muted-foreground'>Loading formulas...</span>
+                            </div>
+                        ) : formulasError ? (
+                            <Alert variant='destructive'>
+                                <AlertDescription>{formulasError}</AlertDescription>
+                            </Alert>
+                        ) : formulas.length === 0 ? (
+                            <Alert>
+                                <AlertDescription>
+                                    No formulas found. Visit the{' '}
+                                    <a href='/mio-formulas' className='underline font-medium'>
+                                        Formula Manager
+                                    </a>{' '}
+                                    to extract your formulas from MIO.
+                                </AlertDescription>
+                            </Alert>
+                        ) : (
+                            <MultiSelect
+                                options={formulas.map(f => ({
+                                    label: f.name,
+                                    value: f.id,
+                                }))}
+                                onValueChange={setSelectedFormulaIds}
+                                defaultValue={selectedFormulaIds}
+                                placeholder='Select one or more formulas...'
+                                className='w-full'
+                                maxCount={3}
+                            />
+                        )}
                     </div>
 
-                    {/* Show user URLs error if any */}
-                    {userUrlsError && (
-                        <div className='mb-3 p-3 bg-red-50 border border-red-200 rounded-md'>
-                            <p className='text-sm text-red-600'>{userUrlsError}</p>
-                        </div>
-                    )}
-
-                    <div className='space-y-4'>
-                        {urls.map((url, i) => {
-                            // Check if this URL is a user-defined URL
-                            const userUrl = userUrls.find(u => u.url === url);
-
-                            return (
-                                <div key={i} className='space-y-3 p-4 border rounded-lg bg-card'>
-                                    {/* Formula selector */}
-                                    <FormulaSelector
-                                        formulas={formulas}
-                                        loading={formulasLoading}
-                                        error={formulasError}
-                                        selectedFormulaId={selectedFormulaIds[i]}
-                                        onFormulaSelect={(formula) => handleFormulaSelect(i, formula)}
-                                        placeholder='Select a formula or enter URL manually below'
-                                        disabled={false}
-                                    />
-
-                                    {/* Manual URL input */}
-                                    <div>
-                                        <div className='flex items-center gap-2 mb-2'>
-                                            <Label className='text-sm'>Or Select/Enter URL Manually</Label>
-                                            {formulaUrlMap.has(i) && (
-                                                <Badge variant='secondary' className='text-xs'>
-                                                    From Formula
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className='flex items-center gap-2'>
-                                            <Select value={url} onValueChange={(val) => handleUrlChange(i, val)}>
-                                                <SelectTrigger className='w-48'>
-                                                    <SelectValue placeholder='Select URL' />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {/* Preset URLs */}
-                                                    {DEFAULT_URLS.map((opt) => (
-                                                        <SelectItem key={opt.value} value={opt.value}>
-                                                            {opt.label} (Preset)
-                                                        </SelectItem>
-                                                    ))}
-                                                    {/* User URLs */}
-                                                    {userUrls.map((userUrl) => (
-                                                        <SelectItem key={userUrl.id} value={userUrl.url}>
-                                                            {userUrl.name} (Custom)
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Input
-                                                value={url}
-                                                onChange={(e) => handleUrlChange(i, e.target.value)}
-                                                className='flex-1'
-                                                placeholder='Paste or edit API URL'
-                                            />
-
-                                            {/* Edit button for user URLs */}
-                                            {userUrl && (
-                                                <Button
-                                                    type='button'
-                                                    variant='outline'
-                                                    size='sm'
-                                                    onClick={() => {
-                                                        setEditingUrl(userUrl);
-                                                        setDialogOpen(true);
-                                                    }}
-                                                    className='flex items-center gap-1'
-                                                >
-                                                    <Edit className='h-3 w-3' />
-                                                </Button>
-                                            )}
-
-                                            {/* Delete button for user URLs */}
-                                            {userUrl && (
-                                                <Button
-                                                    type='button'
-                                                    variant='outline'
-                                                    size='sm'
-                                                    onClick={() => {
-                                                        setUrlToDelete(userUrl);
-                                                        setConfirmDialogOpen(true);
-                                                    }}
-                                                    className='flex items-center gap-1 text-red-600 hover:text-red-700'
-                                                >
-                                                    <Trash2 className='h-3 w-3' />
-                                                </Button>
-                                            )}
-
-                                            {/* Remove from current selection */}
-                                            {urls.length > 1 && (
-                                                <Button
-                                                    type='button'
-                                                    variant='ghost'
-                                                    size='icon'
-                                                    onClick={() => removeUrl(i)}
-                                                >
-                                                    <X className='h-4 w-4' />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        <Button type='button' variant='outline' size='sm' onClick={addUrl}>
-                            <Plus className='h-4 w-4 mr-2' />
-                            Add Another Source
+                    {/* SECTION 2: Custom URLs (Collapsible) */}
+                    <div>
+                        <Button
+                            type='button'
+                            variant='ghost'
+                            size='sm'
+                            onClick={() => setCustomUrlsExpanded(!customUrlsExpanded)}
+                            className='flex items-center gap-2 p-0 h-auto mb-3'
+                        >
+                            {customUrlsExpanded ? (
+                                <ChevronDown className='h-4 w-4' />
+                            ) : (
+                                <ChevronRight className='h-4 w-4' />
+                            )}
+                            <span className='text-sm font-medium'>
+                                Custom URLs {customUrls.length > 0 && `(${customUrls.length})`}
+                            </span>
                         </Button>
+
+                        {customUrlsExpanded && (
+                            <div className='space-y-4 pl-6 border-l-2'>
+                                <div className='flex items-center justify-between'>
+                                    <p className='text-sm text-muted-foreground'>
+                                        Add custom screener URLs for advanced use cases
+                                    </p>
+                                    <Button
+                                        type='button'
+                                        variant='outline'
+                                        size='sm'
+                                        onClick={() => {
+                                            setEditingUrl(null);
+                                            setDialogOpen(true);
+                                        }}
+                                        className='flex items-center gap-2'
+                                    >
+                                        <Plus className='h-4 w-4' />
+                                        Save URL
+                                    </Button>
+                                </div>
+
+                                {/* Show user URLs error if any */}
+                                {userUrlsError && (
+                                    <div className='p-3 bg-red-50 border border-red-200 rounded-md'>
+                                        <p className='text-sm text-red-600'>{userUrlsError}</p>
+                                    </div>
+                                )}
+
+                                {customUrls.length === 0 ? (
+                                    <div className='text-center p-4 border rounded-lg border-dashed'>
+                                        <p className='text-sm text-muted-foreground mb-2'>No custom URLs added</p>
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            size='sm'
+                                            onClick={addCustomUrl}
+                                        >
+                                            <Plus className='h-4 w-4 mr-2' />
+                                            Add First Custom URL
+                                        </Button>
+                                    </div>
+                                ) : (
+                                    <>
+                                        {customUrls.map((url, i) => {
+                                            const userUrl = userUrls.find(u => u.url === url);
+
+                                            return (
+                                                <div key={i} className='flex items-center gap-2'>
+                                                    <Select value={url} onValueChange={(val) => handleCustomUrlChange(i, val)}>
+                                                        <SelectTrigger className='w-48'>
+                                                            <SelectValue placeholder='Select URL' />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {/* Preset URLs */}
+                                                            {DEFAULT_URLS.map((opt) => (
+                                                                <SelectItem key={opt.value} value={opt.value}>
+                                                                    {opt.label} (Preset)
+                                                                </SelectItem>
+                                                            ))}
+                                                            {/* User URLs */}
+                                                            {userUrls.map((userUrl) => (
+                                                                <SelectItem key={userUrl.id} value={userUrl.url}>
+                                                                    {userUrl.name} (Custom)
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    <Input
+                                                        value={url}
+                                                        onChange={(e) => handleCustomUrlChange(i, e.target.value)}
+                                                        className='flex-1'
+                                                        placeholder='Paste or edit API URL'
+                                                    />
+
+                                                    {/* Edit button for user URLs */}
+                                                    {userUrl && (
+                                                        <Button
+                                                            type='button'
+                                                            variant='outline'
+                                                            size='sm'
+                                                            onClick={() => {
+                                                                setEditingUrl(userUrl);
+                                                                setDialogOpen(true);
+                                                            }}
+                                                            className='flex items-center gap-1'
+                                                        >
+                                                            <Edit className='h-3 w-3' />
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Delete button for user URLs */}
+                                                    {userUrl && (
+                                                        <Button
+                                                            type='button'
+                                                            variant='outline'
+                                                            size='sm'
+                                                            onClick={() => {
+                                                                setUrlToDelete(userUrl);
+                                                                setConfirmDialogOpen(true);
+                                                            }}
+                                                            className='flex items-center gap-1 text-red-600 hover:text-red-700'
+                                                        >
+                                                            <Trash2 className='h-3 w-3' />
+                                                        </Button>
+                                                    )}
+
+                                                    {/* Remove from current selection */}
+                                                    {customUrls.length > 1 && (
+                                                        <Button
+                                                            type='button'
+                                                            variant='ghost'
+                                                            size='icon'
+                                                            onClick={() => removeCustomUrl(i)}
+                                                        >
+                                                            <X className='h-4 w-4' />
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                        <Button
+                                            type='button'
+                                            variant='outline'
+                                            size='sm'
+                                            onClick={addCustomUrl}
+                                        >
+                                            <Plus className='h-4 w-4 mr-2' />
+                                            Add Another URL
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -832,13 +943,9 @@ function TvSyncPageContent() {
                     if (urlToDelete) {
                         const success = await deleteUserUrl(urlToDelete.id);
                         if (success) {
-                            // Remove from current URLs if it's being used
-                            const updatedUrls = urls.filter(u => u !== urlToDelete.url);
-                            if (updatedUrls.length === 0) {
-                                setUrls([DEFAULT_URLS[0].value]);
-                            } else {
-                                setUrls(updatedUrls);
-                            }
+                            // Remove from custom URLs if it's being used
+                            const updatedUrls = customUrls.filter(u => u !== urlToDelete.url);
+                            setCustomUrls(updatedUrls);
                             toast('Screener URL deleted successfully.', 'success');
                         } else {
                             toast('Failed to delete screener URL.', 'error');
