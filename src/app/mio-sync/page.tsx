@@ -164,7 +164,6 @@ const MioSyncPageContent: React.FC = () => {
                         },
                     ]
                 );
-                setMioWatchlistsError(sessionError.getDisplayMessage());
             } finally {
                 setLoading(false);
             }

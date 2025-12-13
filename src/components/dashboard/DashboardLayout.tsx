@@ -76,6 +76,16 @@ const TOOLS: Tool[] = [
         keywords: ['manage', 'watchlist', 'mio', 'marketinout'],
     },
     {
+        id: 'mioformulas',
+        title: 'MIO Formula Manager',
+        description: 'Extract and manage stock screener formulas from MarketInOut',
+        href: '/mio-formulas',
+        icon: 'FileCode' as const,
+        category: 'Management',
+        featured: true,
+        keywords: ['formula', 'screener', 'mio', 'marketinout', 'api'],
+    },
+    {
         id: 'userauth',
         title: 'User Authentication',
         description: 'User authentication and sessions',

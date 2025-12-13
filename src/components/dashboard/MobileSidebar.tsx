@@ -20,6 +20,7 @@ import {
     ArrowRight,
     Zap,
     Home,
+    FileCode,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';
@@ -35,6 +36,7 @@ const iconMap = {
     TestTube,
     MIOIcon,
     TVIcon,
+    FileCode,
 };
 
 interface Tool {

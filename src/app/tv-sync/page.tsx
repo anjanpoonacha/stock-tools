@@ -7,6 +7,7 @@ import { Input } from '../../components/ui/input';
 import { EditorWithClipboard } from '../../components/EditorWithClipboard';
 import { Button } from '../../components/ui/button';
 import { Label } from '../../components/ui/label';
+import { Badge } from '../../components/ui/badge';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '../../components/ui/select';
 import { useToast } from '../../components/ui/toast';
 import allNseStocks from '../../all_nse.json';
@@ -19,7 +20,10 @@ import { useUserScreenerUrls } from '../../hooks/useUserScreenerUrls';
 import { ScreenerUrlDialog } from '../../components/ScreenerUrlDialog';
 import { ConfirmationDialog } from '../../components/ConfirmationDialog';
 import { UserScreenerUrl } from '../api/screener-urls/route';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { useFormulas } from '../../hooks/useFormulas';
+import { FormulaSelector } from '../../components/FormulaSelector';
+import type { MIOFormula } from '@/types/formula';
 
 function parseMioSymbols(raw: string): string[] {
     return raw
@@ -81,6 +85,11 @@ function TvSyncPageContent() {
     const [urls, setUrls] = useState([DEFAULT_URLS[0].value]);
     const [error, setError] = useState<SessionError | Error | string | null>(null);
     const toast = useToast();
+
+    // Formula integration state
+    const { formulas, loading: formulasLoading, error: formulasError } = useFormulas();
+    const [selectedFormulaIds, setSelectedFormulaIds] = useState<(string | null)[]>([null]);
+    const [formulaUrlMap, setFormulaUrlMap] = useState<Map<number, string>>(new Map());
 
     // User screener URLs management
     const { urls: userUrls, error: userUrlsError, addUrl: addUserUrl, updateUrl: updateUserUrl, deleteUrl: deleteUserUrl } = useUserScreenerUrls();
@@ -205,10 +214,61 @@ function TvSyncPageContent() {
         const next = [...urls];
         next[i] = value;
         setUrls(next);
+
+        // Clear formula selection if user manually edits URL
+        const newSelectedIds = [...selectedFormulaIds];
+        if (newSelectedIds[i] !== null && formulaUrlMap.get(i) !== value) {
+            newSelectedIds[i] = null;
+            setSelectedFormulaIds(newSelectedIds);
+        }
     };
 
-    const addUrl = () => setUrls([...urls, '']);
-    const removeUrl = (i: number) => setUrls(urls.filter((_, idx) => idx !== i));
+    const handleFormulaSelect = (index: number, formula: MIOFormula | null) => {
+        const newSelectedIds = [...selectedFormulaIds];
+        newSelectedIds[index] = formula ? formula.id : null;
+        setSelectedFormulaIds(newSelectedIds);
+
+        if (formula && formula.apiUrl) {
+            // Update URL with formula's API URL
+            const newUrls = [...urls];
+            newUrls[index] = formula.apiUrl;
+            setUrls(newUrls);
+
+            // Track which URLs came from formulas
+            const newMap = new Map(formulaUrlMap);
+            newMap.set(index, formula.apiUrl);
+            setFormulaUrlMap(newMap);
+        } else {
+            // Clear formula URL mapping
+            const newMap = new Map(formulaUrlMap);
+            newMap.delete(index);
+            setFormulaUrlMap(newMap);
+        }
+    };
+
+    const addUrl = () => {
+        setUrls([...urls, '']);
+        setSelectedFormulaIds([...selectedFormulaIds, null]);
+    };
+
+    const removeUrl = (i: number) => {
+        setUrls(urls.filter((_, idx) => idx !== i));
+        setSelectedFormulaIds(selectedFormulaIds.filter((_, idx) => idx !== i));
+
+        // Clean up formula URL mapping
+        const newMap = new Map(formulaUrlMap);
+        newMap.delete(i);
+        // Adjust indices for remaining URLs
+        const adjustedMap = new Map();
+        Array.from(newMap.entries()).forEach(([key, value]) => {
+            if (key > i) {
+                adjustedMap.set(key - 1, value);
+            } else {
+                adjustedMap.set(key, value);
+            }
+        });
+        setFormulaUrlMap(adjustedMap);
+    };
 
     async function fetchMioSymbols(url: string, signal?: AbortSignal): Promise<string[]> {
         try {
@@ -581,8 +641,13 @@ function TvSyncPageContent() {
                     </Select>
                 </div>
                 <div>
-                    <div className='flex items-center justify-between mb-2'>
-                        <Label className='text-sm font-medium'>Screener URLs</Label>
+                    <div className='flex items-center justify-between mb-4'>
+                        <div>
+                            <Label className='text-base font-semibold'>Screener Sources</Label>
+                            <p className='text-sm text-muted-foreground mt-1'>
+                                Select from your extracted formulas or enter custom URLs
+                            </p>
+                        </div>
                         <Button
                             type='button'
                             variant='outline'
@@ -597,94 +662,120 @@ function TvSyncPageContent() {
                             Add Custom URL
                         </Button>
                     </div>
-                    
+
                     {/* Show user URLs error if any */}
                     {userUrlsError && (
                         <div className='mb-3 p-3 bg-red-50 border border-red-200 rounded-md'>
                             <p className='text-sm text-red-600'>{userUrlsError}</p>
                         </div>
                     )}
-                    
-                    <div className='mt-2 space-y-3'>
+
+                    <div className='space-y-4'>
                         {urls.map((url, i) => {
                             // Check if this URL is a user-defined URL
                             const userUrl = userUrls.find(u => u.url === url);
-                            
+
                             return (
-                                <div key={i} className='flex items-center gap-2'>
-                                    <Select value={url} onValueChange={(val) => handleUrlChange(i, val)}>
-                                        <SelectTrigger className='w-48'>
-                                            <SelectValue placeholder='Select URL' />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {/* Preset URLs */}
-                                            {DEFAULT_URLS.map((opt) => (
-                                                <SelectItem key={opt.value} value={opt.value}>
-                                                    {opt.label} (Preset)
-                                                </SelectItem>
-                                            ))}
-                                            {/* User URLs */}
-                                            {userUrls.map((userUrl) => (
-                                                <SelectItem key={userUrl.id} value={userUrl.url}>
-                                                    {userUrl.name} (Custom)
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Input
-                                        value={url}
-                                        onChange={(e) => handleUrlChange(i, e.target.value)}
-                                        className='flex-1'
-                                        placeholder='Paste or edit API URL'
+                                <div key={i} className='space-y-3 p-4 border rounded-lg bg-card'>
+                                    {/* Formula selector */}
+                                    <FormulaSelector
+                                        formulas={formulas}
+                                        loading={formulasLoading}
+                                        error={formulasError}
+                                        selectedFormulaId={selectedFormulaIds[i]}
+                                        onFormulaSelect={(formula) => handleFormulaSelect(i, formula)}
+                                        placeholder='Select a formula or enter URL manually below'
+                                        disabled={false}
                                     />
-                                    
-                                    {/* Edit button for user URLs */}
-                                    {userUrl && (
-                                        <Button
-                                            type='button'
-                                            variant='outline'
-                                            size='sm'
-                                            onClick={() => {
-                                                setEditingUrl(userUrl);
-                                                setDialogOpen(true);
-                                            }}
-                                            className='flex items-center gap-1'
-                                        >
-                                            <Edit className='h-3 w-3' />
-                                        </Button>
-                                    )}
-                                    
-                                    {/* Delete button for user URLs */}
-                                    {userUrl && (
-                                        <Button
-                                            type='button'
-                                            variant='outline'
-                                            size='sm'
-                                            onClick={() => {
-                                                setUrlToDelete(userUrl);
-                                                setConfirmDialogOpen(true);
-                                            }}
-                                            className='flex items-center gap-1 text-red-600 hover:text-red-700'
-                                        >
-                                            <Trash2 className='h-3 w-3' />
-                                        </Button>
-                                    )}
-                                    
-                                    {/* Remove from current selection */}
-                                    <Button
-                                        type='button'
-                                        variant='destructive'
-                                        size='sm'
-                                        onClick={() => removeUrl(i)}
-                                        disabled={urls.length === 1}
-                                    >
-                                        Remove
-                                    </Button>
+
+                                    {/* Manual URL input */}
+                                    <div>
+                                        <div className='flex items-center gap-2 mb-2'>
+                                            <Label className='text-sm'>Or Select/Enter URL Manually</Label>
+                                            {formulaUrlMap.has(i) && (
+                                                <Badge variant='secondary' className='text-xs'>
+                                                    From Formula
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <div className='flex items-center gap-2'>
+                                            <Select value={url} onValueChange={(val) => handleUrlChange(i, val)}>
+                                                <SelectTrigger className='w-48'>
+                                                    <SelectValue placeholder='Select URL' />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {/* Preset URLs */}
+                                                    {DEFAULT_URLS.map((opt) => (
+                                                        <SelectItem key={opt.value} value={opt.value}>
+                                                            {opt.label} (Preset)
+                                                        </SelectItem>
+                                                    ))}
+                                                    {/* User URLs */}
+                                                    {userUrls.map((userUrl) => (
+                                                        <SelectItem key={userUrl.id} value={userUrl.url}>
+                                                            {userUrl.name} (Custom)
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Input
+                                                value={url}
+                                                onChange={(e) => handleUrlChange(i, e.target.value)}
+                                                className='flex-1'
+                                                placeholder='Paste or edit API URL'
+                                            />
+
+                                            {/* Edit button for user URLs */}
+                                            {userUrl && (
+                                                <Button
+                                                    type='button'
+                                                    variant='outline'
+                                                    size='sm'
+                                                    onClick={() => {
+                                                        setEditingUrl(userUrl);
+                                                        setDialogOpen(true);
+                                                    }}
+                                                    className='flex items-center gap-1'
+                                                >
+                                                    <Edit className='h-3 w-3' />
+                                                </Button>
+                                            )}
+
+                                            {/* Delete button for user URLs */}
+                                            {userUrl && (
+                                                <Button
+                                                    type='button'
+                                                    variant='outline'
+                                                    size='sm'
+                                                    onClick={() => {
+                                                        setUrlToDelete(userUrl);
+                                                        setConfirmDialogOpen(true);
+                                                    }}
+                                                    className='flex items-center gap-1 text-red-600 hover:text-red-700'
+                                                >
+                                                    <Trash2 className='h-3 w-3' />
+                                                </Button>
+                                            )}
+
+                                            {/* Remove from current selection */}
+                                            {urls.length > 1 && (
+                                                <Button
+                                                    type='button'
+                                                    variant='ghost'
+                                                    size='icon'
+                                                    onClick={() => removeUrl(i)}
+                                                >
+                                                    <X className='h-4 w-4' />
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
                             );
                         })}
-                        <Button type='button' variant='outline' onClick={addUrl} className='w-full'>
-                            Add Another URL
+                        <Button type='button' variant='outline' size='sm' onClick={addUrl}>
+                            <Plus className='h-4 w-4 mr-2' />
+                            Add Another Source
                         </Button>
                     </div>
                 </div>

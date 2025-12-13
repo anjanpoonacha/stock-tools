@@ -15,6 +15,7 @@ import {
     UserCheck,
     TestTube,
     ArrowRight,
+    FileCode,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';
@@ -30,6 +31,7 @@ const iconMap = {
     TestTube,
     MIOIcon,
     TVIcon,
+    FileCode,
 } as const;
 
 export interface Tool {

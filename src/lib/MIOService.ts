@@ -8,6 +8,7 @@ import {
 } from './sessionErrors';
 import { SessionHealthMonitor } from './sessionHealthMonitor';
 import { getHealthAwareSessionData } from './sessionValidation';
+import type { FormulaListItem, MIOFormula, FormulaExtractionResult } from '@/types/formula';
 
 // src/lib/MIOService.ts
 
@@ -511,6 +512,364 @@ export class MIOService {
 			return await MIOService.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 		} catch (error) {
 			throw error;
+		}
+	}
+
+	/**
+	 * Get list of formulas from MIO stock screener page
+	 * Fetches: https://www.marketinout.com/stock-screener/my_stock_screens.php
+	 * Parses table to extract formula name, page URL, and screen ID
+	 */
+	static async getFormulaListWithSession(internalSessionId: string): Promise<FormulaListItem[]> {
+		try {
+			// Validate input parameters
+			if (!internalSessionId) {
+				const error = ErrorHandler.createGenericError(
+					Platform.MARKETINOUT,
+					'getFormulaListWithSession',
+					'Missing required parameter: internalSessionId'
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
+			if (!sessionKeyValue) {
+				const error = ErrorHandler.createSessionExpiredError(
+					Platform.MARKETINOUT,
+					'getFormulaListWithSession',
+					internalSessionId
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			// Fetch the formula list page from MIO
+			const res = await fetch('https://www.marketinout.com/stock-screener/my_stock_screens.php', {
+				headers: {
+					Cookie: `${sessionKeyValue.key}=${sessionKeyValue.value}`,
+				},
+			});
+
+			if (!res.ok) {
+				const error = ErrorHandler.parseError(
+					`Failed to fetch formula list page (status: ${res.status})`,
+					Platform.MARKETINOUT,
+					'getFormulaListWithSession',
+					res.status,
+					res.url
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			const html = await res.text();
+
+			// Check if we got a login page instead (indicates session expired)
+			if (html.includes('login') || html.includes('signin') || html.includes('password')) {
+				const error = ErrorHandler.createSessionExpiredError(
+					Platform.MARKETINOUT,
+					'getFormulaListWithSession',
+					internalSessionId
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			// Use dynamic import for cheerio to avoid SSR issues
+			const cheerio = await import('cheerio');
+			const $ = cheerio.load(html);
+
+			// Parse the table containing formulas
+			const formulas: FormulaListItem[] = [];
+			const screenIdRegex = /screen(\d+)/; // Extract number from "screen496310"
+
+			console.log(`[MIOService] Parsing formula list page...`);
+			console.log(`[MIOService] Found ${$('tr[id^="screen"]').length} table rows`);
+
+			// Select all table rows with id starting with "screen"
+			$('tr[id^="screen"]').each((_, element) => {
+				const $row = $(element);
+				const rowId = $row.attr('id');
+
+				if (!rowId) return;
+
+				// Extract screen_id from row id (e.g., "screen496310" -> "496310")
+				const match = rowId.match(screenIdRegex);
+				if (!match || !match[1]) return;
+
+				const screenId = match[1];
+
+				// Get formula name from the third column's <a> tag
+				const $nameLink = $row.find('td').eq(2).find('a').first();
+				const name = $nameLink.text().trim();
+
+				if (!name) return;
+
+				// Construct full page URL
+				const pageUrl = `https://www.marketinout.com/stock-screener/stocks.php?f=1&list=1&screen_id=${screenId}`;
+
+				// Avoid duplicates (though shouldn't be any with this approach)
+				if (!formulas.some(f => f.screenId === screenId)) {
+					formulas.push({
+						name,
+						pageUrl,
+						screenId,
+					});
+				}
+			});
+
+			console.log(`[MIOService] Successfully extracted ${formulas.length} formulas`);
+			return formulas;
+		} catch (error) {
+			// If it's already a SessionError, re-throw it
+			if (error instanceof SessionError) {
+				throw error;
+			}
+
+			// Otherwise, parse and wrap the error
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'getFormulaListWithSession',
+				undefined,
+				'https://www.marketinout.com/stock-screener/my_stock_screens.php'
+			);
+			ErrorLogger.logError(sessionError);
+			throw sessionError;
+		}
+	}
+
+	/**
+	 * Extract API URL from a formula page
+	 * Navigates to the formula page and looks for "Web API" button/link
+	 * Returns the API URL or null if not found
+	 */
+	static async extractApiUrlFromFormula(
+		internalSessionId: string,
+		formulaPageUrl: string
+	): Promise<string | null> {
+		try {
+			const sessionKeyValue = await MIOService.getSessionKeyValue(internalSessionId);
+			if (!sessionKeyValue) {
+				const error = ErrorHandler.createSessionExpiredError(
+					Platform.MARKETINOUT,
+					'extractApiUrlFromFormula',
+					internalSessionId
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			// Fetch the formula page
+			const res = await fetch(formulaPageUrl, {
+				headers: {
+					Cookie: `${sessionKeyValue.key}=${sessionKeyValue.value}`,
+				},
+			});
+
+			if (!res.ok) {
+				console.warn(`[MIOService] Failed to fetch formula page: ${formulaPageUrl} (status: ${res.status})`);
+				return null;
+			}
+
+			const html = await res.text();
+
+			// Check for session expiry
+			if (html.includes('login') || html.includes('signin') || html.includes('password')) {
+				const error = ErrorHandler.createSessionExpiredError(
+					Platform.MARKETINOUT,
+					'extractApiUrlFromFormula',
+					internalSessionId
+				);
+				ErrorLogger.logError(error);
+				throw error;
+			}
+
+			// Use cheerio to parse and find the API URL
+			const cheerio = await import('cheerio');
+			const $ = cheerio.load(html);
+
+			let apiUrl: string | null = null;
+
+			// Method 1: Find Web API image button and extract api_key from onclick
+			// The Web API button is an <img> tag with onclick="api_info('api_key_here')"
+			const webApiButton = $('img[alt="Web API"], img[title="Web API"]').filter('[onclick*="api_info"]');
+			if (webApiButton.length > 0) {
+				const onclickAttr = webApiButton.attr('onclick');
+				if (onclickAttr) {
+					// Extract api_key from: api_info('eed4a72303564710');
+					const apiKeyMatch = onclickAttr.match(/api_info\(['"]([^'"]+)['"]\)/);
+					if (apiKeyMatch && apiKeyMatch[1]) {
+						const apiKey = apiKeyMatch[1];
+						apiUrl = `https://api.marketinout.com/run/screen?key=${apiKey}`;
+						console.log(`[MIOService] Found API URL via Web API button: ${apiUrl}`);
+						return apiUrl;
+					}
+				}
+			}
+
+			// Method 2: Fallback - look for direct links (legacy/alternate format)
+			$('a[href*="api.marketinout.com/run/screen"]').each((_, element) => {
+				const href = $(element).attr('href');
+				if (href && href.includes('key=')) {
+					apiUrl = href;
+					console.log(`[MIOService] Found API URL via direct link: ${apiUrl}`);
+					return false; // Break loop
+				}
+			});
+
+			// Method 3: Fallback - check onclick handlers with full URL (legacy)
+			if (!apiUrl) {
+				$('button, input[type="button"], img').each((_, element) => {
+					const onclick = $(element).attr('onclick');
+					if (onclick && onclick.includes('api.marketinout.com/run/screen')) {
+						const urlMatch = onclick.match(/(https?:\/\/api\.marketinout\.com\/run\/screen\?key=[^'"&\s]+)/);
+						if (urlMatch && urlMatch[1]) {
+							apiUrl = urlMatch[1];
+							console.log(`[MIOService] Found API URL via onclick handler: ${apiUrl}`);
+							return false; // Break loop
+						}
+					}
+				});
+			}
+
+			if (!apiUrl) {
+				console.warn(`[MIOService] No API URL found for ${formulaPageUrl}`);
+			}
+
+			return apiUrl;
+		} catch (error) {
+			if (error instanceof SessionError) {
+				throw error;
+			}
+
+			console.error(`[MIOService] Error extracting API URL from ${formulaPageUrl}:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Extract all formulas with their API URLs
+	 * Orchestrates the full extraction workflow:
+	 * 1. Get formula list
+	 * 2. For each formula, extract API URL
+	 * 3. Build complete MIOFormula objects
+	 */
+	static async extractAllFormulasWithSession(internalSessionId: string): Promise<FormulaExtractionResult> {
+		try {
+			// Step 1: Get the formula list
+			const formulaList = await MIOService.getFormulaListWithSession(internalSessionId);
+
+			if (formulaList.length === 0) {
+				return {
+					success: true,
+					formulas: [],
+					totalExtracted: 0,
+					errors: [],
+				};
+			}
+
+			// Step 2: Extract API URLs for each formula
+			const extractionPromises = formulaList.map(async (formulaItem, index) => {
+				// Add rate limiting delay (100ms between requests)
+				if (index > 0) {
+					await new Promise(resolve => setTimeout(resolve, 100));
+				}
+
+				try {
+					const apiUrl = await MIOService.extractApiUrlFromFormula(
+						internalSessionId,
+						formulaItem.pageUrl
+					);
+
+					const now = new Date().toISOString();
+					const formula: MIOFormula = {
+						id: `formula_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+						name: formulaItem.name,
+						pageUrl: formulaItem.pageUrl,
+						apiUrl,
+						screenId: formulaItem.screenId,
+						createdAt: now,
+						updatedAt: now,
+						extractionStatus: apiUrl ? 'success' : 'failed',
+						extractionError: apiUrl ? undefined : 'API URL not found on formula page',
+					};
+
+					return { success: true, formula };
+				} catch (error) {
+					const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+					const now = new Date().toISOString();
+					const formula: MIOFormula = {
+						id: `formula_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+						name: formulaItem.name,
+						pageUrl: formulaItem.pageUrl,
+						apiUrl: null,
+						screenId: formulaItem.screenId,
+						createdAt: now,
+						updatedAt: now,
+						extractionStatus: 'failed',
+						extractionError: errorMessage,
+					};
+
+					return {
+						success: false,
+						formula,
+						error: { formulaName: formulaItem.name, error: errorMessage },
+					};
+				}
+			});
+
+			// Wait for all extractions to complete
+			const results = await Promise.allSettled(extractionPromises);
+
+			// Process results
+			const formulas: MIOFormula[] = [];
+			const errors: Array<{ formulaName: string; error: string }> = [];
+			let successCount = 0;
+
+			results.forEach(result => {
+				if (result.status === 'fulfilled') {
+					formulas.push(result.value.formula);
+					if (result.value.success) {
+						successCount++;
+					}
+					if (result.value.error) {
+						errors.push(result.value.error);
+					}
+				} else {
+					// Promise rejected
+					errors.push({
+						formulaName: 'Unknown',
+						error: result.reason?.message || 'Extraction failed',
+					});
+				}
+			});
+
+			return {
+				success: errors.length === 0,
+				formulas,
+				totalExtracted: successCount,
+				errors,
+			};
+		} catch (error) {
+			// If it's a SessionError, re-throw it
+			if (error instanceof SessionError) {
+				throw error;
+			}
+
+			// Otherwise, return error result
+			const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+			ErrorLogger.logError(
+				ErrorHandler.parseError(error, Platform.MARKETINOUT, 'extractAllFormulasWithSession')
+			);
+
+			return {
+				success: false,
+				formulas: [],
+				totalExtracted: 0,
+				errors: [{ formulaName: 'All formulas', error: errorMessage }],
+			};
 		}
 	}
 }
