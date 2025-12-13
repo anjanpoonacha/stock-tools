@@ -15,7 +15,12 @@
     "test:ui": "vitest --ui",
     "package-extension": "node scripts/package-extension.js",
     "version-extension": "node scripts/version-extension.js",
-    "release-extension": "pnpm run package-extension && echo 'Extension packaged successfully. Push to main branch to trigger release.'"
+    "release-extension": "pnpm run package-extension && echo 'Extension packaged successfully. Push to main branch to trigger release.'",
+    "package-webapp": "node scripts/package-webapp.js",
+    "version-webapp": "node scripts/version-webapp.js",
+    "release-webapp": "pnpm run package-webapp && echo 'Webapp packaged successfully. Push to main branch to trigger release.'",
+    "setup-hooks": "node scripts/setup-hooks.js",
+    "postinstall": "node scripts/setup-hooks.js install"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.14",
