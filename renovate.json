@@ -70,11 +70,6 @@
       "groupName": "GitHub Actions",
       "automerge": true,
       "labels": ["dependencies", "github-actions"]
-    },
-    {
-      "description": "Monorepo packages - keep grouped by monorepo",
-      "extends": ["group:monorepos"],
-      "labels": ["dependencies", "monorepo"]
     }
   ]
 }
