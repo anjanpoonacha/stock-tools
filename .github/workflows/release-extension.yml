@@ -31,14 +31,14 @@ jobs:
             version: ${{ steps.check.outputs.version }}
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: '18.20.8'
+                  node-version: '24.12.0'
 
             - name: Check for extension changes
               id: check
@@ -84,14 +84,14 @@ jobs:
             contents: write
         steps:
             - name: Checkout code
-              uses: actions/checkout@v4
+              uses: actions/checkout@v6
               with:
                   fetch-depth: 0
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v6
               with:
-                  node-version: '18.20.8'
+                  node-version: '24.12.0'
 
             - name: Install dependencies
               run: |
@@ -215,7 +215,7 @@ jobs:
                   echo "- Real-time session monitoring" >> release-notes.md
 
             - name: Create Release
-              uses: softprops/action-gh-release@v1
+              uses: softprops/action-gh-release@v2
               with:
                   tag_name: v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
                   name: Extension v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
