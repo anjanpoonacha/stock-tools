@@ -20,120 +20,25 @@
   "prCreation": "immediate",
   "packageRules": [
     {
-      "description": "Next.js framework - manual review, grouped together",
-      "groupName": "Next.js framework",
-      "matchPackageNames": ["next", "react", "react-dom"],
-      "matchPackagePatterns": ["^@next/"],
-      "separateMajorMinor": true,
+      "description": "Group all patch updates together (non-major)",
+      "groupName": "All patch updates",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "labels": ["dependencies", "patch-update"]
+    },
+    {
+      "description": "Group all minor updates together (non-major)",
+      "groupName": "All minor updates",
+      "matchUpdateTypes": ["minor"],
       "automerge": false,
-      "minimumReleaseAge": "3 days",
-      "labels": ["dependencies", "nextjs", "high-priority"]
+      "labels": ["dependencies", "minor-update"]
     },
     {
-      "description": "Radix UI components - auto-merge when grouped",
-      "groupName": "Radix UI components",
-      "matchPackagePatterns": ["^@radix-ui/"],
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"],
-      "labels": ["dependencies", "ui"]
-    },
-    {
-      "description": "Tailwind CSS ecosystem - safe to auto-merge",
-      "groupName": "Tailwind CSS",
-      "matchPackageNames": [
-        "tailwindcss",
-        "@tailwindcss/postcss",
-        "tw-animate-css",
-        "tailwind-merge",
-        "class-variance-authority",
-        "clsx"
-      ],
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"],
-      "labels": ["dependencies", "styling"]
-    },
-    {
-      "description": "Testing stack - auto-merge dev dependencies",
-      "groupName": "Testing tools",
-      "matchPackagePatterns": [
-        "^vitest$",
-        "^@vitest/",
-        "^@testing-library/",
-        "^jsdom$"
-      ],
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"],
-      "labels": ["dependencies", "testing"]
-    },
-    {
-      "description": "TypeScript major versions - manual review required",
-      "matchPackageNames": ["typescript"],
+      "description": "Group all major updates together",
+      "groupName": "All major updates",
       "matchUpdateTypes": ["major"],
       "automerge": false,
-      "labels": ["dependencies", "typescript", "high-priority"]
-    },
-    {
-      "description": "TypeScript and types - auto-merge minor/patch",
-      "groupName": "TypeScript and types",
-      "matchPackageNames": ["typescript"],
-      "matchPackagePatterns": ["^@types/"],
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true,
-      "labels": ["dependencies", "typescript"]
-    },
-    {
-      "description": "ESLint and linting tools - grouped together",
-      "groupName": "Linting tools",
-      "matchPackagePatterns": [
-        "^eslint",
-        "^@eslint/",
-        "^eslint-config-",
-        "^eslint-plugin-"
-      ],
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"],
-      "labels": ["dependencies", "linting"]
-    },
-    {
-      "description": "Vercel services - manual review for database client",
-      "matchPackagePatterns": ["^@vercel/"],
-      "automerge": false,
-      "minimumReleaseAge": "3 days",
-      "labels": ["dependencies", "vercel", "high-priority"]
-    },
-    {
-      "description": "shadcn-ui and lucide-react - UI utilities",
-      "groupName": "UI utilities",
-      "matchPackageNames": ["shadcn-ui", "lucide-react", "cmdk", "next-themes"],
-      "automerge": true,
-      "matchUpdateTypes": ["minor", "patch"],
-      "labels": ["dependencies", "ui"]
-    },
-    {
-      "description": "Data validation and parsing",
-      "groupName": "Data utilities",
-      "matchPackageNames": ["zod", "cheerio"],
-      "automerge": false,
-      "labels": ["dependencies", "utilities"]
-    },
-    {
-      "description": "GitHub Actions - auto-update workflow actions",
-      "matchManagers": ["github-actions"],
-      "groupName": "GitHub Actions",
-      "automerge": true,
-      "labels": ["dependencies", "github-actions"]
-    },
-    {
-      "description": "Dev dependencies patch updates - safe auto-merge",
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["patch"],
-      "automerge": true
-    },
-    {
-      "description": "Dev dependencies minor updates - auto-merge with tests",
-      "matchDepTypes": ["devDependencies"],
-      "matchUpdateTypes": ["minor"],
-      "automerge": true
+      "labels": ["dependencies", "major-update", "high-priority"]
     },
     {
       "description": "Critical packages - extra stability period",
@@ -148,11 +53,24 @@
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Security vulnerabilities - immediate updates",
+      "description": "Security vulnerabilities - immediate high priority",
       "matchUpdateTypes": ["patch"],
       "matchCurrentVersion": "!/^0/",
       "automerge": true,
-      "prPriority": 10
+      "prPriority": 10,
+      "labels": ["dependencies", "security"]
+    },
+    {
+      "description": "GitHub Actions - auto-update workflow actions",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      "labels": ["dependencies", "github-actions"]
+    },
+    {
+      "description": "Monorepo packages - keep grouped by monorepo",
+      "extends": ["group:monorepos"],
+      "labels": ["dependencies", "monorepo"]
     }
   ]
 }
