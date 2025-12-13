@@ -1,0 +1,200 @@
+// Renovate Bot Configuration (with comments for reference)
+// This is a copy of the main renovate.json with detailed explanations
+// Renovate will use the root renovate.json file - this is for documentation only
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  
+  // Base presets for best practices
+  "extends": [
+    "config:recommended",           // Renovate's recommended base config
+    "group:monorepos",              // Group monorepo packages together
+    "group:definitelyTyped",        // Group @types/* packages
+    "schedule:weekly",              // Run on a weekly schedule
+    "security:minimumReleaseAgeNpm" // Wait for npm packages to stabilize (3 days minimum)
+  ],
+  
+  // Timezone and schedule
+  "timezone": "Asia/Kolkata",
+  "schedule": ["before 9am on Monday"], // Run Monday mornings IST
+  
+  // Version management
+  "rangeStrategy": "bump",          // Update both package.json ranges AND lockfile
+  "semanticCommits": "enabled",     // Use conventional commits format
+  "semanticCommitScope": "deps",    // Scope: deps (e.g., "chore(deps): update next")
+  
+  // PR settings
+  "labels": ["dependencies", "renovate"],
+  "dependencyDashboard": true,                           // Create a dashboard issue
+  "dependencyDashboardTitle": "📦 Dependency Updates Dashboard",
+  "prConcurrentLimit": 5,           // Max 5 open PRs at once
+  "prHourlyLimit": 2,               // Max 2 PRs created per hour
+  "prCreation": "immediate",        // Create PRs as soon as updates are found
+  
+  "packageRules": [
+    // 1. Next.js Framework - Manual review, grouped together
+    {
+      "description": "Next.js framework - manual review, grouped together",
+      "groupName": "Next.js framework",
+      "matchPackageNames": ["next", "react", "react-dom"],
+      "matchPackagePatterns": ["^@next/"],
+      "separateMajorMinor": true,   // Separate major and minor updates
+      "automerge": false,            // Always require manual review
+      "minimumReleaseAge": "3 days", // Wait 3 days after release
+      "labels": ["dependencies", "nextjs", "high-priority"]
+    },
+    
+    // 2. Radix UI - Auto-merge when grouped (11 packages)
+    {
+      "description": "Radix UI components - auto-merge when grouped",
+      "groupName": "Radix UI components",
+      "matchPackagePatterns": ["^@radix-ui/"],
+      "automerge": true,             // Safe to auto-merge when tests pass
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies", "ui"]
+    },
+    
+    // 3. Tailwind CSS ecosystem
+    {
+      "description": "Tailwind CSS ecosystem - safe to auto-merge",
+      "groupName": "Tailwind CSS",
+      "matchPackageNames": [
+        "tailwindcss",
+        "@tailwindcss/postcss",
+        "tw-animate-css",
+        "tailwind-merge",
+        "class-variance-authority",
+        "clsx"
+      ],
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies", "styling"]
+    },
+    
+    // 4. Testing stack
+    {
+      "description": "Testing stack - auto-merge dev dependencies",
+      "groupName": "Testing tools",
+      "matchPackagePatterns": [
+        "^vitest$",
+        "^@vitest/",
+        "^@testing-library/",
+        "^jsdom$"
+      ],
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies", "testing"]
+    },
+    
+    // 5. TypeScript major versions - Manual review
+    {
+      "description": "TypeScript major versions - manual review required",
+      "matchPackageNames": ["typescript"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["dependencies", "typescript", "high-priority"]
+    },
+    
+    // 6. TypeScript and types - Auto-merge minor/patch
+    {
+      "description": "TypeScript and types - auto-merge minor/patch",
+      "groupName": "TypeScript and types",
+      "matchPackageNames": ["typescript"],
+      "matchPackagePatterns": ["^@types/"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "labels": ["dependencies", "typescript"]
+    },
+    
+    // 7. ESLint and linting tools
+    {
+      "description": "ESLint and linting tools - grouped together",
+      "groupName": "Linting tools",
+      "matchPackagePatterns": [
+        "^eslint",
+        "^@eslint/",
+        "^eslint-config-",
+        "^eslint-plugin-"
+      ],
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies", "linting"]
+    },
+    
+    // 8. Vercel services - Manual review
+    {
+      "description": "Vercel services - manual review for database client",
+      "matchPackagePatterns": ["^@vercel/"],
+      "automerge": false,
+      "minimumReleaseAge": "3 days",
+      "labels": ["dependencies", "vercel", "high-priority"]
+    },
+    
+    // 9. UI utilities
+    {
+      "description": "shadcn-ui and lucide-react - UI utilities",
+      "groupName": "UI utilities",
+      "matchPackageNames": ["shadcn-ui", "lucide-react", "cmdk", "next-themes"],
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"],
+      "labels": ["dependencies", "ui"]
+    },
+    
+    // 10. Data validation and parsing
+    {
+      "description": "Data validation and parsing",
+      "groupName": "Data utilities",
+      "matchPackageNames": ["zod", "cheerio"],
+      "automerge": false, // Manual review for data handling libraries
+      "labels": ["dependencies", "utilities"]
+    },
+    
+    // 11. GitHub Actions - Auto-update workflow actions
+    {
+      "description": "GitHub Actions - auto-update workflow actions",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions",
+      "automerge": true,
+      "labels": ["dependencies", "github-actions"]
+    },
+    
+    // 12. Dev dependencies patch updates
+    {
+      "description": "Dev dependencies patch updates - safe auto-merge",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    },
+    
+    // 13. Dev dependencies minor updates
+    {
+      "description": "Dev dependencies minor updates - auto-merge with tests",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor"],
+      "automerge": true
+    },
+    
+    // 14. Critical packages - Extra stability period
+    {
+      "description": "Critical packages - extra stability period",
+      "matchPackageNames": [
+        "next",
+        "react",
+        "react-dom",
+        "typescript",
+        "@vercel/kv",
+        "zod"
+      ],
+      "minimumReleaseAge": "3 days"
+    },
+    
+    // 15. Security vulnerabilities - Immediate updates
+    {
+      "description": "Security vulnerabilities - immediate updates",
+      "matchUpdateTypes": ["patch"],
+      "matchCurrentVersion": "!/^0/", // Exclude 0.x.x versions
+      "automerge": true,
+      "prPriority": 10 // Highest priority
+    }
+  ]
+}
