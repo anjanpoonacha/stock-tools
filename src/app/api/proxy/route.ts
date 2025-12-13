@@ -7,23 +7,41 @@ function parseRequestBody(body: unknown): unknown {
 	if (trimmed === '[]') return [];
 
 	// First, try to JSON.parse if it's a JSON-encoded string
-	let stringToParse = body;
 	try {
 		const parsed = JSON.parse(body);
+
+		// If we got an array, return it directly
+		if (Array.isArray(parsed)) {
+			return parsed;
+		}
+
+		// If we got a string, try to parse it again (double-encoded)
 		if (typeof parsed === 'string') {
-			stringToParse = parsed;
+			try {
+				const doubleParsed = JSON.parse(parsed);
+				if (Array.isArray(doubleParsed)) {
+					return doubleParsed;
+				}
+				// If it's still a string, use it for comma-splitting
+				body = parsed;
+			} catch {
+				// Use the parsed string for comma-splitting
+				body = parsed;
+			}
 		}
 	} catch {
-		// Not JSON-encoded, continue with original string
+		// Not JSON-encoded, continue with comma-splitting
 	}
 
-	const arr = stringToParse
+	// Fallback: split by comma for legacy comma-separated strings
+	const arr = body
 		.split(',')
 		.map((s) =>
 			s
 				.trim()
 				.replace(/^"+|"+$/g, '')
 				.replace(/^'+|'+$/g, '')
+				.replace(/^\[+|\]+$/g, '')  // Also remove brackets
 		)
 		.filter((s) => s.length > 0 && s !== '""' && s !== "''");
 	return arr;
