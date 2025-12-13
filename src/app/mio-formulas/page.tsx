@@ -1,10 +1,10 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/components/ui/toast';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
+import { useFormulaExtraction } from '@/hooks/useFormulaExtraction';
 import { Badge } from '@/components/ui/badge';
 import { UsageGuide } from '@/components/UsageGuide';
 import type { MIOFormula } from '@/types/formula';
@@ -21,203 +21,19 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw } from 'lucide-react';
 
 const MioFormulasPageContent: React.FC = () => {
-	const [formulas, setFormulas] = useState<MIOFormula[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [extracting, setExtracting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-	const [extractionErrors, setExtractionErrors] = useState<Array<{ formulaName: string; error: string }>>([]);
 	const { mioSessionAvailable, loading: sessionLoading } = useSessionAvailability();
-	const showToast = useToast();
-
-	// Fetch formulas on mount
-	useEffect(() => {
-		loadFormulas();
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, []);
-
-	const loadFormulas = async () => {
-		setLoading(true);
-		setError(null);
-
-		try {
-			// Get stored credentials from localStorage (set by AuthContext)
-			const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-			if (!storedCredentials) {
-				setError('Authentication required. Please log in first.');
-				return;
-			}
-
-			let credentials;
-			try {
-				credentials = JSON.parse(storedCredentials);
-			} catch {
-				setError('Invalid authentication data. Please log in again.');
-				return;
-			}
-
-			const params = new URLSearchParams({
-				userEmail: credentials.userEmail,
-				userPassword: credentials.userPassword,
-			});
-
-			const res = await fetch(`/api/mio-formulas?${params}`);
-
-			if (!res.ok) {
-				const errorData = await res.json();
-				throw new Error(errorData.error || 'Failed to load formulas');
-			}
-
-			const data = await res.json();
-			setFormulas(data.formulas || []);
-		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : 'Failed to load formulas';
-			setError(errorMessage);
-			showToast(errorMessage, 'error');
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	const extractFormulas = async () => {
-		setExtracting(true);
-		setError(null);
-		setExtractionErrors([]);
-
-		try {
-			// Get stored credentials from localStorage (set by AuthContext)
-			const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-			if (!storedCredentials) {
-				throw new Error('Authentication required. Please log in first.');
-			}
-
-			let credentials;
-			try {
-				credentials = JSON.parse(storedCredentials);
-			} catch {
-				throw new Error('Invalid authentication data. Please log in again.');
-			}
-
-			const res = await fetch('/api/mio-formulas', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					userEmail: credentials.userEmail,
-					userPassword: credentials.userPassword,
-					forceRefresh: true,
-				}),
-			});
-
-			if (!res.ok) {
-				const errorData = await res.json();
-				if (errorData.sessionError) {
-					throw new Error(
-						'No valid MIO session found. Please capture your MIO session using the browser extension.'
-					);
-				}
-				throw new Error(errorData.error || 'Failed to extract formulas');
-			}
-
-			const data = await res.json();
-			setFormulas(data.formulas || []);
-			setExtractionErrors(data.errors || []);
-
-			if (data.success) {
-				showToast(
-					`Successfully extracted ${data.extracted} formula${data.extracted !== 1 ? 's' : ''}!`,
-					'success'
-				);
-			} else {
-				showToast(
-					`Extracted ${data.extracted} formula${data.extracted !== 1 ? 's' : ''}, but ${data.failed} failed`,
-					'error'
-				);
-			}
-		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : 'Failed to extract formulas';
-			setError(errorMessage);
-			showToast(errorMessage, 'error');
-		} finally {
-			setExtracting(false);
-		}
-	};
-
-	const deleteFormula = async (formulaId: string) => {
-		try {
-			// Get stored credentials from localStorage (set by AuthContext)
-			const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-			if (!storedCredentials) {
-				throw new Error('Authentication required. Please log in first.');
-			}
-
-			let credentials;
-			try {
-				credentials = JSON.parse(storedCredentials);
-			} catch {
-				throw new Error('Invalid authentication data. Please log in again.');
-			}
-
-			const params = new URLSearchParams({
-				userEmail: credentials.userEmail,
-				userPassword: credentials.userPassword,
-				id: formulaId,
-			});
-
-			const res = await fetch(`/api/mio-formulas?${params}`, {
-				method: 'DELETE',
-			});
-
-			if (!res.ok) {
-				const errorData = await res.json();
-				throw new Error(errorData.error || 'Failed to delete formula');
-			}
-
-			setFormulas(prevFormulas => prevFormulas.filter(f => f.id !== formulaId));
-			showToast('Formula deleted successfully', 'success');
-		} catch (err) {
-			const errorMessage = err instanceof Error ? err.message : 'Failed to delete formula';
-			showToast(errorMessage, 'error');
-		}
-	};
-
-	const copyToClipboard = async (text: string, label: string) => {
-		try {
-			await navigator.clipboard.writeText(text);
-			showToast(`${label} copied to clipboard`, 'success');
-		} catch {
-			showToast('Failed to copy to clipboard', 'error');
-		}
-	};
-
-	const copyAllApiUrls = async () => {
-		const apiUrls = formulas.filter(f => f.apiUrl).map(f => f.apiUrl);
-		if (apiUrls.length === 0) {
-			showToast('No API URLs to copy', 'info');
-			return;
-		}
-
-		const text = apiUrls.join('\n');
-		await copyToClipboard(text, 'All API URLs');
-	};
-
-	const exportFormulas = () => {
-		try {
-			const data = JSON.stringify(formulas, null, 2);
-			const blob = new Blob([data], { type: 'application/json' });
-			const url = URL.createObjectURL(blob);
-			const a = document.createElement('a');
-			a.href = url;
-			a.download = `mio-formulas-${new Date().toISOString().split('T')[0]}.json`;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-			showToast('Formulas exported successfully', 'success');
-		} catch {
-			showToast('Failed to export formulas', 'error');
-		}
-	};
+	const {
+		formulas,
+		loading,
+		extracting,
+		error,
+		extractionErrors,
+		extractFormulas,
+		deleteFormula,
+		copyToClipboard,
+		copyAllApiUrls,
+		exportFormulas,
+	} = useFormulaExtraction();
 
 	const getStatusBadge = (formula: MIOFormula) => {
 		switch (formula.extractionStatus) {

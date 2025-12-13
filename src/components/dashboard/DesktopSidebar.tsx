@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';
+import { useSidebar } from '@/hooks/useSidebar';
 
 const iconMap = {
     ArrowLeftRight,
@@ -59,79 +60,15 @@ interface DesktopSidebarProps {
     defaultCollapsed?: boolean;
 }
 
-// Hook for localStorage persistence
-function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => void] {
-    const [storedValue, setStoredValue] = useState<T>(initialValue);
-
-    useEffect(() => {
-        try {
-            const item = window.localStorage.getItem(key);
-            if (item) {
-                setStoredValue(JSON.parse(item));
-            }
-        } catch (error) {
-            console.warn(`Error reading localStorage key "${key}":`, error);
-        }
-    }, [key]);
-
-    const setValue = (value: T) => {
-        try {
-            setStoredValue(value);
-            window.localStorage.setItem(key, JSON.stringify(value));
-        } catch (error) {
-            console.warn(`Error setting localStorage key "${key}":`, error);
-        }
-    };
-
-    return [storedValue, setValue];
-}
-
 export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSidebarProps) {
     const [searchQuery, setSearchQuery] = useState('');
-    const [isCollapsed, setIsCollapsed] = useLocalStorage('sidebar-collapsed', defaultCollapsed);
-    const [isHovered] = useState(false);
     const pathname = usePathname();
     const router = useRouter();
 
-    // Responsive breakpoint detection
-    const [screenSize, setScreenSize] = useState<'mobile' | 'tablet' | 'desktop' | 'large'>('desktop');
-
-    useEffect(() => {
-        const updateScreenSize = () => {
-            const width = window.innerWidth;
-            if (width < 768) {
-                setScreenSize('mobile');
-            } else if (width < 1024) {
-                setScreenSize('tablet');
-                setIsCollapsed(true); // Auto-collapse on tablet
-            } else if (width < 1440) {
-                setScreenSize('desktop');
-            } else {
-                setScreenSize('large');
-            }
-        };
-
-        updateScreenSize();
-        window.addEventListener('resize', updateScreenSize);
-        return () => window.removeEventListener('resize', updateScreenSize);
-    }, [setIsCollapsed]);
-
-    // Computed state for expansion - NO HOVER EXPANSION
-    const isExpanded = !isCollapsed;
-
-    // No hover expansion - only tooltips
-    const handleMouseEnter = () => {
-        // Do nothing - no hover expansion
-    };
-
-    const handleMouseLeave = () => {
-        // Do nothing - no hover expansion
-    };
-
-    // Toggle collapse state
-    const toggleCollapse = () => {
-        setIsCollapsed(!isCollapsed);
-    };
+    // Use custom sidebar hook for state management
+    const { isCollapsed, isExpanded, toggleCollapse, getWidth, handleMouseEnter, handleMouseLeave } = useSidebar({
+        defaultCollapsed,
+    });
 
     const filteredTools = tools.filter((tool) => {
         if (!searchQuery) return true;
@@ -152,29 +89,12 @@ export function DesktopSidebar({ tools, defaultCollapsed = false }: DesktopSideb
 
     const featuredTools = tools.filter((tool) => tool.featured);
 
-    // Responsive width calculation
-    const getWidth = () => {
-        if (!isExpanded) return 'w-16';
-
-        switch (screenSize) {
-            case 'large':
-                return 'w-80 xl:w-80 2xl:w-96'; // 320px on 2xl screens
-            case 'desktop':
-                return 'w-72 lg:w-72 xl:w-80'; // 280px standard, 320px on xl
-            case 'tablet':
-                return 'w-64 md:w-64 lg:w-72'; // Smaller on tablet
-            default:
-                return 'w-72';
-        }
-    };
-
     return (
         <TooltipProvider>
             <div
                 className={cn(
                     'border-r bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50 transition-all duration-300 ease-in-out flex flex-col h-screen',
-                    getWidth(),
-                    isHovered && 'shadow-lg shadow-primary/10'
+                    getWidth()
                 )}
                 onMouseEnter={handleMouseEnter}
                 onMouseLeave={handleMouseLeave}
