@@ -298,8 +298,8 @@ export class APIClient {
 
 				if (!name) return;
 
-				// Construct full page URL
-				const pageUrl = `${URLS.FORMULA_PAGE_BASE}?f=1&list=1&screen_id=${screenId}`;
+				// Construct full page URL (without list=1 - it's for results page, not editor)
+				const pageUrl = `${URLS.FORMULA_PAGE_BASE}?f=1&screen_id=${screenId}`;
 
 				// Avoid duplicates (though shouldn't be any with this approach)
 				if (!formulas.some(f => f.screenId === screenId)) {
@@ -372,21 +372,29 @@ export class APIClient {
 			const cheerio = await import('cheerio');
 			const $ = cheerio.load(html);
 
+			// Debug: Check what form elements exist
+			console.log('[APIClient] Found textareas:', $('textarea').length);
+			console.log('[APIClient] Found inputs:', $('input').length);
+			console.log('[APIClient] textarea[name="formula"] exists:', $('textarea[name="formula"]').length > 0);
+
 			let apiUrl: string | null = null;
 			let formulaText: string | null = null;
 
 			// Extract formula text - try multiple strategies
 			// Strategy 1: Look for textarea with name="formula"
 			formulaText = $('textarea[name="formula"]').val() as string;
+			console.log('[APIClient] Strategy 1 (textarea[name="formula"]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 
 			// Strategy 2: Look for input with name="formula"
 			if (!formulaText) {
 				formulaText = $('input[name="formula"]').val() as string;
+				console.log('[APIClient] Strategy 2 (input[name="formula"]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 			}
 
 			// Strategy 3: Look for readonly textarea or pre/code blocks
 			if (!formulaText) {
 				formulaText = $('textarea[readonly]').val() as string;
+				console.log('[APIClient] Strategy 3 (textarea[readonly]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 			}
 
 			// Strategy 4: Look for text following "Formula:" label
@@ -402,6 +410,35 @@ export class APIClient {
 						}
 					}
 				});
+				console.log('[APIClient] Strategy 4 (Formula: label):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
+			}
+
+			// Strategy 5: Look for formula in section header (on results page)
+			// The formula appears after: <font class="section">Screen Name:</font><br>(formula text)
+			if (!formulaText) {
+				const $sectionFont = $('font.section').filter((_, el) => {
+					const text = $(el).text();
+					return text.includes(':');
+				});
+
+				if ($sectionFont.length > 0) {
+					const $parentTd = $sectionFont.parent();
+					const htmlContent = $parentTd.html() || '';
+
+					// Extract text after </font><br> and before next tag or end
+					// Pattern: </font><br>(formula text here)<optional whitespace/newlines>
+					const match = htmlContent.match(/<\/font><br>([^<]+)/);
+					if (match && match[1]) {
+						formulaText = match[1]
+							.replace(/&gt;/g, '>')
+							.replace(/&lt;/g, '<')
+							.replace(/&amp;/g, '&')
+							.replace(/&quot;/g, '"')
+							.replace(/&apos;/g, "'")
+							.trim();
+						console.log('[APIClient] Strategy 5 (section header):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
+					}
+				}
 			}
 
 			if (formulaText) {
