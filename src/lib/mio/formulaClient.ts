@@ -1,6 +1,6 @@
 // src/lib/mio/formulaClient.ts
 
-import { SessionKeyValue } from './types';
+import { SessionKeyValue, MIO_URLS } from './types';
 import { ErrorHandler, Platform, ErrorLogger } from '../errors';
 
 export const FORMULA_SCREENER_URL = 'https://www.marketinout.com/stock-screener/formula_screener.php';
@@ -224,6 +224,53 @@ export class FormulaClient {
 				'editFormula',
 				undefined,
 				FORMULA_SCREENER_URL
+			);
+			ErrorLogger.logError(sessionError);
+			throw sessionError;
+		}
+	}
+
+	/**
+	 * Delete formula(s) from MIO
+	 * GET to my_stock_screens.php with todelete params and mode=delete
+	 * Supports multiple deletes: ?todelete=X&todelete=Y&mode=delete
+	 */
+	static async deleteFormula(
+		sessionKeyValue: SessionKeyValue,
+		screenIds: string[]
+	): Promise<void> {
+		try {
+			// Build query string with multiple todelete parameters
+			const deleteParams = screenIds.map(id => `todelete=${id}`).join('&');
+			const url = `${MIO_URLS.MY_STOCK_SCREENS}?${deleteParams}&mode=delete`;
+
+			console.log('[FormulaClient] Deleting formulas:', { screenIds, url });
+
+			const res = await fetch(url, {
+				method: 'GET',
+				headers: {
+					'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+					'Accept-Language': 'en-GB,en;q=0.5',
+					'Cookie': `${sessionKeyValue.key}=${sessionKeyValue.value}`,
+					'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+					'Referer': MIO_URLS.MY_STOCK_SCREENS,
+				},
+			});
+
+			console.log('[FormulaClient] Delete response status:', res.status);
+
+			if (!res.ok && res.status !== 302 && res.status !== 301) {
+				throw new Error(`Failed to delete formula: ${res.status} ${res.statusText}`);
+			}
+
+			console.log('[FormulaClient] Formulas deleted successfully');
+		} catch (error) {
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'deleteFormula',
+				undefined,
+				MIO_URLS.MY_STOCK_SCREENS
 			);
 			ErrorLogger.logError(sessionError);
 			throw sessionError;

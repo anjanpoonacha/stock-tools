@@ -44,7 +44,7 @@ export function useFormulaEditor(
 ): UseFormulaEditorReturn {
 	const [formData, setFormData] = useState<FormulaFormData>({
 		name: mode.formula?.name || '',
-		formula: '',
+		formula: mode.formula?.formulaText || '',
 		categoryId: 'price_action',
 		groupId: 'stock',
 		eventId: 'trend_up',
@@ -57,6 +57,24 @@ export function useFormulaEditor(
 	const [saving, setSaving] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const showToast = useToast();
+
+	// Reset form data when mode changes (e.g., create → edit → create)
+	useEffect(() => {
+		console.log('[useFormulaEditor] Mode changed:', {
+			mode: mode.mode,
+			hasFormula: !!mode.formula,
+			formulaText: mode.formula?.formulaText?.substring(0, 50),
+		});
+
+		setFormData({
+			name: mode.formula?.name || '',
+			formula: mode.formula?.formulaText || '',
+			categoryId: 'price_action',
+			groupId: 'stock',
+			eventId: 'trend_up',
+			screenId: mode.formula?.screenId,
+		});
+	}, [mode]);
 
 	// Load autocomplete data on mount
 	useEffect(() => {

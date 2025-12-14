@@ -333,14 +333,15 @@ export class APIClient {
 	}
 
 	/**
-	 * Extract API URL from a formula page
+	 * Extract API URL and formula text from a formula page
 	 * Navigates to the formula page and looks for "Web API" button/link
-	 * Returns the API URL or null if not found
+	 * Also extracts the formula text for editing
+	 * Returns object with apiUrl and formulaText (both can be null if not found)
 	 */
 	static async extractApiUrlFromFormula(
 		sessionKeyValue: SessionKeyValue,
 		formulaPageUrl: string
-	): Promise<string | null> {
+	): Promise<{ apiUrl: string | null; formulaText: string | null }> {
 		try {
 			// Fetch the formula page
 			const res = await fetch(formulaPageUrl, {
@@ -351,7 +352,7 @@ export class APIClient {
 
 			if (!res.ok) {
 				console.warn(`[APIClient] Failed to fetch formula page: ${formulaPageUrl} (status: ${res.status})`);
-				return null;
+				return { apiUrl: null, formulaText: null };
 			}
 
 			const html = await res.text();
@@ -367,11 +368,47 @@ export class APIClient {
 				throw error;
 			}
 
-			// Use cheerio to parse and find the API URL
+			// Use cheerio to parse and find the API URL and formula text
 			const cheerio = await import('cheerio');
 			const $ = cheerio.load(html);
 
 			let apiUrl: string | null = null;
+			let formulaText: string | null = null;
+
+			// Extract formula text - try multiple strategies
+			// Strategy 1: Look for textarea with name="formula"
+			formulaText = $('textarea[name="formula"]').val() as string;
+
+			// Strategy 2: Look for input with name="formula"
+			if (!formulaText) {
+				formulaText = $('input[name="formula"]').val() as string;
+			}
+
+			// Strategy 3: Look for readonly textarea or pre/code blocks
+			if (!formulaText) {
+				formulaText = $('textarea[readonly]').val() as string;
+			}
+
+			// Strategy 4: Look for text following "Formula:" label
+			if (!formulaText) {
+				$('td, div, span').each((_, el) => {
+					const text = $(el).text();
+					if (text.includes('Formula:')) {
+						// Get next sibling or child content
+						const nextText = $(el).next().text().trim();
+						if (nextText && nextText.length > 3) {
+							formulaText = nextText;
+							return false; // Break
+						}
+					}
+				});
+			}
+
+			if (formulaText) {
+				console.log(`[APIClient] Found formula text: ${formulaText.substring(0, 50)}...`);
+			} else {
+				console.warn(`[APIClient] No formula text found for ${formulaPageUrl}`);
+			}
 
 			// Method 1: Find Web API image button and extract api_key from onclick
 			// The Web API button is an <img> tag with onclick="api_info('api_key_here')"
@@ -385,20 +422,21 @@ export class APIClient {
 						const apiKey = apiKeyMatch[1];
 						apiUrl = `${URLS.API_BASE}?key=${apiKey}`;
 						console.log(`[APIClient] Found API URL via Web API button: ${apiUrl}`);
-						return apiUrl;
 					}
 				}
 			}
 
 			// Method 2: Fallback - look for direct links (legacy/alternate format)
-			$('a[href*="api.marketinout.com/run/screen"]').each((_, element) => {
-				const href = $(element).attr('href');
-				if (href && href.includes('key=')) {
-					apiUrl = href;
-					console.log(`[APIClient] Found API URL via direct link: ${apiUrl}`);
-					return false; // Break loop
-				}
-			});
+			if (!apiUrl) {
+				$('a[href*="api.marketinout.com/run/screen"]').each((_, element) => {
+					const href = $(element).attr('href');
+					if (href && href.includes('key=')) {
+						apiUrl = href;
+						console.log(`[APIClient] Found API URL via direct link: ${apiUrl}`);
+						return false; // Break loop
+					}
+				});
+			}
 
 			// Method 3: Fallback - check onclick handlers with full URL (legacy)
 			if (!apiUrl) {
@@ -419,14 +457,14 @@ export class APIClient {
 				console.warn(`[APIClient] No API URL found for ${formulaPageUrl}`);
 			}
 
-			return apiUrl;
+			return { apiUrl, formulaText };
 		} catch (error) {
 			if (error instanceof SessionError) {
 				throw error;
 			}
 
-			console.error(`[APIClient] Error extracting API URL from ${formulaPageUrl}:`, error);
-			return null;
+			console.error(`[APIClient] Error extracting data from ${formulaPageUrl}:`, error);
+			return { apiUrl: null, formulaText: null };
 		}
 	}
 }

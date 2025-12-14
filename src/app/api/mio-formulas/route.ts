@@ -196,7 +196,7 @@ export async function PUT(request: NextRequest) {
 }
 
 /**
- * DELETE - Remove formula
+ * DELETE - Remove formula from MIO and local storage
  */
 export async function DELETE(request: NextRequest) {
 	try {
@@ -223,7 +223,7 @@ export async function DELETE(request: NextRequest) {
 			);
 		}
 
-		// Find and remove the formula
+		// Find the formula to delete
 		const formulaIndex = storedData.formulas.findIndex(f => f.id === formulaId);
 		if (formulaIndex === -1) {
 			return NextResponse.json(
@@ -233,6 +233,25 @@ export async function DELETE(request: NextRequest) {
 		}
 
 		const deletedFormula = storedData.formulas[formulaIndex];
+
+		// Delete from MIO first
+		try {
+			const userCredentials = { userEmail, userPassword };
+			const sessionInfo = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
+
+			if (sessionInfo && sessionInfo.internalId && deletedFormula.screenId) {
+				console.log('[API] Deleting formula from MIO:', deletedFormula.screenId);
+				await MIOService.deleteFormulaWithSession(sessionInfo.internalId, [deletedFormula.screenId]);
+			} else {
+				console.warn('[API] No valid session or screenId, skipping MIO deletion');
+			}
+		} catch (mioError) {
+			console.error('[API] Error deleting from MIO:', mioError);
+			// Continue with local deletion even if MIO delete fails
+			// This allows cleanup of orphaned local entries
+		}
+
+		// Remove from local storage
 		storedData.formulas = storedData.formulas.filter(f => f.id !== formulaId);
 		storedData.totalCount = storedData.formulas.length;
 		storedData.lastUpdated = new Date().toISOString();

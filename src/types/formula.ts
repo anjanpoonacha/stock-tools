@@ -18,6 +18,7 @@ export interface MIOFormula {
 	pageUrl: string; // Formula detail page URL
 	apiUrl: string | null; // Web API URL (null if extraction pending/failed)
 	screenId: string; // Extracted from page URL
+	formulaText?: string; // Actual formula text (for editing)
 	createdAt: string; // ISO timestamp
 	updatedAt: string; // ISO timestamp
 	extractionStatus: 'pending' | 'success' | 'failed';
@@ -60,6 +61,7 @@ export const MIOFormulaSchema = z.object({
 	pageUrl: z.string().url('Invalid page URL'),
 	apiUrl: z.string().url('Invalid API URL').nullable(),
 	screenId: z.string().min(1, 'Screen ID is required'),
+	formulaText: z.string().optional(),
 	createdAt: z.string().datetime('Invalid created timestamp'),
 	updatedAt: z.string().datetime('Invalid updated timestamp'),
 	extractionStatus: z.enum(['pending', 'success', 'failed']),

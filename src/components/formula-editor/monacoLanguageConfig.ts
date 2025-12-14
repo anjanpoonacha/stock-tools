@@ -2,11 +2,20 @@
 
 import type { Monaco } from '@monaco-editor/react';
 
+// Singleton flag to prevent duplicate registration
+let languageRegistered = false;
+
 /**
- * Register custom MIO formula language with Monaco Editor
+ * Ensure custom MIO formula language is registered with Monaco Editor
+ * Uses singleton pattern to prevent duplicate registration
  * Provides syntax highlighting for MIO formula syntax
  */
-export function registerFormulaLanguage(monaco: Monaco): void {
+export function ensureLanguageRegistered(monaco: Monaco): void {
+	// Already registered, skip
+	if (languageRegistered) {
+		return;
+	}
+
 	// Register the language
 	monaco.languages.register({ id: 'mio-formula' });
 
@@ -97,4 +106,7 @@ export function registerFormulaLanguage(monaco: Monaco): void {
 		],
 		colors: {},
 	});
+
+	// Mark as registered
+	languageRegistered = true;
 }

@@ -21,6 +21,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit } from 'lucide-react';
 import { FormulaEditorDialog } from '@/components/formula-editor/FormulaEditorDialog';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const MioFormulasPageContent: React.FC = () => {
 	const { mioSessionAvailable, loading: sessionLoading } = useSessionAvailability();
@@ -270,14 +281,34 @@ const MioFormulasPageContent: React.FC = () => {
 													>
 														<Edit className='h-4 w-4' />
 													</Button>
-													<Button
-														size='sm'
-														variant='ghost'
-														onClick={() => deleteFormula(formula.id)}
-														title='Delete formula'
-													>
-														<Trash2 className='h-4 w-4 text-destructive' />
-													</Button>
+													<AlertDialog>
+														<AlertDialogTrigger asChild>
+															<Button
+																size='sm'
+																variant='ghost'
+																title='Delete formula'
+															>
+																<Trash2 className='h-4 w-4 text-destructive' />
+															</Button>
+														</AlertDialogTrigger>
+														<AlertDialogContent>
+															<AlertDialogHeader>
+																<AlertDialogTitle>Delete Formula?</AlertDialogTitle>
+																<AlertDialogDescription>
+																	Are you sure you want to delete &quot;{formula.name}&quot;? This will remove it from both MIO and your local storage. This action cannot be undone.
+																</AlertDialogDescription>
+															</AlertDialogHeader>
+															<AlertDialogFooter>
+																<AlertDialogCancel>Cancel</AlertDialogCancel>
+																<AlertDialogAction
+																	onClick={() => deleteFormula(formula.id)}
+																	className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+																>
+																	Delete
+																</AlertDialogAction>
+															</AlertDialogFooter>
+														</AlertDialogContent>
+													</AlertDialog>
 												</div>
 											</TableCell>
 										</TableRow>

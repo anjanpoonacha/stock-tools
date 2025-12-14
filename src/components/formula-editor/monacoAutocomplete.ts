@@ -2,18 +2,21 @@
 
 import type { Monaco } from '@monaco-editor/react';
 import type { FormulaIndicator, FormulaSample } from '@/types/formulaEditor';
+import type { IDisposable } from 'monaco-editor';
 
 /**
  * Register autocomplete (IntelliSense) provider for MIO formulas
  * Provides suggestions based on indicators and sample formulas
+ *
+ * @returns Disposable that should be disposed when provider is no longer needed
  */
 export function registerFormulaCompletionProvider(
 	monaco: Monaco,
 	indicators: FormulaIndicator[],
 	samples: FormulaSample[]
-): void {
+): IDisposable {
 	// Register completion provider
-	monaco.languages.registerCompletionItemProvider('mio-formula', {
+	const completionDisposable = monaco.languages.registerCompletionItemProvider('mio-formula', {
 		triggerCharacters: ['(', ',', ' '],
 
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,17 +30,40 @@ export function registerFormulaCompletionProvider(
 			};
 
 			// Build suggestions from indicators
-			const indicatorSuggestions = indicators.map((indicator) => ({
-				label: indicator.name,
-				kind: monaco.languages.CompletionItemKind.Function,
-				documentation: {
-					value: `**${indicator.name}**\n\n${indicator.description}\n\n**Syntax:** \`${indicator.syntax}\`${indicator.example ? `\n\n**Example:** \`${indicator.example}\`` : ''}`,
-				},
-				detail: indicator.category || 'indicator',
-				insertText: indicator.syntax,
-				range,
-				sortText: `a_${indicator.name}`, // Sort indicators first
-			}));
+			const indicatorSuggestions = indicators.map((indicator) => {
+				// Create snippet with placeholders for parameters
+				// E.g., "ADVOL(20)" -> "ADVOL(${1:period})"
+				let insertSnippet = indicator.name;
+
+				if (indicator.syntax.includes('(')) {
+					// Has parameters
+					const match = indicator.syntax.match(/\(([^)]+)\)/);
+					if (match && match[1]) {
+						// Parse parameters and create placeholders
+						const params = match[1].split(',').map((p, i) => {
+							const paramName = p.trim();
+							return `\${${i + 1}:${paramName}}`;
+						}).join(', ');
+						insertSnippet = `${indicator.name}(${params})`;
+					} else {
+						// Has parentheses but no clear params
+						insertSnippet = `${indicator.name}(\${1})`;
+					}
+				}
+
+				return {
+					label: indicator.name,
+					kind: monaco.languages.CompletionItemKind.Function,
+					insertText: insertSnippet,
+					insertTextFormat: 4, // Snippet format (CompletionItemInsertTextFormat enum value)
+					documentation: {
+						value: `**${indicator.name}**\n\n${indicator.description}\n\n**Syntax:** \`${indicator.syntax}\`${indicator.example ? `\n\n**Example:** \`${indicator.example}\`` : ''}`,
+					},
+					detail: indicator.syntax, // Show syntax as detail
+					range,
+					sortText: `a_${indicator.name}`, // Sort indicators first
+				};
+			});
 
 			// Build suggestions from samples
 			const sampleSuggestions = samples.map((sample, index) => ({
@@ -87,18 +113,45 @@ export function registerFormulaCompletionProvider(
 	});
 
 	// Register hover provider for documentation tooltips
-	monaco.languages.registerHoverProvider('mio-formula', {
+	const hoverDisposable = monaco.languages.registerHoverProvider('mio-formula', {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		provideHover: (model: any, position: any) => {
 			const word = model.getWordAtPosition(position);
-			if (!word) return null;
+			console.log('[HoverProvider] Hover triggered!');
+			console.log('[HoverProvider] Word at position:', word?.word);
+			console.log('[HoverProvider] Available indicators:', indicators.length);
+			console.log('[HoverProvider] Available samples:', samples.length);
+
+			if (!word) {
+				console.log('[HoverProvider] No word found at position');
+				return null;
+			}
 
 			// Find matching indicator
 			const indicator = indicators.find(
 				(i) => i.name.toLowerCase() === word.word.toLowerCase()
 			);
 
+			if (!indicator) {
+				console.log('[HoverProvider] Indicator not found for:', word.word);
+			} else {
+				console.log('[HoverProvider] Found indicator:', indicator.name);
+			}
+
 			if (indicator) {
+				console.log('[HoverProvider] Returning hover for:', indicator.name);
+
+				// Build markdown content
+				let markdownContent = `**${indicator.name}**\n\n${indicator.description}\n\n**Syntax:** \`${indicator.syntax}\``;
+
+				if (indicator.parameters && indicator.parameters.length > 0) {
+					markdownContent += `\n\n**Parameters:** ${indicator.parameters.join(', ')}`;
+				}
+
+				if (indicator.example) {
+					markdownContent += `\n\n**Example:** \`${indicator.example}\``;
+				}
+
 				return {
 					range: new monaco.Range(
 						position.lineNumber,
@@ -107,20 +160,36 @@ export function registerFormulaCompletionProvider(
 						word.endColumn
 					),
 					contents: [
-						{ value: `**${indicator.name}**` },
-						{ value: indicator.description },
-						{ value: `**Syntax:** \`${indicator.syntax}\`` },
-						...(indicator.parameters
-							? [{ value: `**Parameters:** ${indicator.parameters.join(', ')}` }]
-							: []),
-						...(indicator.example ? [{ value: `**Example:** \`${indicator.example}\`` }] : []),
+						{ value: markdownContent }
 					],
 				};
 			}
 
-			// Find matching sample
-			const sample = samples.find((s) => s.name.toLowerCase().includes(word.word.toLowerCase()));
+			// Find matching sample - use exact match or starts with, not contains
+			const sample = samples.find((s) => {
+				const lowerName = s.name.toLowerCase();
+				const lowerWord = word.word.toLowerCase();
+				return lowerName === lowerWord || lowerName.startsWith(lowerWord);
+			});
+
 			if (sample) {
+				console.log('[HoverProvider] Returning hover for sample:', sample.name);
+
+				let sampleContent = `**${sample.name}**\n\n`;
+				if (sample.description) {
+					// Limit description length
+					const desc = sample.description.length > 200
+						? sample.description.substring(0, 200) + '...'
+						: sample.description;
+					sampleContent += `${desc}\n\n`;
+				}
+
+				// Limit formula length
+				const formula = sample.formula.length > 300
+					? sample.formula.substring(0, 300) + '...'
+					: sample.formula;
+				sampleContent += `\`\`\`\n${formula}\n\`\`\``;
+
 				return {
 					range: new monaco.Range(
 						position.lineNumber,
@@ -129,9 +198,7 @@ export function registerFormulaCompletionProvider(
 						word.endColumn
 					),
 					contents: [
-						{ value: `**${sample.name}**` },
-						...(sample.description ? [{ value: sample.description }] : []),
-						{ value: `\`\`\`\n${sample.formula}\n\`\`\`` },
+						{ value: sampleContent }
 					],
 				};
 			}
@@ -141,7 +208,7 @@ export function registerFormulaCompletionProvider(
 	});
 
 	// Register signature help provider (for function parameters)
-	monaco.languages.registerSignatureHelpProvider('mio-formula', {
+	const signatureDisposable = monaco.languages.registerSignatureHelpProvider('mio-formula', {
 		signatureHelpTriggerCharacters: ['(', ','],
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		provideSignatureHelp: (model: any, position: any) => {
@@ -185,4 +252,13 @@ export function registerFormulaCompletionProvider(
 			};
 		},
 	});
+
+	// Return a combined disposable that disposes all three providers
+	return {
+		dispose: () => {
+			completionDisposable.dispose();
+			hoverDisposable.dispose();
+			signatureDisposable.dispose();
+		},
+	};
 }

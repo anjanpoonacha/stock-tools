@@ -57,18 +57,32 @@ export async function POST(request: NextRequest) {
 
 		console.log('[API] Formula created successfully:', { screenId: result.screenId });
 
+		// Extract API URL immediately after creation
+		console.log('[API] Extracting API URL from formula page:', result.redirectUrl);
+		const extracted = await MIOService.extractApiUrlFromFormula(
+			sessionInfo.internalId,
+			result.redirectUrl
+		);
+
 		// Create MIOFormula object for storage
 		const now = new Date().toISOString();
 		const newFormula: MIOFormula = {
 			id: `formula_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 			name,
 			pageUrl: result.redirectUrl,
-			apiUrl: null, // Will be populated by extraction if needed
+			apiUrl: extracted.apiUrl,
 			screenId: result.screenId,
 			createdAt: now,
 			updatedAt: now,
-			extractionStatus: 'pending',
+			extractionStatus: extracted.apiUrl ? 'success' : 'failed',
+			formulaText: extracted.formulaText || undefined,
 		};
+
+		console.log('[API] Formula stored with API URL:', {
+			hasApiUrl: !!extracted.apiUrl,
+			hasFormulaText: !!extracted.formulaText,
+			extractionStatus: newFormula.extractionStatus
+		});
 
 		// Add to stored formulas
 		const key = generateFormulasKey(userEmail, userPassword);
