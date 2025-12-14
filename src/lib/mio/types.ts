@@ -51,6 +51,7 @@ export const MIO_URLS = {
 	MY_WATCHLISTS: 'https://www.marketinout.com/wl/my_watch_lists.php',
 	FORMULA_LIST: 'https://www.marketinout.com/stock-screener/my_stock_screens.php',
 	FORMULA_PAGE_BASE: 'https://www.marketinout.com/stock-screener/stocks.php',
+	FORMULA_SCREENER: 'https://www.marketinout.com/stock-screener/formula_screener.php',
 	API_BASE: 'https://api.marketinout.com/run/screen',
 } as const;
 

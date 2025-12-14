@@ -1,5 +1,5 @@
 'use client';
-import React from 'react';
+import React, { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,7 @@ import { useFormulaExtraction } from '@/hooks/useFormulaExtraction';
 import { Badge } from '@/components/ui/badge';
 import { UsageGuide } from '@/components/UsageGuide';
 import type { MIOFormula } from '@/types/formula';
+import type { FormulaEditorMode } from '@/types/formulaEditor';
 import {
 	Table,
 	TableBody,
@@ -18,7 +19,8 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw } from 'lucide-react';
+import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit } from 'lucide-react';
+import { FormulaEditorDialog } from '@/components/formula-editor/FormulaEditorDialog';
 
 const MioFormulasPageContent: React.FC = () => {
 	const { mioSessionAvailable, loading: sessionLoading } = useSessionAvailability();
@@ -33,7 +35,31 @@ const MioFormulasPageContent: React.FC = () => {
 		copyToClipboard,
 		copyAllApiUrls,
 		exportFormulas,
+		loadFormulas,
 	} = useFormulaExtraction();
+
+	// Formula editor dialog state
+	const [editorDialogOpen, setEditorDialogOpen] = useState(false);
+	const [editorMode, setEditorMode] = useState<FormulaEditorMode>({ mode: 'create' });
+
+	// Handler to open create dialog
+	const handleCreateFormula = () => {
+		setEditorMode({ mode: 'create' });
+		setEditorDialogOpen(true);
+	};
+
+	// Handler to open edit dialog
+	const handleEditFormula = (formula: MIOFormula) => {
+		setEditorMode({ mode: 'edit', formula });
+		setEditorDialogOpen(true);
+	};
+
+	// Handler for successful create/edit
+	const handleEditorSuccess = async () => {
+		setEditorDialogOpen(false);
+		// Refresh formula list
+		await loadFormulas();
+	};
 
 	const getStatusBadge = (formula: MIOFormula) => {
 		switch (formula.extractionStatus) {
@@ -63,8 +89,10 @@ const MioFormulasPageContent: React.FC = () => {
 				title="How to Use Formula Manager"
 				steps={[
 					'Ensure you have captured your MIO session using the browser extension',
-					'Click "Extract Formulas from MIO" to fetch all your formulas',
+					'Click "Create Formula" to build new formulas with autocomplete editor',
+					'Click "Extract Formulas from MIO" to fetch all your existing formulas',
 					'View formula details including screen ID, page URL, and API URL',
+					'Edit formulas directly from the table using the edit button',
 					'Copy individual API URLs or export all formulas as JSON',
 					'Delete formulas you no longer need from your saved list'
 				]}
@@ -105,9 +133,19 @@ const MioFormulasPageContent: React.FC = () => {
 			{/* Action Buttons */}
 			<div className='flex flex-wrap gap-3'>
 				<Button
+					onClick={handleCreateFormula}
+					disabled={!mioSessionAvailable || sessionLoading}
+					size='default'
+				>
+					<Plus className='h-4 w-4 mr-2' />
+					Create Formula
+				</Button>
+
+				<Button
 					onClick={extractFormulas}
 					disabled={!mioSessionAvailable || sessionLoading || extracting}
 					size='default'
+					variant='outline'
 				>
 					{extracting ? (
 						<>
@@ -223,13 +261,24 @@ const MioFormulasPageContent: React.FC = () => {
 											</TableCell>
 											<TableCell>{getStatusBadge(formula)}</TableCell>
 											<TableCell className='text-right'>
-												<Button
-													size='sm'
-													variant='ghost'
-													onClick={() => deleteFormula(formula.id)}
-												>
-													<Trash2 className='h-4 w-4 text-destructive' />
-												</Button>
+												<div className='flex items-center justify-end gap-1'>
+													<Button
+														size='sm'
+														variant='ghost'
+														onClick={() => handleEditFormula(formula)}
+														title='Edit formula'
+													>
+														<Edit className='h-4 w-4' />
+													</Button>
+													<Button
+														size='sm'
+														variant='ghost'
+														onClick={() => deleteFormula(formula.id)}
+														title='Delete formula'
+													>
+														<Trash2 className='h-4 w-4 text-destructive' />
+													</Button>
+												</div>
 											</TableCell>
 										</TableRow>
 									))}
@@ -239,6 +288,14 @@ const MioFormulasPageContent: React.FC = () => {
 					</CardContent>
 				</Card>
 			)}
+
+			{/* Formula Editor Dialog */}
+			<FormulaEditorDialog
+				open={editorDialogOpen}
+				onOpenChange={setEditorDialogOpen}
+				mode={editorMode}
+				onSuccess={handleEditorSuccess}
+			/>
 		</div>
 	);
 };

@@ -2,6 +2,7 @@
 
 import { SessionManager } from './sessionManager';
 import { APIClient } from './apiClient';
+import { FormulaClient, type FormulaCreateEditResult } from './formulaClient';
 import {
 	SessionError,
 	ErrorHandler,
@@ -374,5 +375,60 @@ export class MIOService {
 				errors: [{ formulaName: 'All formulas', error: errorMessage }],
 			};
 		}
+	}
+
+	/**
+	 * Create new formula on MIO
+	 */
+	static async createFormulaWithSession(
+		internalSessionId: string,
+		params: {
+			name: string;
+			formula: string;
+			categoryId?: string;
+			groupId?: string;
+			eventId?: string;
+		}
+	): Promise<FormulaCreateEditResult> {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'createFormulaWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return FormulaClient.createFormula({ sessionKeyValue, ...params });
+	}
+
+	/**
+	 * Edit existing formula on MIO
+	 */
+	static async editFormulaWithSession(
+		internalSessionId: string,
+		params: {
+			screenId: string;
+			name: string;
+			formula: string;
+			categoryId?: string;
+			groupId?: string;
+			eventId?: string;
+		}
+	): Promise<FormulaCreateEditResult> {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'editFormulaWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return FormulaClient.editFormula({ sessionKeyValue, ...params });
 	}
 }
