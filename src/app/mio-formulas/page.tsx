@@ -1,5 +1,6 @@
 'use client';
-import React, { useState } from 'react';
+import React from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import { Badge } from '@/components/ui/badge';
 import { UsageGuide } from '@/components/UsageGuide';
 import { useToast } from '@/components/ui/toast';
 import type { MIOFormula } from '@/types/formula';
-import type { FormulaEditorMode } from '@/types/formulaEditor';
 import {
 	Table,
 	TableBody,
@@ -21,7 +21,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit } from 'lucide-react';
-import { FormulaEditorDialog } from '@/components/formula-editor/FormulaEditorDialog';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -35,6 +34,7 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const MioFormulasPageContent: React.FC = () => {
+	const router = useRouter();
 	const { mioSessionAvailable, loading: sessionLoading } = useSessionAvailability();
 	const showToast = useToast();
 	const {
@@ -48,21 +48,19 @@ const MioFormulasPageContent: React.FC = () => {
 		copyToClipboard,
 		copyAllApiUrls,
 		exportFormulas,
-		loadFormulas,
 	} = useFormulaExtraction();
 
-	// Formula editor dialog state
-	const [editorDialogOpen, setEditorDialogOpen] = useState(false);
-	const [editorMode, setEditorMode] = useState<FormulaEditorMode>({ mode: 'create' });
+	// Track which formula is being edited
+	const [editingFormulaId, setEditingFormulaId] = React.useState<string | null>(null);
 
-	// Handler to open create dialog
+	// Handler to navigate to create page
 	const handleCreateFormula = () => {
-		setEditorMode({ mode: 'create' });
-		setEditorDialogOpen(true);
+		router.push('/mio-formulas/editor?mode=create');
 	};
 
-	// Handler to open edit dialog
+	// Handler to navigate to edit page
 	const handleEditFormula = async (formula: MIOFormula) => {
+		setEditingFormulaId(formula.id);
 		console.log('[MioFormulasPage] Edit clicked for:', formula.name);
 		console.log('[MioFormulasPage] Formula text exists:', !!formula.formulaText);
 
@@ -122,15 +120,14 @@ const MioFormulasPageContent: React.FC = () => {
 			}
 		}
 
-		setEditorMode({ mode: 'edit', formula });
-		setEditorDialogOpen(true);
-	};
+		// Store formula data in session storage for the editor page
+		sessionStorage.setItem(`formula-editor-data-${formula.screenId}`, JSON.stringify(formula));
 
-	// Handler for successful create/edit
-	const handleEditorSuccess = async () => {
-		setEditorDialogOpen(false);
-		// Refresh formula list
-		await loadFormulas();
+		// Navigate to editor page
+		router.push(`/mio-formulas/editor?mode=edit&screenId=${formula.screenId}`);
+		
+		// Clear loading state after navigation
+		setEditingFormulaId(null);
 	};
 
 	const getStatusBadge = (formula: MIOFormula) => {
@@ -339,8 +336,13 @@ const MioFormulasPageContent: React.FC = () => {
 														variant='ghost'
 														onClick={() => handleEditFormula(formula)}
 														title='Edit formula'
+														disabled={editingFormulaId === formula.id}
 													>
-														<Edit className='h-4 w-4' />
+														{editingFormulaId === formula.id ? (
+															<Loader2 className='h-4 w-4 animate-spin' />
+														) : (
+															<Edit className='h-4 w-4' />
+														)}
 													</Button>
 													<AlertDialog>
 														<AlertDialogTrigger asChild>
@@ -380,14 +382,6 @@ const MioFormulasPageContent: React.FC = () => {
 					</CardContent>
 				</Card>
 			)}
-
-			{/* Formula Editor Dialog */}
-			<FormulaEditorDialog
-				open={editorDialogOpen}
-				onOpenChange={setEditorDialogOpen}
-				mode={editorMode}
-				onSuccess={handleEditorSuccess}
-			/>
 		</div>
 	);
 };
