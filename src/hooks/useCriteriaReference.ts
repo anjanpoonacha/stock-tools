@@ -83,18 +83,14 @@ export function useCriteriaReference(
     
     try {
       const options = await apiClient.getOptions(criterionId);
-      
+
       // Update loaded options cache
       setLoadedOptions(prev => new Map(prev).set(criterionId, options));
-      
-      console.log(`[useCriteriaReference] Loaded ${options.length} options for ${criterionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Store error message
       setErrors(prev => new Map(prev).set(criterionId, errorMessage));
-      
-      console.error(`[useCriteriaReference] Failed to load options for ${criterionId}:`, error);
     } finally {
       // Remove from loading set
       setLoadingCriteria(prev => {
@@ -124,18 +120,14 @@ export function useCriteriaReference(
     
     try {
       const options = await apiClient.refreshOptions(criterionId);
-      
+
       // Update loaded options cache
       setLoadedOptions(prev => new Map(prev).set(criterionId, options));
-      
-      console.log(`[useCriteriaReference] Refreshed ${options.length} options for ${criterionId}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       // Store error message
       setErrors(prev => new Map(prev).set(criterionId, errorMessage));
-      
-      console.error(`[useCriteriaReference] Failed to refresh options for ${criterionId}:`, error);
     } finally {
       // Remove from loading set
       setLoadingCriteria(prev => {
