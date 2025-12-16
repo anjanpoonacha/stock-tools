@@ -52,82 +52,90 @@ const MioFormulasPageContent: React.FC = () => {
 
 	// Track which formula is being edited
 	const [editingFormulaId, setEditingFormulaId] = React.useState<string | null>(null);
+	const [isCreating, setIsCreating] = React.useState(false);
 
 	// Handler to navigate to create page
 	const handleCreateFormula = () => {
+		setIsCreating(true);
 		router.push('/mio-formulas/editor?mode=create');
+		// Loading state clears on component unmount during navigation
 	};
 
 	// Handler to navigate to edit page
 	const handleEditFormula = async (formula: MIOFormula) => {
-		setEditingFormulaId(formula.id);
-		console.log('[MioFormulasPage] Edit clicked for:', formula.name);
-		console.log('[MioFormulasPage] Formula text exists:', !!formula.formulaText);
+		try {
+			setEditingFormulaId(formula.id);
+			console.log('[MioFormulasPage] Edit clicked for:', formula.name);
+			console.log('[MioFormulasPage] Formula text exists:', !!formula.formulaText);
 
-		// If formula text doesn't exist, fetch it from the page URL
-		if (!formula.formulaText && formula.pageUrl) {
-			// Normalize URL: Remove list=1 parameter from old URLs
-			let normalizedUrl = formula.pageUrl;
-			if (normalizedUrl.includes('list=1')) {
-				// Extract screen_id and reconstruct URL in correct format
-				const screenIdMatch = normalizedUrl.match(/screen_id=(\d+)/);
-				if (screenIdMatch) {
-					normalizedUrl = `https://www.marketinout.com/stock-screener/stocks.php?f=1&screen_id=${screenIdMatch[1]}`;
-					console.log('[MioFormulasPage] Normalized URL from:', formula.pageUrl);
-					console.log('[MioFormulasPage] Normalized URL to:', normalizedUrl);
+			// If formula text doesn't exist, fetch it from the page URL
+			if (!formula.formulaText && formula.pageUrl) {
+				// Normalize URL: Remove list=1 parameter from old URLs
+				let normalizedUrl = formula.pageUrl;
+				if (normalizedUrl.includes('list=1')) {
+					// Extract screen_id and reconstruct URL in correct format
+					const screenIdMatch = normalizedUrl.match(/screen_id=(\d+)/);
+					if (screenIdMatch) {
+						normalizedUrl = `https://www.marketinout.com/stock-screener/stocks.php?f=1&screen_id=${screenIdMatch[1]}`;
+						console.log('[MioFormulasPage] Normalized URL from:', formula.pageUrl);
+						console.log('[MioFormulasPage] Normalized URL to:', normalizedUrl);
+					}
 				}
-			}
 
-			console.log('[MioFormulasPage] Fetching formula text from:', normalizedUrl);
+				console.log('[MioFormulasPage] Fetching formula text from:', normalizedUrl);
 
-			try {
-				const credentials = JSON.parse(localStorage.getItem('mio-tv-auth-credentials') || '{}');
-				const params = new URLSearchParams({
-					userEmail: credentials.userEmail,
-					userPassword: credentials.userPassword,
-					pageUrl: normalizedUrl,
-				});
-
-				const response = await fetch(`/api/mio-formulas/extract-text?${params}`);
-				console.log('[MioFormulasPage] Response status:', response.status, response.ok);
-
-				if (response.ok) {
-					const data = await response.json();
-					console.log('[MioFormulasPage] Response data:', {
-						success: data.success,
-						hasFormulaText: !!data.formulaText,
-						formulaTextLength: data.formulaText?.length,
-						hasApiUrl: !!data.apiUrl,
-						error: data.error,
+				try {
+					const credentials = JSON.parse(localStorage.getItem('mio-tv-auth-credentials') || '{}');
+					const params = new URLSearchParams({
+						userEmail: credentials.userEmail,
+						userPassword: credentials.userPassword,
+						pageUrl: normalizedUrl,
 					});
 
-					if (data.formulaText) {
-						console.log('[MioFormulasPage] ✓ Extracted formula text:', data.formulaText.substring(0, 50));
-						// Update formula object with extracted text
-						formula = { ...formula, formulaText: data.formulaText };
+					const response = await fetch(`/api/mio-formulas/extract-text?${params}`);
+					console.log('[MioFormulasPage] Response status:', response.status, response.ok);
+
+					if (response.ok) {
+						const data = await response.json();
+						console.log('[MioFormulasPage] Response data:', {
+							success: data.success,
+							hasFormulaText: !!data.formulaText,
+							formulaTextLength: data.formulaText?.length,
+							hasApiUrl: !!data.apiUrl,
+							error: data.error,
+						});
+
+						if (data.formulaText) {
+							console.log('[MioFormulasPage] ✓ Extracted formula text:', data.formulaText.substring(0, 50));
+							// Update formula object with extracted text
+							formula = { ...formula, formulaText: data.formulaText };
+						} else {
+							console.warn('[MioFormulasPage] ✗ No formula text in response');
+							showToast('Could not extract formula text from page', 'error');
+							return; // Exit early - don't navigate on error
+						}
 					} else {
-						console.warn('[MioFormulasPage] ✗ No formula text in response');
-						showToast('Could not extract formula text from page', 'error');
+						const errorData = await response.json().catch(() => ({}));
+						console.error('[MioFormulasPage] Failed to extract formula text:', errorData);
+						showToast(`Could not load formula text: ${errorData.error || 'Unknown error'}`, 'error');
+						return; // Exit early - don't navigate on error
 					}
-				} else {
-					const errorData = await response.json().catch(() => ({}));
-					console.error('[MioFormulasPage] Failed to extract formula text:', errorData);
-					showToast(`Could not load formula text: ${errorData.error || 'Unknown error'}`, 'error');
+				} catch (error) {
+					console.error('[MioFormulasPage] Error fetching formula text:', error);
+					showToast('Error loading formula text', 'error');
+					return; // Exit early - don't navigate on error
 				}
-			} catch (error) {
-				console.error('[MioFormulasPage] Error fetching formula text:', error);
-				showToast('Error loading formula text', 'error');
 			}
+
+			// Store formula data in session storage for the editor page
+			sessionStorage.setItem(`formula-editor-data-${formula.screenId}`, JSON.stringify(formula));
+
+			// Navigate to editor page
+			router.push(`/mio-formulas/editor?mode=edit&screenId=${formula.screenId}`);
+		} finally {
+			// Always clear loading state, even on errors
+			setEditingFormulaId(null);
 		}
-
-		// Store formula data in session storage for the editor page
-		sessionStorage.setItem(`formula-editor-data-${formula.screenId}`, JSON.stringify(formula));
-
-		// Navigate to editor page
-		router.push(`/mio-formulas/editor?mode=edit&screenId=${formula.screenId}`);
-		
-		// Clear loading state after navigation
-		setEditingFormulaId(null);
 	};
 
 	const getStatusBadge = (formula: MIOFormula) => {
@@ -203,11 +211,20 @@ const MioFormulasPageContent: React.FC = () => {
 			<div className='flex flex-wrap gap-3'>
 				<Button
 					onClick={handleCreateFormula}
-					disabled={!mioSessionAvailable || sessionLoading}
+					disabled={!mioSessionAvailable || sessionLoading || isCreating}
 					size='default'
 				>
-					<Plus className='h-4 w-4 mr-2' />
-					Create Formula
+					{isCreating ? (
+						<>
+							<Loader2 className='h-4 w-4 mr-2 animate-spin' />
+							Creating...
+						</>
+					) : (
+						<>
+							<Plus className='h-4 w-4 mr-2' />
+							Create Formula
+						</>
+					)}
 				</Button>
 
 				<Button
