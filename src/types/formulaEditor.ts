@@ -31,6 +31,7 @@ export interface FormulaDocumentation {
 	topic: string;
 	content: string;
 	url?: string;
+	date?: string;
 }
 
 /**

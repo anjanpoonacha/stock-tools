@@ -92,3 +92,7 @@ temp/
 web-ext-artifacts/
 *.pem
 *.key
+
+# MIO parser output and analysis
+/output/
+*.baseline.json
