@@ -26,17 +26,12 @@ export class SessionManager {
 			const healthAwareResult = await getHealthAwareSessionData(internalSessionId);
 
 			if (!healthAwareResult.sessionExists) {
-				console.warn(`[SessionManager] No valid session found for ID: ${internalSessionId}`, {
-					overallStatus: healthAwareResult.overallStatus,
-					recommendations: healthAwareResult.recommendations
-				});
 				return undefined;
 			}
 
 			// Get the actual session data from session store
 			const session = await getPlatformSession(internalSessionId, 'marketinout');
 			if (!session) {
-				console.warn(`[SessionManager] No MarketInOut session found for ID: ${internalSessionId}`);
 				return undefined;
 			}
 
@@ -54,7 +49,6 @@ export class SessionManager {
 				return { key, value: session[key] };
 			}
 
-			console.warn(`[SessionManager] No valid session cookies found for ID: ${internalSessionId}`);
 			return undefined;
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(
@@ -77,22 +71,16 @@ export class SessionManager {
 		try {
 			const setCookieHeaders = response.headers.get('set-cookie');
 			if (!setCookieHeaders) {
-				console.debug('[SessionManager] No set-cookie headers found in response');
 				return null;
 			}
 
 			// Use CookieParser for robust parsing
 			const parseResult = CookieParser.parseSetCookieHeader(setCookieHeaders);
 
-			if (parseResult.errors.length > 0) {
-				console.warn('[SessionManager] Cookie parsing errors:', parseResult.errors);
-			}
-
 			// Extract all ASPSESSION cookies
 			const aspSessionCookies = CookieParser.extractASPSESSION(parseResult.aspSessionCookies);
 
 			if (Object.keys(aspSessionCookies).length > 0) {
-				console.log(`[SessionManager] Extracted ${Object.keys(aspSessionCookies).length} ASPSESSION cookies:`, Object.keys(aspSessionCookies));
 				return aspSessionCookies;
 			}
 
@@ -108,10 +96,6 @@ export class SessionManager {
 			}
 
 			const hasSessionData = Object.keys(allCookies).length > 0;
-			if (!hasSessionData) {
-				console.debug('[SessionManager] No session cookies found in response');
-			}
-
 			return hasSessionData ? allCookies : null;
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(
@@ -186,11 +170,8 @@ export class SessionManager {
 	 */
 	static async refreshSession(internalSessionId: string): Promise<boolean> {
 		try {
-			console.log(`[SessionManager] Refreshing session for ${internalSessionId}`);
-
 			const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
 			if (!sessionKeyValue) {
-				console.warn(`[SessionManager] No valid session to refresh for ID: ${internalSessionId}`);
 				return false;
 			}
 
@@ -203,12 +184,6 @@ export class SessionManager {
 			});
 
 			const isRefreshed = res.ok || res.status === 302;
-			if (isRefreshed) {
-				console.log(`[SessionManager] Session refreshed successfully for ID: ${internalSessionId}`);
-			} else {
-				console.warn(`[SessionManager] Session refresh failed for ID: ${internalSessionId} with status: ${res.status}`);
-			}
-
 			return isRefreshed;
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(
@@ -238,7 +213,7 @@ export class SessionManager {
 		try {
 			await monitor.checkSessionHealth(internalSessionId, 'marketinout');
 		} catch (error) {
-			console.warn('[SessionManager] Failed to update health status after successful operation:', error);
+			// Silently handle health monitor update failures
 		}
 	}
 }

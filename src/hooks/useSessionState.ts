@@ -14,12 +14,10 @@ export function useSessionState() {
 	// Migration is now handled by AuthContext automatically
 
 	const login = useCallback(async (credentials: AuthCredentials) => {
-		console.log('[useSessionState] Delegating login to AuthContext');
 		return await auth.login(credentials);
 	}, [auth]);
 
 	const logout = useCallback(() => {
-		console.log('[useSessionState] Delegating logout to AuthContext');
 		// Clean up any remaining old keys
 		localStorage.removeItem('userEmail');
 		localStorage.removeItem('userPassword');
@@ -27,7 +25,6 @@ export function useSessionState() {
 	}, [auth]);
 
 	const refreshSession = useCallback(async () => {
-		console.log('[useSessionState] Delegating refresh to AuthContext');
 		await auth.checkAuthStatus();
 	}, [auth]);
 
@@ -35,7 +32,6 @@ export function useSessionState() {
 	const autoLogin = useCallback(async () => {
 		// AuthContext handles auto-login in its useEffect
 		// This is kept for API compatibility but does nothing
-		console.log('[useSessionState] Auto-login handled by AuthContext');
 	}, []);
 
 	// Map AuthContext state to useSessionState API
@@ -85,7 +81,6 @@ export function useSessionState() {
 		// Utilities
 		clearError: () => {
 			// AuthContext doesn't have clearError, so this is a no-op
-			console.log('[useSessionState] clearError called - handled by AuthContext');
 		},
 	};
 }

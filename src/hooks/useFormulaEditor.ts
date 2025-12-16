@@ -60,12 +60,6 @@ export function useFormulaEditor(
 
 	// Reset form data when mode changes (e.g., create → edit → create)
 	useEffect(() => {
-		console.log('[useFormulaEditor] Mode changed:', {
-			mode: mode.mode,
-			hasFormula: !!mode.formula,
-			formulaText: mode.formula?.formulaText?.substring(0, 50),
-		});
-
 		setFormData({
 			name: mode.formula?.name || '',
 			formula: mode.formula?.formulaText || '',
@@ -91,7 +85,6 @@ export function useFormulaEditor(
 			const cachedData = FormulaCacheManager.get();
 
 			if (cachedData && !FormulaCacheManager.isExpired()) {
-				console.log('[useFormulaEditor] Using cached autocomplete data');
 				setIndicators(cachedData.indicators);
 				setSamples(cachedData.samples);
 				setLoading(false);
@@ -99,7 +92,6 @@ export function useFormulaEditor(
 			}
 
 			// Fetch fresh data from API
-			console.log('[useFormulaEditor] Fetching fresh autocomplete data');
 			const credentials = getCredentials();
 			const params = new URLSearchParams({
 				userEmail: credentials.userEmail,
@@ -123,8 +115,6 @@ export function useFormulaEditor(
 				samples: data.samples || [],
 				documentation: data.documentation || [],
 			});
-
-			console.log(`[useFormulaEditor] Loaded ${data.indicators?.length || 0} indicators, ${data.samples?.length || 0} samples`);
 		} catch (err) {
 			console.error('[useFormulaEditor] Failed to load autocomplete data:', err);
 			const errorMessage = err instanceof Error ? err.message : 'Failed to load autocomplete data';
@@ -153,11 +143,6 @@ export function useFormulaEditor(
 						: '/api/mio-formulas/edit';
 				const method = mode.mode === 'create' ? 'POST' : 'PUT';
 
-				console.log(`[useFormulaEditor] ${mode.mode === 'create' ? 'Creating' : 'Editing'} formula:`, {
-					name: formData.name,
-					formulaLength: formData.formula.length,
-				});
-
 				const res = await fetch(endpoint, {
 					method,
 					headers: { 'Content-Type': 'application/json' },
@@ -173,10 +158,7 @@ export function useFormulaEditor(
 					throw new Error(errorData.error || `Failed to ${mode.mode} formula`);
 				}
 
-				const result = await res.json();
-				console.log(`[useFormulaEditor] Formula ${mode.mode === 'create' ? 'created' : 'edited'} successfully:`, {
-					screenId: result.screenId,
-				});
+				await res.json();
 
 				showToast(
 					mode.mode === 'create'

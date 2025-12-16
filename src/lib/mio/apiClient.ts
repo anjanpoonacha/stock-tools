@@ -216,7 +216,6 @@ export class APIClient {
 		}
 		const params = todeleteIds.map((id) => `todelete=${encodeURIComponent(id)}`).join('&');
 		const url = `${URLS.MY_WATCHLISTS}?${params}&mode=delete`;
-		console.log('[APIClient][deleteWatchlists] url:', url, 'params:', params, 'ids:', todeleteIds);
 		const res = await fetch(url, {
 			method: 'GET',
 			headers: {
@@ -276,8 +275,6 @@ export class APIClient {
 			// Parse the table containing formulas
 			const formulas: FormulaListItem[] = [];
 
-			console.log(`[APIClient] Parsing formula list page...`);
-			console.log(`[APIClient] Found ${$('tr[id^="screen"]').length} table rows`);
 
 			// Select all table rows with id starting with "screen"
 			$('tr[id^="screen"]').each((_, element) => {
@@ -311,7 +308,6 @@ export class APIClient {
 				}
 			});
 
-			console.log(`[APIClient] Successfully extracted ${formulas.length} formulas`);
 			return formulas;
 		} catch (error) {
 			// If it's already a SessionError, re-throw it
@@ -351,7 +347,6 @@ export class APIClient {
 			});
 
 			if (!res.ok) {
-				console.warn(`[APIClient] Failed to fetch formula page: ${formulaPageUrl} (status: ${res.status})`);
 				return { apiUrl: null, formulaText: null };
 			}
 
@@ -372,10 +367,6 @@ export class APIClient {
 			const cheerio = await import('cheerio');
 			const $ = cheerio.load(html);
 
-			// Debug: Check what form elements exist
-			console.log('[APIClient] Found textareas:', $('textarea').length);
-			console.log('[APIClient] Found inputs:', $('input').length);
-			console.log('[APIClient] textarea[name="formula"] exists:', $('textarea[name="formula"]').length > 0);
 
 			let apiUrl: string | null = null;
 			let formulaText: string | null = null;
@@ -383,18 +374,15 @@ export class APIClient {
 			// Extract formula text - try multiple strategies
 			// Strategy 1: Look for textarea with name="formula"
 			formulaText = $('textarea[name="formula"]').val() as string;
-			console.log('[APIClient] Strategy 1 (textarea[name="formula"]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 
 			// Strategy 2: Look for input with name="formula"
 			if (!formulaText) {
 				formulaText = $('input[name="formula"]').val() as string;
-				console.log('[APIClient] Strategy 2 (input[name="formula"]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 			}
 
 			// Strategy 3: Look for readonly textarea or pre/code blocks
 			if (!formulaText) {
 				formulaText = $('textarea[readonly]').val() as string;
-				console.log('[APIClient] Strategy 3 (textarea[readonly]):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 			}
 
 			// Strategy 4: Look for text following "Formula:" label
@@ -410,7 +398,6 @@ export class APIClient {
 						}
 					}
 				});
-				console.log('[APIClient] Strategy 4 (Formula: label):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 			}
 
 			// Strategy 5: Look for formula in section header (on results page)
@@ -436,15 +423,8 @@ export class APIClient {
 							.replace(/&quot;/g, '"')
 							.replace(/&apos;/g, "'")
 							.trim();
-						console.log('[APIClient] Strategy 5 (section header):', formulaText ? `Found ${formulaText.length} chars` : 'Not found');
 					}
 				}
-			}
-
-			if (formulaText) {
-				console.log(`[APIClient] Found formula text: ${formulaText.substring(0, 50)}...`);
-			} else {
-				console.warn(`[APIClient] No formula text found for ${formulaPageUrl}`);
 			}
 
 			// Method 1: Find Web API image button and extract api_key from onclick
@@ -458,7 +438,6 @@ export class APIClient {
 					if (apiKeyMatch && apiKeyMatch[1]) {
 						const apiKey = apiKeyMatch[1];
 						apiUrl = `${URLS.API_BASE}?key=${apiKey}`;
-						console.log(`[APIClient] Found API URL via Web API button: ${apiUrl}`);
 					}
 				}
 			}
@@ -469,7 +448,6 @@ export class APIClient {
 					const href = $(element).attr('href');
 					if (href && href.includes('key=')) {
 						apiUrl = href;
-						console.log(`[APIClient] Found API URL via direct link: ${apiUrl}`);
 						return false; // Break loop
 					}
 				});
@@ -483,15 +461,10 @@ export class APIClient {
 						const urlMatch = onclick.match(PATTERNS.API_URL_ONCLICK);
 						if (urlMatch && urlMatch[1]) {
 							apiUrl = urlMatch[1];
-							console.log(`[APIClient] Found API URL via onclick handler: ${apiUrl}`);
 							return false; // Break loop
 						}
 					}
 				});
-			}
-
-			if (!apiUrl) {
-				console.warn(`[APIClient] No API URL found for ${formulaPageUrl}`);
 			}
 
 			return { apiUrl, formulaText };
@@ -500,7 +473,6 @@ export class APIClient {
 				throw error;
 			}
 
-			console.error(`[APIClient] Error extracting data from ${formulaPageUrl}:`, error);
 			return { apiUrl: null, formulaText: null };
 		}
 	}

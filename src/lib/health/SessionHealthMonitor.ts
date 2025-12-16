@@ -49,15 +49,12 @@ export class SessionHealthMonitor {
 		const key = `${internalSessionId}:${platform}`;
 
 		if (this.healthMetrics.has(key)) {
-			console.log(`[SessionHealthMonitor] Already monitoring ${platform} for session ${internalSessionId}`);
 			return;
 		}
 
 		const metrics = createHealthMetrics(internalSessionId, platform);
 		this.healthMetrics.set(key, metrics);
 		this.scheduleHealthCheck(key);
-
-		console.log(`[SessionHealthMonitor] Started monitoring ${platform} for session ${internalSessionId}`);
 
 		// Start global monitoring if not already active
 		if (!this.isGlobalMonitoringActive) {
@@ -80,8 +77,6 @@ export class SessionHealthMonitor {
 
 		// Remove metrics
 		this.healthMetrics.delete(key);
-
-		console.log(`[SessionHealthMonitor] Stopped monitoring ${platform} for session ${internalSessionId}`);
 
 		// Stop global monitoring if no sessions are being monitored
 		if (this.healthMetrics.size === 0 && this.isGlobalMonitoringActive) {
@@ -152,22 +147,17 @@ export class SessionHealthMonitor {
 		const metrics = this.healthMetrics.get(key);
 
 		if (!metrics) {
-			console.warn(`[SessionHealthMonitor] No metrics found for ${key}`);
 			return 'expired';
 		}
-
-		console.log(`[SessionHealthMonitor] Checking health for ${platform} session ${internalSessionId}`);
 
 		try {
 			const isHealthy = await performPlatformHealthCheck(platform, internalSessionId);
 			updateHealthMetrics(metrics, isHealthy);
 			this.healthMetrics.set(key, metrics);
 
-			console.log(`[SessionHealthMonitor] Health check completed for ${platform}:${internalSessionId} - Status: ${metrics.status}`);
 			return metrics.status;
 
 		} catch (error) {
-			console.error(`[SessionHealthMonitor] Health check failed for ${platform}:${internalSessionId}:`, error);
 			updateHealthMetricsOnError(metrics);
 			this.healthMetrics.set(key, metrics);
 			return 'critical';
@@ -211,16 +201,12 @@ export class SessionHealthMonitor {
 		}, delay);
 
 		this.monitoringIntervals.set(key, timeoutId);
-
-		console.log(`[SessionHealthMonitor] Scheduled next health check for ${key} in ${Math.round(delay / 1000)}s`);
 	}
 
 	/**
 	 * Clean up expired session data
 	 */
 	private cleanupExpiredSession(internalSessionId: string, platform: string): void {
-		console.log(`[SessionHealthMonitor] Cleaning up expired session for ${platform}:${internalSessionId}`);
-
 		// Remove from monitoring
 		this.stopMonitoring(internalSessionId, platform);
 
@@ -229,7 +215,6 @@ export class SessionHealthMonitor {
 			.filter(m => m.internalSessionId === internalSessionId && m.status !== 'expired');
 
 		if (remainingPlatforms.length === 0) {
-			console.log(`[SessionHealthMonitor] All platforms expired for session ${internalSessionId}, deleting session`);
 			deleteSession(internalSessionId);
 		}
 	}
@@ -241,7 +226,6 @@ export class SessionHealthMonitor {
 		if (this.isGlobalMonitoringActive) return;
 
 		this.isGlobalMonitoringActive = true;
-		console.log('[SessionHealthMonitor] Started global session health monitoring');
 
 		// Discover existing sessions and start monitoring them
 		this.discoverAndMonitorExistingSessions();
@@ -261,20 +245,14 @@ export class SessionHealthMonitor {
 		this.healthMetrics.clear();
 
 		this.isGlobalMonitoringActive = false;
-		console.log('[SessionHealthMonitor] Stopped global session health monitoring');
 	}
 
 	/**
 	 * Discover existing sessions and start monitoring them
 	 */
 	private discoverAndMonitorExistingSessions(): void {
-		try {
-			// This would need to be implemented to scan the session store
-			// For now, sessions will be added to monitoring when they're used
-			console.log('[SessionHealthMonitor] Session discovery not yet implemented');
-		} catch (error) {
-			console.error('[SessionHealthMonitor] Error discovering existing sessions:', error);
-		}
+		// This would need to be implemented to scan the session store
+		// For now, sessions will be added to monitoring when they're used
 	}
 }
 
