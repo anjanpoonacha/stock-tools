@@ -135,20 +135,20 @@ export class FormulaDataManager {
 	 * Parse indicators from HTML response
 	 */
 	static parseIndicatorsHtml(html: string): FormulaIndicator[] {
-		return parseIndicatorsHtml(html);
+		return parseIndicatorsHtml(html) as FormulaIndicator[];
 	}
 
 	/**
 	 * Parse sample formulas from HTML response
 	 */
 	static parseSamplesHtml(html: string): FormulaSample[] {
-		return parseSamplesHtml(html);
+		return parseSamplesHtml(html) as FormulaSample[];
 	}
 
 	/**
 	 * Parse documentation from HTML response
 	 */
 	static parseDocsHtml(html: string): FormulaDocumentation[] {
-		return parseDocsHtml(html);
+		return parseDocsHtml(html) as FormulaDocumentation[];
 	}
 }

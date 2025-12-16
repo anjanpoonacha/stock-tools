@@ -8,7 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { MonacoFormulaEditor } from './MonacoFormulaEditor';
+import { CriteriaReferencePanel } from './CriteriaReferencePanel';
 import { useFormulaEditor } from '@/hooks/useFormulaEditor';
+import { useEditorContext } from '@/hooks/useEditorContext';
 import { Loader2, ArrowLeft, Save } from 'lucide-react';
 import type { FormulaEditorMode } from '@/types/formulaEditor';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -75,6 +77,9 @@ export function FormulaEditorPage() {
 
 	const { formData, setFormData, indicators, samples, loading, saving, error, handleSubmit } =
 		useFormulaEditor(editorMode, handleSuccess);
+
+	// Reference panel context detection
+	const { context, handleCursorChange } = useEditorContext([]);
 
 	// Show error if navigated without proper data
 	useEffect(() => {
@@ -221,28 +226,38 @@ export function FormulaEditorPage() {
 								</CardContent>
 							</Card>
 
-							{/* Formula Editor */}
+							{/* Formula Editor with Reference Panel */}
 							<Card className='flex-1 flex flex-col overflow-hidden'>
-								<CardContent className='pt-6 pb-4 flex-1 flex flex-col'>
-									<div className='space-y-2 flex-1 flex flex-col'>
-										<Label htmlFor='formula-editor'>Formula *</Label>
-										<div className='flex-1 min-h-0'>
-											<MonacoFormulaEditor
-												value={formData.formula}
-												onChange={(value) => setFormData({ ...formData, formula: value })}
-												indicators={indicators}
-												samples={samples}
-												readOnly={saving}
-												height='calc(100vh - 400px)'
-											/>
+								<CardContent className='pt-6 pb-4 flex-1 flex flex-col min-h-0'>
+									<Label htmlFor='formula-editor' className='mb-2'>Formula *</Label>
+									
+									<div className='flex-1 flex gap-0 min-h-0 overflow-hidden'>
+										{/* Editor (70% width) */}
+										<div className='flex-[7] flex flex-col min-w-0'>
+											<div className='flex-1 min-h-0'>
+												<MonacoFormulaEditor
+													value={formData.formula}
+													onChange={(value) => setFormData({ ...formData, formula: value })}
+													indicators={indicators}
+													samples={samples}
+													readOnly={saving}
+													height='calc(100vh - 400px)'
+													onCursorChange={handleCursorChange}
+												/>
+											</div>
+											<p className='text-xs text-muted-foreground mt-2'>
+												Start typing to see autocomplete suggestions. Press{' '}
+												<kbd className='px-1 py-0.5 text-xs border rounded bg-muted'>
+													Ctrl+Space
+												</kbd>{' '}
+												for manual trigger. Hover over functions for documentation.
+											</p>
 										</div>
-										<p className='text-xs text-muted-foreground'>
-											Start typing to see autocomplete suggestions. Press{' '}
-											<kbd className='px-1 py-0.5 text-xs border rounded bg-muted'>
-												Ctrl+Space
-											</kbd>{' '}
-											for manual trigger. Hover over functions for documentation.
-										</p>
+										
+										{/* Reference Panel (30% width) */}
+										<div className='flex-[3] flex flex-col min-h-0'>
+											<CriteriaReferencePanel editorContext={context} />
+										</div>
 									</div>
 								</CardContent>
 							</Card>

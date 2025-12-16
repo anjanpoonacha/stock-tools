@@ -17,6 +17,7 @@ interface MonacoFormulaEditorProps {
 	samples: FormulaSample[];
 	readOnly?: boolean;
 	height?: string;
+	onCursorChange?: (content: string, cursorPosition: number) => void;
 }
 
 /**
@@ -30,6 +31,7 @@ export function MonacoFormulaEditor({
 	samples,
 	readOnly = false,
 	height = '400px',
+	onCursorChange,
 }: MonacoFormulaEditorProps) {
 	const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 	const monacoRef = useRef<Monaco | null>(null);
@@ -131,6 +133,18 @@ export function MonacoFormulaEditor({
 			indicators: indicators.length,
 			samples: samples.length,
 		});
+
+		// Listen to cursor position changes
+		if (onCursorChange) {
+			editor.onDidChangeCursorPosition((e) => {
+				const model = editor.getModel();
+				if (model) {
+					const content = model.getValue();
+					const offset = model.getOffsetAt(e.position);
+					onCursorChange(content, offset);
+				}
+			});
+		}
 
 		// Focus editor
 		editor.focus();

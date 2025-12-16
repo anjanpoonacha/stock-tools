@@ -30,7 +30,7 @@ export { DocumentationParser } from './documentation-parser';
  * const html = await fetch('/api/indicators').then(r => r.text());
  * const indicators = parseIndicatorsHtml(html);
  */
-export function parseIndicatorsHtml(html: string): any[] {
+export function parseIndicatorsHtml(html: string): unknown[] {
   return new IndicatorParser(html).parse();
 }
 
@@ -44,7 +44,7 @@ export function parseIndicatorsHtml(html: string): any[] {
  * const html = await fetch('/api/samples').then(r => r.text());
  * const samples = parseSamplesHtml(html);
  */
-export function parseSamplesHtml(html: string): any[] {
+export function parseSamplesHtml(html: string): unknown[] {
   return new SampleParser(html).parse();
 }
 
@@ -58,6 +58,6 @@ export function parseSamplesHtml(html: string): any[] {
  * const html = await fetch('/api/docs').then(r => r.text());
  * const docs = parseDocsHtml(html);
  */
-export function parseDocsHtml(html: string): any[] {
+export function parseDocsHtml(html: string): unknown[] {
   return new DocumentationParser(html).parse();
 }

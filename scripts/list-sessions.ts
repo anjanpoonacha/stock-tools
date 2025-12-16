@@ -9,13 +9,13 @@ async function listSessions() {
 
     // Try to scan for session keys
     const keys: string[] = [];
-    let cursor = 0;
+    let cursor: string | number = 0;
 
     do {
-      const result = await kv.scan(cursor, { match: 'session:*', count: 100 });
+      const result: [string | number, string[]] = await kv.scan(cursor, { match: 'session:*', count: 100 });
       cursor = result[0];
       keys.push(...result[1]);
-    } while (cursor !== 0);
+    } while (cursor !== 0 && cursor !== '0');
 
     console.log(`Found ${keys.length} session(s):\n`);
 
@@ -53,8 +53,9 @@ async function listSessions() {
       console.log(`  pnpm run analyze-mio ${sessionId}`);
     }
 
-  } catch (error: any) {
-    console.error('Error accessing KV store:', error.message);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error('Error accessing KV store:', err.message);
     console.error('\nMake sure your .env file has the correct KV credentials.');
   }
 }
