@@ -2,6 +2,7 @@
 
 import { SessionManager } from './sessionManager';
 import { APIClient } from './apiClient';
+import { FormulaClient, type FormulaCreateEditResult } from './formulaClient';
 import {
 	SessionError,
 	ErrorHandler,
@@ -221,14 +222,15 @@ export class MIOService {
 	}
 
 	/**
-	 * Extract API URL from a formula page
+	 * Extract API URL and formula text from a formula page
 	 * Navigates to the formula page and looks for "Web API" button/link
-	 * Returns the API URL or null if not found
+	 * Also extracts formula text for editing
+	 * Returns object with apiUrl and formulaText (both can be null if not found)
 	 */
 	static async extractApiUrlFromFormula(
 		internalSessionId: string,
 		formulaPageUrl: string
-	): Promise<string | null> {
+	): Promise<{ apiUrl: string | null; formulaText: string | null }> {
 		try {
 			const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
 			if (!sessionKeyValue) {
@@ -247,8 +249,8 @@ export class MIOService {
 				throw error;
 			}
 
-			console.error(`[MIOService] Error extracting API URL from ${formulaPageUrl}:`, error);
-			return null;
+			console.error(`[MIOService] Error extracting data from ${formulaPageUrl}:`, error);
+			return { apiUrl: null, formulaText: null };
 		}
 	}
 
@@ -281,7 +283,7 @@ export class MIOService {
 				}
 
 				try {
-					const apiUrl = await MIOService.extractApiUrlFromFormula(
+					const extracted = await MIOService.extractApiUrlFromFormula(
 						internalSessionId,
 						formulaItem.pageUrl
 					);
@@ -291,12 +293,13 @@ export class MIOService {
 						id: `formula_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
 						name: formulaItem.name,
 						pageUrl: formulaItem.pageUrl,
-						apiUrl,
+						apiUrl: extracted.apiUrl,
 						screenId: formulaItem.screenId,
+						formulaText: extracted.formulaText || undefined,
 						createdAt: now,
 						updatedAt: now,
-						extractionStatus: apiUrl ? 'success' : 'failed',
-						extractionError: apiUrl ? undefined : 'API URL not found on formula page',
+						extractionStatus: extracted.apiUrl ? 'success' : 'failed',
+						extractionError: extracted.apiUrl ? undefined : 'API URL not found on formula page',
 					};
 
 					return { success: true, formula };
@@ -309,6 +312,7 @@ export class MIOService {
 						pageUrl: formulaItem.pageUrl,
 						apiUrl: null,
 						screenId: formulaItem.screenId,
+						formulaText: undefined,
 						createdAt: now,
 						updatedAt: now,
 						extractionStatus: 'failed',
@@ -374,5 +378,81 @@ export class MIOService {
 				errors: [{ formulaName: 'All formulas', error: errorMessage }],
 			};
 		}
+	}
+
+	/**
+	 * Create new formula on MIO
+	 */
+	static async createFormulaWithSession(
+		internalSessionId: string,
+		params: {
+			name: string;
+			formula: string;
+			categoryId?: string;
+			groupId?: string;
+			eventId?: string;
+		}
+	): Promise<FormulaCreateEditResult> {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'createFormulaWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return FormulaClient.createFormula({ sessionKeyValue, ...params });
+	}
+
+	/**
+	 * Edit existing formula on MIO
+	 */
+	static async editFormulaWithSession(
+		internalSessionId: string,
+		params: {
+			screenId: string;
+			name: string;
+			formula: string;
+			categoryId?: string;
+			groupId?: string;
+			eventId?: string;
+		}
+	): Promise<FormulaCreateEditResult> {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'editFormulaWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return FormulaClient.editFormula({ sessionKeyValue, ...params });
+	}
+
+	/**
+	 * Delete formula(s) from MIO
+	 */
+	static async deleteFormulaWithSession(
+		internalSessionId: string,
+		screenIds: string[]
+	): Promise<void> {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'deleteFormulaWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return FormulaClient.deleteFormula(sessionKeyValue, screenIds);
 	}
 }

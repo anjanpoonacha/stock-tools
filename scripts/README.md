@@ -1,8 +1,57 @@
-# Extension Build Scripts
+# Build & Utility Scripts
 
-This directory contains scripts for managing and packaging the Multi-Platform Session Extractor extension.
+This directory contains scripts for managing the extension, web app, and MarketInOut data scraping.
 
-## Scripts
+## MarketInOut Scripts
+
+### `scrape-mio-criteria.ts`
+
+Scrapes all criteria metadata from MarketInOut.com stock screener and fetches enum options.
+
+**Usage:**
+
+```bash
+pnpm run scrape-mio
+# or
+tsx scripts/scrape-mio-criteria.ts
+```
+
+**Features:**
+
+- Scrapes 303 criteria across 17 categories
+- Fetches options for 14 enum-type criteria (sector, industry, exchange, etc.)
+- Rate-limited API calls (1 req/sec) with retry logic
+- Generates comprehensive JSON data file at `src/data/mio-criteria.json`
+- Includes lookups, metadata, and validation
+
+**Output Structure:**
+
+```typescript
+{
+  tree: {
+    categories: {...},      // 17 categories with criteria
+    criteriaById: {...},    // Quick lookup by ID
+    optionsById: {...},     // Enum options (sector, industry, etc.)
+    timestamp: "..."
+  },
+  lookups: {
+    enumCriteria: [...],         // 14 enum criteria
+    indicatorCriteria: [...],    // 17 indicators (RSI, MACD, etc.)
+    eventCriteria: [...],        // Pattern detection
+    scalarCriteria: [...],       // Simple ranges
+    categoryToCriteria: {...},
+    typeToCriteria: {...}
+  },
+  metadata: {
+    totalCriteria: 303,
+    totalCategories: 17,
+    totalOptions: 275,
+    errors: []
+  }
+}
+```
+
+## Extension Scripts
 
 ### `package-extension.js`
 

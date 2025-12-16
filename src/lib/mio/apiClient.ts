@@ -216,7 +216,6 @@ export class APIClient {
 		}
 		const params = todeleteIds.map((id) => `todelete=${encodeURIComponent(id)}`).join('&');
 		const url = `${URLS.MY_WATCHLISTS}?${params}&mode=delete`;
-		console.log('[APIClient][deleteWatchlists] url:', url, 'params:', params, 'ids:', todeleteIds);
 		const res = await fetch(url, {
 			method: 'GET',
 			headers: {
@@ -276,8 +275,6 @@ export class APIClient {
 			// Parse the table containing formulas
 			const formulas: FormulaListItem[] = [];
 
-			console.log(`[APIClient] Parsing formula list page...`);
-			console.log(`[APIClient] Found ${$('tr[id^="screen"]').length} table rows`);
 
 			// Select all table rows with id starting with "screen"
 			$('tr[id^="screen"]').each((_, element) => {
@@ -298,8 +295,8 @@ export class APIClient {
 
 				if (!name) return;
 
-				// Construct full page URL
-				const pageUrl = `${URLS.FORMULA_PAGE_BASE}?f=1&list=1&screen_id=${screenId}`;
+				// Construct full page URL (without list=1 - it's for results page, not editor)
+				const pageUrl = `${URLS.FORMULA_PAGE_BASE}?f=1&screen_id=${screenId}`;
 
 				// Avoid duplicates (though shouldn't be any with this approach)
 				if (!formulas.some(f => f.screenId === screenId)) {
@@ -311,7 +308,6 @@ export class APIClient {
 				}
 			});
 
-			console.log(`[APIClient] Successfully extracted ${formulas.length} formulas`);
 			return formulas;
 		} catch (error) {
 			// If it's already a SessionError, re-throw it
@@ -333,14 +329,15 @@ export class APIClient {
 	}
 
 	/**
-	 * Extract API URL from a formula page
+	 * Extract API URL and formula text from a formula page
 	 * Navigates to the formula page and looks for "Web API" button/link
-	 * Returns the API URL or null if not found
+	 * Also extracts the formula text for editing
+	 * Returns object with apiUrl and formulaText (both can be null if not found)
 	 */
 	static async extractApiUrlFromFormula(
 		sessionKeyValue: SessionKeyValue,
 		formulaPageUrl: string
-	): Promise<string | null> {
+	): Promise<{ apiUrl: string | null; formulaText: string | null }> {
 		try {
 			// Fetch the formula page
 			const res = await fetch(formulaPageUrl, {
@@ -350,8 +347,7 @@ export class APIClient {
 			});
 
 			if (!res.ok) {
-				console.warn(`[APIClient] Failed to fetch formula page: ${formulaPageUrl} (status: ${res.status})`);
-				return null;
+				return { apiUrl: null, formulaText: null };
 			}
 
 			const html = await res.text();
@@ -367,11 +363,69 @@ export class APIClient {
 				throw error;
 			}
 
-			// Use cheerio to parse and find the API URL
+			// Use cheerio to parse and find the API URL and formula text
 			const cheerio = await import('cheerio');
 			const $ = cheerio.load(html);
 
+
 			let apiUrl: string | null = null;
+			let formulaText: string | null = null;
+
+			// Extract formula text - try multiple strategies
+			// Strategy 1: Look for textarea with name="formula"
+			formulaText = $('textarea[name="formula"]').val() as string;
+
+			// Strategy 2: Look for input with name="formula"
+			if (!formulaText) {
+				formulaText = $('input[name="formula"]').val() as string;
+			}
+
+			// Strategy 3: Look for readonly textarea or pre/code blocks
+			if (!formulaText) {
+				formulaText = $('textarea[readonly]').val() as string;
+			}
+
+			// Strategy 4: Look for text following "Formula:" label
+			if (!formulaText) {
+				$('td, div, span').each((_, el) => {
+					const text = $(el).text();
+					if (text.includes('Formula:')) {
+						// Get next sibling or child content
+						const nextText = $(el).next().text().trim();
+						if (nextText && nextText.length > 3) {
+							formulaText = nextText;
+							return false; // Break
+						}
+					}
+				});
+			}
+
+			// Strategy 5: Look for formula in section header (on results page)
+			// The formula appears after: <font class="section">Screen Name:</font><br>(formula text)
+			if (!formulaText) {
+				const $sectionFont = $('font.section').filter((_, el) => {
+					const text = $(el).text();
+					return text.includes(':');
+				});
+
+				if ($sectionFont.length > 0) {
+					const $parentTd = $sectionFont.parent();
+					const htmlContent = $parentTd.html() || '';
+
+					// Extract text after </font><br> and before next tag or end
+					// Pattern: </font><br>(formula text here)<optional whitespace/newlines>
+					const match = htmlContent.match(/<\/font><br>([^<]+)/);
+					if (match && match[1]) {
+						formulaText = match[1]
+							.replace(/&gt;/g, '>')
+							.replace(/&lt;/g, '<')
+							.replace(/&amp;/g, '&')
+							.replace(/&quot;/g, '"')
+							.replace(/&apos;/g, "'")
+							.trim();
+					}
+				}
+			}
 
 			// Method 1: Find Web API image button and extract api_key from onclick
 			// The Web API button is an <img> tag with onclick="api_info('api_key_here')"
@@ -384,21 +438,20 @@ export class APIClient {
 					if (apiKeyMatch && apiKeyMatch[1]) {
 						const apiKey = apiKeyMatch[1];
 						apiUrl = `${URLS.API_BASE}?key=${apiKey}`;
-						console.log(`[APIClient] Found API URL via Web API button: ${apiUrl}`);
-						return apiUrl;
 					}
 				}
 			}
 
 			// Method 2: Fallback - look for direct links (legacy/alternate format)
-			$('a[href*="api.marketinout.com/run/screen"]').each((_, element) => {
-				const href = $(element).attr('href');
-				if (href && href.includes('key=')) {
-					apiUrl = href;
-					console.log(`[APIClient] Found API URL via direct link: ${apiUrl}`);
-					return false; // Break loop
-				}
-			});
+			if (!apiUrl) {
+				$('a[href*="api.marketinout.com/run/screen"]').each((_, element) => {
+					const href = $(element).attr('href');
+					if (href && href.includes('key=')) {
+						apiUrl = href;
+						return false; // Break loop
+					}
+				});
+			}
 
 			// Method 3: Fallback - check onclick handlers with full URL (legacy)
 			if (!apiUrl) {
@@ -408,25 +461,19 @@ export class APIClient {
 						const urlMatch = onclick.match(PATTERNS.API_URL_ONCLICK);
 						if (urlMatch && urlMatch[1]) {
 							apiUrl = urlMatch[1];
-							console.log(`[APIClient] Found API URL via onclick handler: ${apiUrl}`);
 							return false; // Break loop
 						}
 					}
 				});
 			}
 
-			if (!apiUrl) {
-				console.warn(`[APIClient] No API URL found for ${formulaPageUrl}`);
-			}
-
-			return apiUrl;
+			return { apiUrl, formulaText };
 		} catch (error) {
 			if (error instanceof SessionError) {
 				throw error;
 			}
 
-			console.error(`[APIClient] Error extracting API URL from ${formulaPageUrl}:`, error);
-			return null;
+			return { apiUrl: null, formulaText: null };
 		}
 	}
 }

@@ -38,7 +38,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     useEffect(() => {
         const loadStoredAuth = async () => {
             try {
-                console.log('[AuthContext] loadStoredAuth started');
                 setIsLoading(true);
                 setError(null);
 
@@ -47,8 +46,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const oldPassword = localStorage.getItem('userPassword');
 
                 if (oldEmail && oldPassword) {
-                    console.log('[AuthContext] Found old credentials, migrating to AuthContext');
-
                     // Validate credentials with Zod
                     const validatedCredentials = UserCredentialsSchema.parse({
                         userEmail: oldEmail,
@@ -86,7 +83,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                         // Clean up old keys after successful migration
                         localStorage.removeItem('userEmail');
                         localStorage.removeItem('userPassword');
-                        console.log('[AuthContext] Migration successful, old keys removed');
 
                         setAuthStatus(newAuthStatus);
                         return; // Exit early
@@ -97,17 +93,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const storedCredentials = localStorage.getItem(AUTH_STORAGE_KEY);
                 const storedAuthStatus = localStorage.getItem(AUTH_STATUS_KEY);
 
-                console.log('[AuthContext] Stored credentials:', !!storedCredentials);
-                console.log('[AuthContext] Stored auth status:', !!storedAuthStatus);
-
                 if (storedCredentials && storedAuthStatus) {
                     const credentials = JSON.parse(storedCredentials);
 
                     // Validate stored credentials
                     const validatedCredentials = UserCredentialsSchema.safeParse(credentials);
                     if (validatedCredentials.success) {
-                        console.log('[AuthContext] Validating stored credentials with backend');
-                        
                         // CRITICAL FIX: Always validate stored credentials against backend
                         // This prevents stale session state when KV data is removed
                         try {
@@ -147,7 +138,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                                     // Update stored auth status with fresh data
                                     localStorage.setItem(AUTH_STATUS_KEY, JSON.stringify(freshAuthStatus));
                                     setAuthStatus(freshAuthStatus);
-                                    console.log('[AuthContext] Stored credentials validated and updated with fresh session data');
                                 } else {
                                     // Credentials are valid but no sessions exist - update with no-session state
                                     const noSessionAuthStatus: AuthStatus = {
@@ -164,17 +154,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
                                     // Update stored auth status with no-session state
                                     localStorage.setItem(AUTH_STATUS_KEY, JSON.stringify(noSessionAuthStatus));
                                     setAuthStatus(noSessionAuthStatus);
-                                    console.log('[AuthContext] Stored credentials valid but no sessions found - updated with fresh no-session state');
                                 }
                             } else {
                                 // Credentials are no longer valid, clear them
-                                console.log('[AuthContext] Stored credentials are invalid, clearing');
                                 localStorage.removeItem(AUTH_STORAGE_KEY);
                                 localStorage.removeItem(AUTH_STATUS_KEY);
                                 setAuthStatus(null);
                             }
                         } catch (error) {
-                            console.error('[AuthContext] Error validating stored credentials:', error);
                             // On validation error, clear stored credentials to be safe
                             localStorage.removeItem(AUTH_STORAGE_KEY);
                             localStorage.removeItem(AUTH_STATUS_KEY);
@@ -187,7 +174,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     }
                 }
             } catch (error) {
-                console.error('[AuthContext] Error loading stored auth:', error);
                 // Clear stored auth on error
                 localStorage.removeItem(AUTH_STORAGE_KEY);
                 localStorage.removeItem(AUTH_STATUS_KEY);
@@ -196,7 +182,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
         };
 
-        console.log('[AuthContext] useEffect triggered, calling loadStoredAuth');
         loadStoredAuth();
     }, []); // Empty dependency array - run only once on mount
 
@@ -251,7 +236,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
             setError(errorMessage);
-            console.error('[AuthContext] Login error:', error);
             return false;
         } finally {
             setIsLoading(false);
@@ -277,7 +261,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const validatedCredentials = UserCredentialsSchema.parse(credentials);
                 await login(validatedCredentials);
             } catch (error) {
-                console.error('[AuthContext] Error checking auth status:', error);
                 logout();
             }
         }

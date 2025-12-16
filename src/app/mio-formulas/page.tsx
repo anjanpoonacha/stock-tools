@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { AuthGuard } from '@/components/auth/AuthGuard';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,7 @@ import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { useFormulaExtraction } from '@/hooks/useFormulaExtraction';
 import { Badge } from '@/components/ui/badge';
 import { UsageGuide } from '@/components/UsageGuide';
+import { useToast } from '@/components/ui/toast';
 import type { MIOFormula } from '@/types/formula';
 import {
 	Table,
@@ -18,10 +20,23 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw } from 'lucide-react';
+import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit } from 'lucide-react';
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+	AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const MioFormulasPageContent: React.FC = () => {
+	const router = useRouter();
 	const { mioSessionAvailable, loading: sessionLoading } = useSessionAvailability();
+	const showToast = useToast();
 	const {
 		formulas,
 		loading,
@@ -34,6 +49,99 @@ const MioFormulasPageContent: React.FC = () => {
 		copyAllApiUrls,
 		exportFormulas,
 	} = useFormulaExtraction();
+
+	// Track which formula is being edited
+	const [editingFormulaId, setEditingFormulaId] = React.useState<string | null>(null);
+	const [isCreating, setIsCreating] = React.useState(false);
+
+	// Handler to navigate to create page
+	const handleCreateFormula = () => {
+		setIsCreating(true);
+		router.push('/mio-formulas/editor?mode=create');
+		// Loading state clears on component unmount during navigation
+	};
+
+	// Handler to navigate to edit page
+	const handleEditFormula = async (formula: MIOFormula) => {
+		try {
+			setEditingFormulaId(formula.id);
+			console.log('[MioFormulasPage] Edit clicked for:', formula.name);
+			console.log('[MioFormulasPage] Formula text exists:', !!formula.formulaText);
+
+			// If formula text doesn't exist, fetch it from the page URL
+			if (!formula.formulaText && formula.pageUrl) {
+				// Normalize URL: Remove list=1 parameter from old URLs
+				let normalizedUrl = formula.pageUrl;
+				if (normalizedUrl.includes('list=1')) {
+					// Extract screen_id and reconstruct URL in correct format
+					const screenIdMatch = normalizedUrl.match(/screen_id=(\d+)/);
+					if (screenIdMatch) {
+						normalizedUrl = `https://www.marketinout.com/stock-screener/stocks.php?f=1&screen_id=${screenIdMatch[1]}`;
+						console.log('[MioFormulasPage] Normalized URL from:', formula.pageUrl);
+						console.log('[MioFormulasPage] Normalized URL to:', normalizedUrl);
+					}
+				}
+
+				console.log('[MioFormulasPage] Fetching formula text from:', normalizedUrl);
+
+				try {
+					const credentials = JSON.parse(localStorage.getItem('mio-tv-auth-credentials') || '{}');
+
+					const response = await fetch('/api/mio-formulas/extract-text', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							userEmail: credentials.userEmail,
+							userPassword: credentials.userPassword,
+							pageUrl: normalizedUrl,
+						}),
+					});
+					console.log('[MioFormulasPage] Response status:', response.status, response.ok);
+
+					if (response.ok) {
+						const data = await response.json();
+						console.log('[MioFormulasPage] Response data:', {
+							success: data.success,
+							hasFormulaText: !!data.formulaText,
+							formulaTextLength: data.formulaText?.length,
+							hasApiUrl: !!data.apiUrl,
+							error: data.error,
+						});
+
+						if (data.formulaText) {
+							console.log('[MioFormulasPage] ✓ Extracted formula text:', data.formulaText.substring(0, 50));
+							// Update formula object with extracted text
+							formula = { ...formula, formulaText: data.formulaText };
+						} else {
+							console.warn('[MioFormulasPage] ✗ No formula text in response');
+							showToast('Could not extract formula text from page', 'error');
+							return; // Exit early - don't navigate on error
+						}
+					} else {
+						const errorData = await response.json().catch(() => ({}));
+						console.error('[MioFormulasPage] Failed to extract formula text:', errorData);
+						showToast(`Could not load formula text: ${errorData.error || 'Unknown error'}`, 'error');
+						return; // Exit early - don't navigate on error
+					}
+				} catch (error) {
+					console.error('[MioFormulasPage] Error fetching formula text:', error);
+					showToast('Error loading formula text', 'error');
+					return; // Exit early - don't navigate on error
+				}
+			}
+
+			// Store formula data in session storage for the editor page
+			sessionStorage.setItem(`formula-editor-data-${formula.screenId}`, JSON.stringify(formula));
+
+			// Navigate to editor page
+			router.push(`/mio-formulas/editor?mode=edit&screenId=${formula.screenId}`);
+		} finally {
+			// Always clear loading state, even on errors
+			setEditingFormulaId(null);
+		}
+	};
 
 	const getStatusBadge = (formula: MIOFormula) => {
 		switch (formula.extractionStatus) {
@@ -63,8 +171,10 @@ const MioFormulasPageContent: React.FC = () => {
 				title="How to Use Formula Manager"
 				steps={[
 					'Ensure you have captured your MIO session using the browser extension',
-					'Click "Extract Formulas from MIO" to fetch all your formulas',
+					'Click "Create Formula" to build new formulas with autocomplete editor',
+					'Click "Extract Formulas from MIO" to fetch all your existing formulas',
 					'View formula details including screen ID, page URL, and API URL',
+					'Edit formulas directly from the table using the edit button',
 					'Copy individual API URLs or export all formulas as JSON',
 					'Delete formulas you no longer need from your saved list'
 				]}
@@ -105,9 +215,28 @@ const MioFormulasPageContent: React.FC = () => {
 			{/* Action Buttons */}
 			<div className='flex flex-wrap gap-3'>
 				<Button
+					onClick={handleCreateFormula}
+					disabled={!mioSessionAvailable || sessionLoading || isCreating}
+					size='default'
+				>
+					{isCreating ? (
+						<>
+							<Loader2 className='h-4 w-4 mr-2 animate-spin' />
+							Creating...
+						</>
+					) : (
+						<>
+							<Plus className='h-4 w-4 mr-2' />
+							Create Formula
+						</>
+					)}
+				</Button>
+
+				<Button
 					onClick={extractFormulas}
 					disabled={!mioSessionAvailable || sessionLoading || extracting}
 					size='default'
+					variant='outline'
 				>
 					{extracting ? (
 						<>
@@ -223,13 +352,49 @@ const MioFormulasPageContent: React.FC = () => {
 											</TableCell>
 											<TableCell>{getStatusBadge(formula)}</TableCell>
 											<TableCell className='text-right'>
-												<Button
-													size='sm'
-													variant='ghost'
-													onClick={() => deleteFormula(formula.id)}
-												>
-													<Trash2 className='h-4 w-4 text-destructive' />
-												</Button>
+												<div className='flex items-center justify-end gap-1'>
+													<Button
+														size='sm'
+														variant='ghost'
+														onClick={() => handleEditFormula(formula)}
+														title='Edit formula'
+														disabled={editingFormulaId === formula.id}
+													>
+														{editingFormulaId === formula.id ? (
+															<Loader2 className='h-4 w-4 animate-spin' />
+														) : (
+															<Edit className='h-4 w-4' />
+														)}
+													</Button>
+													<AlertDialog>
+														<AlertDialogTrigger asChild>
+															<Button
+																size='sm'
+																variant='ghost'
+																title='Delete formula'
+															>
+																<Trash2 className='h-4 w-4 text-destructive' />
+															</Button>
+														</AlertDialogTrigger>
+														<AlertDialogContent>
+															<AlertDialogHeader>
+																<AlertDialogTitle>Delete Formula?</AlertDialogTitle>
+																<AlertDialogDescription>
+																	Are you sure you want to delete &quot;{formula.name}&quot;? This will remove it from both MIO and your local storage. This action cannot be undone.
+																</AlertDialogDescription>
+															</AlertDialogHeader>
+															<AlertDialogFooter>
+																<AlertDialogCancel>Cancel</AlertDialogCancel>
+																<AlertDialogAction
+																	onClick={() => deleteFormula(formula.id)}
+																	className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+																>
+																	Delete
+																</AlertDialogAction>
+															</AlertDialogFooter>
+														</AlertDialogContent>
+													</AlertDialog>
+												</div>
 											</TableCell>
 										</TableRow>
 									))}

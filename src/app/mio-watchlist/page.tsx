@@ -15,6 +15,7 @@ import { ErrorDisplay } from '@/components/error';
 import { SessionStatus } from '@/components/SessionStatus';
 import { API_ENDPOINTS, UI_CONSTANTS, SUCCESS_MESSAGES } from '@/lib/constants';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
+import { Loader2 } from 'lucide-react';
 
 interface Watchlist {
     id: string;
@@ -284,7 +285,14 @@ function MioWatchlistPageContent() {
                     placeholder={UI_CONSTANTS.PLACEHOLDER_GROUP_BY}
                 />
                 <Button onClick={handleAddWatchlist} disabled={loading}>
-                    Add to Watchlist
+                    {loading ? (
+                        <>
+                            <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                            Adding...
+                        </>
+                    ) : (
+                        'Add to Watchlist'
+                    )}
                 </Button>
             </div>
 
@@ -299,7 +307,14 @@ function MioWatchlistPageContent() {
                     placeholder={UI_CONSTANTS.PLACEHOLDER_WATCHLIST_NAME}
                 />
                 <Button onClick={handleCreateWatchlist} disabled={loading}>
-                    Create Watchlist
+                    {loading ? (
+                        <>
+                            <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                            Creating...
+                        </>
+                    ) : (
+                        'Create Watchlist'
+                    )}
                 </Button>
             </div>
 
@@ -319,7 +334,14 @@ function MioWatchlistPageContent() {
                     onClick={handleDeleteWatchlists}
                     disabled={loading || deleteIds.length === 0}
                 >
-                    Delete Watchlists
+                    {loading ? (
+                        <>
+                            <Loader2 className='h-4 w-4 mr-2 animate-spin' />
+                            Deleting...
+                        </>
+                    ) : (
+                        'Delete Watchlists'
+                    )}
                 </Button>
             </div>
 
