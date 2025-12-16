@@ -5,17 +5,15 @@ import { MIOService } from '@/lib/mio';
 import { SessionResolver } from '@/lib/SessionResolver';
 
 /**
- * GET - Extract formula text from a formula page URL
+ * POST - Extract formula text from a formula page URL
  * Used when editing formulas that don't have formulaText stored
- * Query params: userEmail, userPassword, pageUrl
+ * Body params: userEmail, userPassword, pageUrl
  * Response: { formulaText, apiUrl }
  */
-export async function GET(request: NextRequest) {
+export async function POST(request: NextRequest) {
 	try {
-		const { searchParams } = new URL(request.url);
-		const userEmail = searchParams.get('userEmail');
-		const userPassword = searchParams.get('userPassword');
-		const pageUrl = searchParams.get('pageUrl');
+		const body = await request.json();
+		const { userEmail, userPassword, pageUrl } = body;
 
 		// Validate required fields
 		if (!userEmail || !userPassword || !pageUrl) {

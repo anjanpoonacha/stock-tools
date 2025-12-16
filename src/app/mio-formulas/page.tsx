@@ -86,13 +86,18 @@ const MioFormulasPageContent: React.FC = () => {
 
 				try {
 					const credentials = JSON.parse(localStorage.getItem('mio-tv-auth-credentials') || '{}');
-					const params = new URLSearchParams({
-						userEmail: credentials.userEmail,
-						userPassword: credentials.userPassword,
-						pageUrl: normalizedUrl,
-					});
 
-					const response = await fetch(`/api/mio-formulas/extract-text?${params}`);
+					const response = await fetch('/api/mio-formulas/extract-text', {
+						method: 'POST',
+						headers: {
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							userEmail: credentials.userEmail,
+							userPassword: credentials.userPassword,
+							pageUrl: normalizedUrl,
+						}),
+					});
 					console.log('[MioFormulasPage] Response status:', response.status, response.ok);
 
 					if (response.ok) {
