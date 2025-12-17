@@ -10,7 +10,7 @@ import {
     CommandList,
 } from '@/components/ui/command';
 import { Button } from '@/components/ui/button';
-import { Search, Zap, Menu } from 'lucide-react';
+import { Search, Zap, Menu, TrendingUp } from 'lucide-react';
 import { ActionCard, Tool } from './ActionCard';
 import { MobileSidebar } from './MobileSidebar';
 import { DesktopSidebar } from './DesktopSidebar';
@@ -64,6 +64,16 @@ const TOOLS: Tool[] = [
         icon: 'ArrowLeftRight' as const,
         category: 'Core Tools',
         keywords: ['convert', 'symbol', 'format', 'mio', 'tv', 'tradingview'],
+    },
+    {
+        id: 'chart',
+        title: 'TradingView Charts',
+        description: 'View and analyze NSE stocks with interactive charts',
+        href: '/chart',
+        icon: 'TrendingUp' as const,
+        category: 'Core Tools',
+        featured: true,
+        keywords: ['chart', 'tradingview', 'analysis', 'nse', 'stocks'],
     },
     {
         id: 'miowatchlist',
