@@ -75,6 +75,35 @@ export function regroupTVWatchlist(input: string, toGroup: RegroupOption): strin
 		.join(',');
 }
 
+/**
+ * Enrich stock symbol with sector/industry data from symbolInfoMap
+ * @param symbol - Stock symbol in NSE:XXX format
+ * @returns Object with sector and industry, or undefined if not found
+ */
+export function enrichStockMetadata(symbol: string): {
+	sector?: string;
+	industry?: string;
+} {
+	// Remove exchange prefix (NSE:, BSE:)
+	const baseSymbol = symbol.replace(/^(NSE:|BSE:)/, '');
+
+	// Try with .NS suffix first
+	let lookup = `${baseSymbol}.NS`;
+	let info = symbolInfoMap[lookup];
+
+	// Fallback to .BO suffix
+	if (!info) {
+		lookup = `${baseSymbol}.BO`;
+		info = symbolInfoMap[lookup];
+	}
+
+	// Map capitalized keys to lowercase for Stock interface
+	return {
+		sector: info?.Sector,
+		industry: info?.Industry,
+	};
+}
+
 export function downloadTextFile(text: string, filename: string) {
 	if (!text) return;
 	const blob = new Blob([text], { type: 'text/plain' });

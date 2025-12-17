@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit } from 'lucide-react';
+import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit, BarChart3 } from 'lucide-react';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -353,6 +353,14 @@ const MioFormulasPageContent: React.FC = () => {
 											<TableCell>{getStatusBadge(formula)}</TableCell>
 											<TableCell className='text-right'>
 												<div className='flex items-center justify-end gap-1'>
+													<Button
+														size='sm'
+														variant='ghost'
+														onClick={() => router.push(`/mio-formulas/results?formulaId=${formula.id}`)}
+														title='View results'
+													>
+														<BarChart3 className='h-4 w-4' />
+													</Button>
 													<Button
 														size='sm'
 														variant='ghost'

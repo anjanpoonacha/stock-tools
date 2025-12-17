@@ -453,23 +453,9 @@ export function TradingViewLiveChart({
 	}
 
 	return (
-		<div className="space-y-2">
+		<div>
 			{/* Chart Container */}
 			<div ref={chartContainerRef} className="border border-gray-200 dark:border-gray-800 rounded-lg" />
-
-			{/* Chart Footer */}
-			{data && (
-				<div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 px-2">
-					<div>
-						{data.bars.length} bars loaded
-					</div>
-					<div>
-						{new Date(data.bars[0]?.time * 1000).toLocaleDateString()} 
-						{' - '}
-						{new Date(data.bars[data.bars.length - 1]?.time * 1000).toLocaleDateString()}
-					</div>
-				</div>
-			)}
 		</div>
 	);
 }
