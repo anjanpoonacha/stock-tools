@@ -315,7 +315,7 @@ const MioFormulasPageContent: React.FC = () => {
 													href={formula.pageUrl}
 													target='_blank'
 													rel='noopener noreferrer'
-													className='text-blue-600 hover:underline flex items-center gap-1'
+													className='text-foreground hover:underline flex items-center gap-1'
 												>
 													View Page
 													<ExternalLink className='h-3 w-3' />
@@ -328,7 +328,7 @@ const MioFormulasPageContent: React.FC = () => {
 															href={formula.apiUrl}
 															target='_blank'
 															rel='noopener noreferrer'
-															className='text-blue-600 hover:underline flex items-center gap-1 truncate max-w-[200px]'
+															className='text-foreground hover:underline flex items-center gap-1 truncate max-w-[200px]'
 															title={formula.apiUrl}
 														>
 															{formula.apiUrl.substring(0, 40)}...

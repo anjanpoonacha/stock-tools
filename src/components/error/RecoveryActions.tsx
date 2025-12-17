@@ -38,7 +38,7 @@ export function RecoveryActions({ error, onRetry }: RecoveryActionsProps) {
                 ) : (
                     <div className='flex items-center gap-2 text-sm'>
                         {React.createElement(getRecoveryActionIcon(primaryStep.action), {
-                            className: 'h-4 w-4 text-blue-600',
+                            className: 'h-4 w-4 text-foreground',
                         })}
                         <span className='font-medium'>Next Step:</span>
                     </div>

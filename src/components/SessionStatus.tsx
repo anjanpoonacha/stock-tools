@@ -33,7 +33,7 @@ export function SessionStatus({
                 variant: 'default' as const,
                 badgeVariant: 'secondary' as const,
                 icon: <Loader2 className='h-4 w-4 animate-spin' />,
-                alertClass: 'border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/50',
+                alertClass: 'border-border bg-muted/30 dark:border-border dark:bg-muted/20',
                 needsAttention: false,
             };
         }
