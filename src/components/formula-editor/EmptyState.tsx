@@ -9,7 +9,7 @@
  */
 export function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center h-full p-6 text-center max-w-md mx-auto">
+    <div className="flex flex-col items-center justify-center p-6 py-16 text-center max-w-md mx-auto">
       <div className="text-4xl mb-4">📝</div>
       <h3 className="text-lg font-semibold mb-2">Formula Reference</h3>
       <p className="text-sm text-muted-foreground mb-4 break-words">

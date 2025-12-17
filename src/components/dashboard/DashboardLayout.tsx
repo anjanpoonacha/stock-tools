@@ -111,9 +111,10 @@ interface DashboardLayoutProps {
     showHero?: boolean;
     showSidebar?: boolean;
     pageTitle?: string;
+    fullPage?: boolean;
 }
 
-export function DashboardLayout({ children, showHero = true, showSidebar = true }: DashboardLayoutProps) {
+export function DashboardLayout({ children, showHero = true, showSidebar = true, fullPage = false }: DashboardLayoutProps) {
     const [commandOpen, setCommandOpen] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const router = useRouter();
@@ -158,112 +159,121 @@ export function DashboardLayout({ children, showHero = true, showSidebar = true 
             )}
 
             {/* Main Content Area */}
-            <div className='flex-1 flex flex-col overflow-hidden'>
-                {/* Sticky Main Header */}
-                <header className='sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
-                    <div className='flex h-16 items-center justify-between px-4 md:px-6 lg:px-8'>
-                        <div className='flex items-center gap-3'>
-                            {/* Mobile Menu Button */}
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                className='md:hidden'
-                                onClick={() => setMobileSidebarOpen(true)}
-                            >
-                                <Menu className='w-4 h-4' />
-                            </Button>
+            <div className='flex-1 min-h-0 flex flex-col overflow-hidden'>
+                {/* Compact Header for Full Page Mode, Regular Header Otherwise */}
+                {!fullPage && (
+                    <header className='sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60'>
+                        <div className='flex h-16 items-center justify-between px-4 md:px-6 lg:px-8'>
+                            <div className='flex items-center gap-3'>
+                                {/* Mobile Menu Button */}
+                                <Button
+                                    variant='outline'
+                                    size='sm'
+                                    className='md:hidden'
+                                    onClick={() => setMobileSidebarOpen(true)}
+                                >
+                                    <Menu className='w-4 h-4' />
+                                </Button>
 
-                            <div className='w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center md:hidden'>
-                                <Zap className='w-5 h-5 text-primary-foreground' />
+                                <div className='w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center md:hidden'>
+                                    <Zap className='w-5 h-5 text-primary-foreground' />
+                                </div>
+
+                                <div>
+                                    <h1 className='font-bold text-lg md:text-xl'>{fullTitle}</h1>
+                                    <p className='text-xs text-muted-foreground hidden sm:block md:hidden'>
+                                        MarketInOut & TradingView Integration
+                                    </p>
+                                </div>
                             </div>
 
-                            <div>
-                                <h1 className='font-bold text-lg md:text-xl'>{fullTitle}</h1>
-                                <p className='text-xs text-muted-foreground hidden sm:block md:hidden'>
-                                    MarketInOut & TradingView Integration
-                                </p>
+                            <div className='flex items-center gap-4'>
+                                <ThemeToggle />
+
+                                {/* Command Palette Trigger - Hidden on desktop with sidebar */}
+                                <Button
+                                    variant='outline'
+                                    size='sm'
+                                    className='hidden sm:flex md:hidden items-center gap-2 text-muted-foreground'
+                                    onClick={() => setCommandOpen(true)}
+                                >
+                                    <Search className='w-4 h-4' />
+                                    <span className='hidden sm:inline'>Search tools...</span>
+                                    <kbd className='pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100'>
+                                        <span className='text-xs'>⌘</span>K
+                                    </kbd>
+                                </Button>
                             </div>
                         </div>
+                    </header>
+                )}
 
-                        <div className='flex items-center gap-4'>
-                            <ThemeToggle />
-
-                            {/* Command Palette Trigger - Hidden on desktop with sidebar */}
-                            <Button
-                                variant='outline'
-                                size='sm'
-                                className='hidden sm:flex md:hidden items-center gap-2 text-muted-foreground'
-                                onClick={() => setCommandOpen(true)}
-                            >
-                                <Search className='w-4 h-4' />
-                                <span className='hidden sm:inline'>Search tools...</span>
-                                <kbd className='pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100'>
-                                    <span className='text-xs'>⌘</span>K
-                                </kbd>
-                            </Button>
-                        </div>
+                {/* Full Page Mode - Direct Children Rendering */}
+                {fullPage ? (
+                    <div className='flex-1 min-h-0 overflow-hidden'>
+                        {children}
                     </div>
-                </header>
-
-                {/* Scrollable Main Content */}
-                <main className='flex-1 overflow-y-auto overflow-x-hidden'>
-                    <div className='container py-6 md:py-8 px-4 md:px-6 lg:px-8 max-w-none xl:max-w-7xl 2xl:max-w-screen-xl mx-auto'>
-                        {showHero && featuredTools.length > 0 && (
-                            <>
-                                {/* Hero Section */}
-                                <section className='mb-8 md:mb-12'>
-                                    <div className='text-center mb-6 md:mb-8'>
-                                        <h2 className='text-2xl md:text-3xl font-bold tracking-tight mb-2'>
-                                            Professional Stock Trading Tools
-                                        </h2>
-                                        <p className='text-muted-foreground text-base md:text-lg max-w-2xl mx-auto'>
-                                            Seamlessly convert, sync, and manage your stock symbols between MarketInOut
-                                            and TradingView platforms
-                                        </p>
-                                    </div>
-
-                                    <div className='max-w-6xl mx-auto'>
-                                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8'>
-                                            {featuredTools.map((tool) => (
-                                                <ActionCard key={tool.id} tool={tool} featured />
-                                            ))}
+                ) : (
+                    /* Scrollable Main Content */
+                    <main className='flex-1 overflow-y-auto overflow-x-hidden'>
+                        <div className='container py-6 md:py-8 px-4 md:px-6 lg:px-8 max-w-none xl:max-w-7xl 2xl:max-w-screen-xl mx-auto'>
+                            {showHero && featuredTools.length > 0 && (
+                                <>
+                                    {/* Hero Section */}
+                                    <section className='mb-8 md:mb-12'>
+                                        <div className='text-center mb-6 md:mb-8'>
+                                            <h2 className='text-2xl md:text-3xl font-bold tracking-tight mb-2'>
+                                                Professional Stock Trading Tools
+                                            </h2>
+                                            <p className='text-muted-foreground text-base md:text-lg max-w-2xl mx-auto'>
+                                                Seamlessly convert, sync, and manage your stock symbols between MarketInOut
+                                                and TradingView platforms
+                                            </p>
                                         </div>
-                                    </div>
-                                </section>
 
-                                {/* Sync Operations */}
-                                <section className='mb-8 md:mb-12'>
-                                    <h3 className='text-lg md:text-xl font-semibold mb-4 md:mb-6'>Sync Operations</h3>
-                                    <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
-                                        {quickTools.map((tool) => (
-                                            <ActionCard key={tool.id} tool={tool} />
-                                        ))}
-                                    </div>
-                                </section>
-
-                                {/* All Tools by Category */}
-                                <section>
-                                    <h3 className='text-lg md:text-xl font-semibold mb-4 md:mb-6'>All Tools</h3>
-                                    {Object.entries(allToolsByCategory).map(([category, tools]) => (
-                                        <div key={category} className='mb-6 md:mb-8'>
-                                            <h4 className='text-base md:text-lg font-medium mb-3 md:mb-4 text-muted-foreground'>
-                                                {category}
-                                            </h4>
-                                            <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
-                                                {tools.map((tool) => (
-                                                    <ActionCard key={tool.id} tool={tool} compact />
+                                        <div className='max-w-6xl mx-auto'>
+                                            <div className='grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-6 md:mb-8'>
+                                                {featuredTools.map((tool) => (
+                                                    <ActionCard key={tool.id} tool={tool} featured />
                                                 ))}
                                             </div>
                                         </div>
-                                    ))}
-                                </section>
-                            </>
-                        )}
+                                    </section>
 
-                        {/* Page Content */}
-                        {children}
-                    </div>
-                </main>
+                                    {/* Sync Operations */}
+                                    <section className='mb-8 md:mb-12'>
+                                        <h3 className='text-lg md:text-xl font-semibold mb-4 md:mb-6'>Sync Operations</h3>
+                                        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
+                                            {quickTools.map((tool) => (
+                                                <ActionCard key={tool.id} tool={tool} />
+                                            ))}
+                                        </div>
+                                    </section>
+
+                                    {/* All Tools by Category */}
+                                    <section>
+                                        <h3 className='text-lg md:text-xl font-semibold mb-4 md:mb-6'>All Tools</h3>
+                                        {Object.entries(allToolsByCategory).map(([category, tools]) => (
+                                            <div key={category} className='mb-6 md:mb-8'>
+                                                <h4 className='text-base md:text-lg font-medium mb-3 md:mb-4 text-muted-foreground'>
+                                                    {category}
+                                                </h4>
+                                                <div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4'>
+                                                    {tools.map((tool) => (
+                                                        <ActionCard key={tool.id} tool={tool} compact />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </section>
+                                </>
+                            )}
+
+                            {/* Page Content */}
+                            {children}
+                        </div>
+                    </main>
+                )}
             </div>
 
             {/* Command Palette */}

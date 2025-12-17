@@ -25,6 +25,7 @@ import {
     PanelLeftClose,
     PanelLeftOpen,
     FileCode,
+    TrendingUp,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';
@@ -42,6 +43,7 @@ const iconMap = {
     MIOIcon,
     TVIcon,
     FileCode,
+    TrendingUp,
 };
 
 interface Tool {

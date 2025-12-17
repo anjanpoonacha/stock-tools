@@ -7,11 +7,11 @@ import { FormulaEditorPage } from '@/components/formula-editor/FormulaEditorPage
 
 const EditorPageWrapper: React.FC = () => {
 	return (
-		<DashboardLayout showHero={false} showSidebar={true}>
-			<AuthGuard>
+		<AuthGuard>
+			<DashboardLayout showHero={false} showSidebar={true} fullPage={true}>
 				<FormulaEditorPage />
-			</AuthGuard>
-		</DashboardLayout>
+			</DashboardLayout>
+		</AuthGuard>
 	);
 };
 
