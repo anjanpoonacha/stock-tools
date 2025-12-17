@@ -1,0 +1,56 @@
+Request URL
+wss://prodata.tradingview.com/socket.io/websocket?from=chart%2FS09yY40x%2F&date=2025-12-16T18%3A58%3A45&type=chart
+Request Method
+GET
+Status Code
+101 Switching Protocols
+connection
+upgrade
+date
+Wed, 17 Dec 2025 07:59:08 GMT
+sec-websocket-accept
+225N+p+jJ1KxLB5qhRGiORvi/Mk=
+server
+tv
+upgrade
+websocket
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-GB,en-US;q=0.9,en;q=0.8
+cache-control
+no-cache
+connection
+Upgrade
+host
+prodata.tradingview.com
+origin
+https://www.tradingview.com
+pragma
+no-cache
+sec-gpc
+1
+sec-websocket-extensions
+permessage-deflate; client_max_window_bits
+sec-websocket-key
+MoTiv+yUmqKJxXysaTXB7w==
+sec-websocket-version
+13
+upgrade
+websocket
+user-agent
+Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+
+
+curl 'wss://prodata.tradingview.com/socket.io/websocket?from=chart%2FS09yY40x%2F&date=2025-12-16T18%3A58%3A45&type=chart' \
+  -H 'Upgrade: websocket' \
+  -H 'Sec-GPC: 1' \
+  -H 'Origin: https://www.tradingview.com' \
+  -H 'Cache-Control: no-cache' \
+  -H 'Accept-Language: en-GB,en-US;q=0.9,en;q=0.8' \
+  -H 'Pragma: no-cache' \
+  -H 'Connection: Upgrade' \
+  -H 'Sec-WebSocket-Key: 2yWhodzSQd6dZ4nkxqRL+Q==' \
+  -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' \
+  -H 'Sec-WebSocket-Version: 13' \
+  -H 'Sec-WebSocket-Extensions: permessage-deflate; client_max_window_bits'

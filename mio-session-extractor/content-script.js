@@ -176,11 +176,12 @@
 
     /**
      * Extract TradingView session using background script message passing
+     * CRITICAL: TradingView requires BOTH sessionid and sessionid_sign cookies for data access
      */
     async function extractTradingViewSession(platformConfig) {
         try {
-            // Use background script to get sessionid from .tradingview.com domain
-            const cookie = await new Promise((resolve, reject) => {
+            // Get sessionid cookie
+            const sessionIdCookie = await new Promise((resolve, reject) => {
                 chrome.runtime.sendMessage(
                     {
                         action: 'getCookie',
@@ -197,15 +198,35 @@
                 );
             });
 
-            if (cookie && cookie.value) {
+            // Get sessionid_sign cookie (CRITICAL for JWT data access token)
+            const sessionIdSignCookie = await new Promise((resolve, reject) => {
+                chrome.runtime.sendMessage(
+                    {
+                        action: 'getCookie',
+                        url: 'https://www.tradingview.com',
+                        name: 'sessionid_sign',
+                    },
+                    (response) => {
+                        if (chrome.runtime.lastError) {
+                            reject(chrome.runtime.lastError);
+                        } else {
+                            resolve(response.cookie);
+                        }
+                    }
+                );
+            });
+
+            if (sessionIdCookie && sessionIdCookie.value) {
                 const sessionData = {
                     platform: currentPlatform,
-                    sessionKey: cookie.name,
-                    sessionValue: cookie.value,
+                    sessionKey: sessionIdCookie.name,
+                    sessionValue: sessionIdCookie.value,
                     extractedAt: new Date().toISOString(),
                     url: window.location.href,
                     source: 'browser-extension',
-                    domain: cookie.domain,
+                    domain: sessionIdCookie.domain,
+                    // Store sessionid_sign as a separate field (CRITICAL for data access)
+                    sessionid_sign: sessionIdSignCookie && sessionIdSignCookie.value ? sessionIdSignCookie.value : null,
                 };
 
                 console.log(
@@ -216,8 +237,18 @@
                         sessionValueLength: sessionData.sessionValue.length,
                         domain: sessionData.domain,
                         extractedAt: sessionData.extractedAt,
+                        hasSessionIdSign: !!sessionData.sessionid_sign,
+                        sessionIdSignLength: sessionData.sessionid_sign ? sessionData.sessionid_sign.length : 0,
                     }
                 );
+
+                // Warn if sessionid_sign is missing
+                if (!sessionData.sessionid_sign) {
+                    console.warn(
+                        `[MULTI-EXTRACTOR] WARNING: sessionid_sign cookie not found! ` +
+                        `This is required for TradingView data access. JWT token extraction will fail.`
+                    );
+                }
 
                 return sessionData;
             } else {

@@ -96,3 +96,7 @@ web-ext-artifacts/
 # MIO parser output and analysis
 /output/
 *.baseline.json
+
+# POC outputs (contains sensitive session/token data)
+/scripts/poc-output/
+/scripts/poc-tradingview/poc-config.ts
