@@ -546,6 +546,12 @@ export abstract class BaseWebSocketClient {
 		
 		// Track that we expect this study's data
 		this.expectedStudyCount++;
+		const configText = typeof config.text === 'string' ? config.text : '';
+		console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: study created, expecting ${this.expectedStudyCount} studies`, {
+			studyId,
+			configTextLength: configText.length,
+			configPineId: config.pineId
+		});
 		console.log(`[BaseWebSocket] Expecting ${this.expectedStudyCount} studies (added ${studyId})`);
 		
 		// Send create_study message
@@ -571,10 +577,11 @@ export abstract class BaseWebSocketClient {
 	 * @param timeout Timeout in milliseconds (default: from config or 10000)
 	 */
 	protected async waitForData(timeout: number = this.config.dataTimeout): Promise<void> {
-		// If we're waiting for studies, use shorter timeout (800ms instead of 10s)
-		// CVD and other indicators often don't arrive, we shouldn't wait forever
+		// If we're waiting for studies, use 2-second timeout (increased from 800ms)
+		// CVD data typically arrives within 1-3 seconds
 		if (this.expectedStudyCount > 0) {
-			timeout = Math.min(timeout, 800);
+			timeout = Math.min(timeout, 2000);
+			console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: waiting for ${this.expectedStudyCount} studies (timeout: ${timeout}ms)`);
 			console.log(`[BaseWebSocket] Waiting max ${timeout}ms for ${this.expectedStudyCount} studies`);
 		}
 		if (!this.config.eventDrivenWaits) {
@@ -597,6 +604,7 @@ export abstract class BaseWebSocketClient {
 			this.dataWaitTimeout = setTimeout(() => {
 				if (this.dataWaitResolver) {
 					if (this.expectedStudyCount > 0) {
+						console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: TIMEOUT after ${timeout}ms - no study data received`);
 						console.log(`[BaseWebSocket] ⏱️ Timeout waiting for studies after ${timeout}ms - proceeding without CVD data`);
 					}
 					this.dataWaitResolver(false);
@@ -699,6 +707,15 @@ export abstract class BaseWebSocketClient {
 		// Check if we have all required data before resolving wait
 		const hasBars = this.bars.length > 0;
 		const hasAllStudies = this.hasAllStudyData();
+		
+		console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: data update received`, {
+			hasBars,
+			barsCount: this.bars.length,
+			hasAllStudies,
+			studiesReceived: this.studies.size,
+			studiesExpected: this.expectedStudyCount,
+			dataKey: Object.keys(dataObj).join(', ')
+		});
 		
 		if (hasBars && hasAllStudies && this.dataWaitResolver) {
 			console.log(`[BaseWebSocket] ✅ All data received - bars: ${this.bars.length}, studies: ${this.studies.size}/${this.expectedStudyCount}`);

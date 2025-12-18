@@ -319,12 +319,31 @@ export function TradingViewLiveChart({
 			
 			console.log('[CVD Debug] Rendering CVD on pane index:', cvdPaneIndex);
 			
+			// Format large numbers with K/M/B notation
+			const formatCVDValue = (value: number): string => {
+				const absValue = Math.abs(value);
+				const sign = value < 0 ? '-' : '';
+				
+				if (absValue >= 1e9) {
+					return sign + (absValue / 1e9).toFixed(2) + 'B';
+				} else if (absValue >= 1e6) {
+					return sign + (absValue / 1e6).toFixed(2) + 'M';
+				} else if (absValue >= 1e3) {
+					return sign + (absValue / 1e3).toFixed(2) + 'K';
+				}
+				return sign + absValue.toFixed(0);
+			};
+			
 			const cvdSeries = chart.addSeries(CandlestickSeries, {
 				upColor: '#26a69a',        // Teal for positive CVD
 				downColor: '#ef5350',      // Red for negative CVD
 				borderVisible: false,
 				wickUpColor: '#26a69a',
 				wickDownColor: '#ef5350',
+				priceFormat: {
+					type: 'custom',
+					formatter: formatCVDValue,
+				},
 			});
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			cvdSeries.setData(cvdData as any);

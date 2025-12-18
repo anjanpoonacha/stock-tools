@@ -14,6 +14,7 @@
 import { BaseWebSocketClient } from './baseWebSocketClient';
 import { createSymbolSpec } from './protocol';
 import type { OHLCVBar, SymbolMetadata, StudyData } from './types';
+import { getCVDConfig, CVD_PINE_FEATURES } from './cvdConfigService';
 
 interface ChartRequest {
 	symbol: string;
@@ -108,19 +109,47 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 				console.log(`[PooledClient] Modified series for ${request.symbol} (${turnaroundId})`);
 			}
 			
-			// Request CVD if enabled
-			if (request.cvdEnabled) {
-				const cvdId = `cvd_${this.requestCount}`;
-				const cvdConfig = {
-					text: '',
-					pineId: 'PUB;ixVixhRxOlMl4Ro2B8WBP0Zt2HXRzh5Z',
-					pineVersion: '1.0',
-					in_0: { v: request.cvdAnchorPeriod || '3M', f: true, t: 'resolution' },
-					in_1: { v: !!request.cvdTimeframe, f: true, t: 'bool' },
-					in_2: { v: request.cvdTimeframe || '', f: true, t: 'resolution' },
-				};
-				await this.createStudy(cvdId, 'Script@tv-scripting-101!', cvdConfig);
+		// Request CVD if enabled
+		if (request.cvdEnabled) {
+			const cvdId = `cvd_${this.requestCount}`;
+			
+			// Validate session credentials
+			if (!request.sessionId || !request.sessionIdSign) {
+				console.error('[ConnectionPool] ⚠️ CVD requested but credentials missing - skipping CVD', {
+					hasSessionId: !!request.sessionId,
+					hasSessionIdSign: !!request.sessionIdSign
+				});
+			} else {
+				try {
+					console.log('[ConnectionPool] 🔍 CVD Diagnostic: fetching dynamic CVD config');
+					
+					// Fetch dynamic CVD config using session credentials
+					const fetchedConfig = await getCVDConfig(request.sessionId, request.sessionIdSign);
+					
+					const cvdConfig = {
+						text: fetchedConfig.text,
+						pineId: fetchedConfig.pineId,
+						pineVersion: fetchedConfig.pineVersion,
+						pineFeatures: CVD_PINE_FEATURES,
+						in_0: { v: request.cvdAnchorPeriod || '3M', f: true, t: 'resolution' },
+						in_1: { v: !!request.cvdTimeframe, f: true, t: 'bool' },
+						in_2: { v: request.cvdTimeframe || '', f: true, t: 'resolution' },
+						__profile: { v: false, f: true, t: 'bool' }
+					};
+					
+					console.log(`[ConnectionPool] 🔍 CVD Diagnostic: creating CVD study in pool`, {
+						cvdId,
+						textLength: fetchedConfig.text.length,
+						pineVersion: fetchedConfig.pineVersion,
+						source: fetchedConfig.source
+					});
+					
+					await this.createStudy(cvdId, 'Script@tv-scripting-101!', cvdConfig);
+				} catch (error) {
+					console.error('[ConnectionPool] ❌ Failed to fetch CVD config - skipping CVD:', error instanceof Error ? error.message : String(error));
+				}
 			}
+		}
 			
 			// Wait for data
 			// Both create_series and modify_series take ~3-5 seconds for data
@@ -287,7 +316,9 @@ export class WebSocketConnectionPool {
 			barsCount: r.barsCount,
 			cvdEnabled: r.cvdEnabled,
 			cvdAnchorPeriod: r.cvdAnchorPeriod,
-			cvdTimeframe: r.cvdTimeframe
+			cvdTimeframe: r.cvdTimeframe,
+			sessionId: r.sessionId,
+			sessionIdSign: r.sessionIdSign
 		}));
 		
 		// Process in parallel
@@ -322,6 +353,8 @@ export class WebSocketConnectionPool {
 			cvdEnabled?: boolean;
 			cvdAnchorPeriod?: string;
 			cvdTimeframe?: string;
+			sessionId?: string;
+			sessionIdSign?: string;
 		}>
 	): Promise<Array<{ symbol: string; result?: ChartResult; error?: string }>> {
 		const startTime = Date.now();
@@ -389,6 +422,8 @@ export class WebSocketConnectionPool {
 							cvdEnabled: req.cvdEnabled,
 							cvdAnchorPeriod: req.cvdAnchorPeriod,
 							cvdTimeframe: req.cvdTimeframe,
+							sessionId: req.sessionId,
+							sessionIdSign: req.sessionIdSign,
 							resolve: () => {},
 							reject: () => {},
 						});

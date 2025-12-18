@@ -391,9 +391,23 @@ export async function getChartData(
 		const useConnectionPool = !process.env.DISABLE_CONNECTION_POOL;
 		const dataStart = Date.now();
 		
+		// Log CVD request parameters
+		console.log('[ChartDataService] 🔍 CVD Diagnostic: request params', {
+			cvdEnabled: params.cvdEnabled,
+			cvdAnchorPeriod: params.cvdAnchorPeriod,
+			cvdTimeframe: params.cvdTimeframe,
+			sessionId: sessionResult.sessionId ? `${sessionResult.sessionId.substring(0, 10)}...` : 'MISSING',
+			sessionIdSign: sessionResult.sessionIdSign ? `${sessionResult.sessionIdSign.substring(0, 10)}...` : 'MISSING'
+		});
+		
 		// Warn if CVD is requested but credentials missing
 		if (params.cvdEnabled === 'true' && (!sessionResult.sessionId || !sessionResult.sessionIdSign)) {
 			console.warn('[Chart Data Service] ⚠️ CVD enabled but missing credentials (sessionId or sessionIdSign) - CVD will be skipped automatically');
+		}
+		
+		// Log before calling historical data client
+		if (params.cvdEnabled === 'true') {
+			console.log('[ChartDataService] 🔍 CVD Diagnostic: calling historical data client with CVD enabled');
 		}
 		
 		const dataResult = useConnectionPool
