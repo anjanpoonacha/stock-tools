@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { 
 	createChart, 
@@ -22,7 +22,8 @@ import {
 	HistogramSeries
 } from 'lightweight-charts';
 import { useAuth } from '@/contexts/AuthContext';
-import type { OHLCVBar } from '@/lib/tradingview/types';
+import type { OHLCVBar, SymbolMetadata, StudyData } from '@/lib/tradingview/types';
+import { useChartData } from '@/hooks/useChartData';
 
 interface TradingViewLiveChartProps {
 	symbol?: string;
@@ -35,32 +36,17 @@ interface TradingViewLiveChartProps {
 	showCVD?: boolean;
 	cvdAnchorPeriod?: string;
 	cvdTimeframe?: string;
-}
-
-interface ChartDataResponse {
-	success: boolean;
-	symbol: string;
-	resolution: string;
-	bars: OHLCVBar[];
-	metadata: {
-		name?: string;
-		exchange?: string;
-		currency_code?: string;
-		pricescale?: number;
-	};
-	indicators?: {
-		cvd?: {
-			studyId: string;
-			studyName: string;
-			config: unknown;
-			values: Array<{
-				time: number;
-				values: number[];
-			}>;
+	chartData?: {
+		bars: OHLCVBar[];
+		metadata: Partial<SymbolMetadata>;
+		indicators?: {
+			cvd?: StudyData;
 		};
 	};
-	error?: string;
+	isStreaming?: boolean;
 }
+
+// Removed - now imported from useChartData hook
 
 interface SMADataPoint {
 	time: number;
@@ -107,15 +93,37 @@ export function TradingViewLiveChart({
 	showGrid = true,
 	showCVD = false,
 	cvdAnchorPeriod = '3M',
-	cvdTimeframe
+	cvdTimeframe,
+	chartData: providedChartData,
+	isStreaming = false
 }: TradingViewLiveChartProps) {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [data, setData] = useState<ChartDataResponse | null>(null);
 	const { authStatus, isLoading: authLoading } = useAuth();
 	const { theme, resolvedTheme } = useTheme();
+	
+	// If chartData is provided (from SSE stream), use it directly
+	// If streaming is active, wait for data (don't fetch)
+	// Otherwise, fetch from API (for standalone usage)
+	const { data: fetchedData, loading, error } = useChartData({
+		symbol,
+		resolution,
+		barsCount,
+		apiEndpoint: '/api/chart-data',
+		cvdEnabled: showCVD, // Respect showCVD prop - don't fetch CVD if not needed
+		cvdAnchorPeriod: cvdAnchorPeriod || '3M',
+		cvdTimeframe,
+		enabled: !providedChartData && !isStreaming && authStatus?.isAuthenticated && !authLoading
+	});
+	
+	// Use provided data if available, otherwise use fetched data
+	const data = providedChartData || fetchedData;
+	
+	console.log('[TradingViewLiveChart] symbol:', symbol, 'resolution:', resolution);
+	console.log('[TradingViewLiveChart] isStreaming:', isStreaming);
+	console.log('[TradingViewLiveChart] providedChartData:', providedChartData ? `✓ bars=${providedChartData.bars?.length}, cvd=${providedChartData.indicators?.cvd?.values?.length}` : '✗ NONE');
+	console.log('[TradingViewLiveChart] Data source:', providedChartData ? '📡 STREAMED' : (isStreaming ? '⏳ WAITING' : '🌐 API'));
+	console.log('[TradingViewLiveChart] API fetch enabled:', !providedChartData && !isStreaming && authStatus?.isAuthenticated && !authLoading);
 	
 	// Determine if dark mode is active
 	const isDark = resolvedTheme === 'dark' || theme === 'dark';
@@ -133,13 +141,13 @@ export function TradingViewLiveChart({
 
 	// Memoize SMA calculation to avoid recalculating on every render
 	const smaData = useMemo(() => {
-		if (uniqueBars.length === 0) return [];
+		if (!data || uniqueBars.length === 0) return [];
 		return calculateSMA(uniqueBars, 20);
-	}, [uniqueBars]);
+	}, [data, uniqueBars]);
 
 	// Memoize volume data to avoid recalculating on every render
 	const volumeData = useMemo(() => {
-		if (uniqueBars.length === 0) return [];
+		if (!data || uniqueBars.length === 0) return [];
 		return uniqueBars.map(bar => ({
 			time: bar.time,
 			value: bar.volume,
@@ -147,15 +155,26 @@ export function TradingViewLiveChart({
 				? (isDark ? 'rgba(38, 166, 154, 0.4)' : 'rgba(38, 166, 154, 0.5)') 
 				: (isDark ? 'rgba(239, 83, 80, 0.4)' : 'rgba(239, 83, 80, 0.5)')
 		}));
-	}, [uniqueBars, isDark]);
+	}, [data, uniqueBars, isDark]);
 
 	// Memoize CVD candlestick data (Cumulative Volume Delta)
 	const cvdData = useMemo(() => {
-		if (!data?.indicators?.cvd?.values) return [];
+		console.log('[CVD Debug] Full data object:', data);
+		console.log('[CVD Debug] Indicators:', data?.indicators);
+		console.log('[CVD Debug] CVD object:', data?.indicators?.cvd);
+		
+		if (!data?.indicators?.cvd?.values) {
+			console.log('[CVD Debug] No CVD data available - indicators:', Object.keys(data?.indicators || {}));
+			return [];
+		}
+		
+		console.log('[CVD Debug] CVD values count:', data.indicators.cvd.values.length);
 		
 		// CVD values: [open, high, low, close, ...] - convert to candlestick format
 		const filtered = data.indicators.cvd.values
-			.filter(d => d.values[3] !== 1e+100); // Filter out placeholder values
+			.filter((d: { values: number[] }) => d.values[3] !== 1e+100); // Filter out placeholder values
+		
+		console.log('[CVD Debug] Filtered values count:', filtered.length);
 		
 		// Remove duplicates (keep last value for each timestamp) and sort
 		const uniqueMap = new Map<number, {
@@ -177,97 +196,16 @@ export function TradingViewLiveChart({
 		}
 		
 		// Convert to array and sort by time (ascending)
-		return Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
+		const result = Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
+		console.log('[CVD Debug] Final CVD data points:', result.length);
+		if (result.length > 0) {
+			console.log('[CVD Debug] First CVD bar:', result[0]);
+			console.log('[CVD Debug] Last CVD bar:', result[result.length - 1]);
+		}
+		return result;
 	}, [data?.indicators?.cvd]);
 
-	useEffect(() => {
-		let mounted = true;
-
-		async function loadChart() {
-			try {
-				setLoading(true);
-				setError(null);
-
-				// Wait for auth to finish loading before checking status
-				if (authLoading) {
-					// Auth still loading, keep showing loading state
-					return;
-				}
-
-				// Auth finished loading, now check if authenticated
-				if (!authStatus?.isAuthenticated) {
-					throw new Error('Please log in to view charts');
-				}
-
-				// Get credentials from localStorage (stored by AuthContext)
-				const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-				if (!storedCredentials) {
-					throw new Error('Authentication credentials not found. Please log in again.');
-				}
-
-				const credentials = JSON.parse(storedCredentials);
-
-				// Build API URL
-				const url = new URL('/api/chart-data', window.location.origin);
-				url.searchParams.set('symbol', symbol);
-				url.searchParams.set('resolution', resolution);
-				url.searchParams.set('barsCount', barsCount.toString());
-				
-				// Add CVD parameters if enabled
-				if (showCVD) {
-					url.searchParams.set('cvdEnabled', 'true');
-					url.searchParams.set('cvdAnchorPeriod', cvdAnchorPeriod);
-					if (cvdTimeframe) {
-						url.searchParams.set('cvdTimeframe', cvdTimeframe);
-					}
-				}
-
-				// Fetch data from API
-				const response = await fetch(url.toString(), {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({
-						userEmail: credentials.userEmail,
-						userPassword: credentials.userPassword
-					})
-				});
-
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-
-				const result: ChartDataResponse = await response.json();
-
-				if (!mounted) return;
-
-				if (!result.success) {
-					throw new Error(result.error || 'Failed to fetch chart data');
-				}
-
-				// Validate bars data
-				if (!result.bars || result.bars.length === 0) {
-					throw new Error('No chart data received');
-				}
-
-				setData(result);
-				setLoading(false);
-			} catch (err) {
-				console.error('[Chart] Error loading data:', err);
-				if (!mounted) return;
-				const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-				setError(errorMessage);
-				setLoading(false);
-			}
-		}
-
-		loadChart();
-		
-		return () => {
-			mounted = false;
-		};
-	}, [symbol, resolution, barsCount, showCVD, cvdAnchorPeriod, cvdTimeframe, authStatus, authLoading]);
+	// Data fetching is now handled by useChartData hook with caching
 
 	// Separate effect for chart creation (runs when data is available)
 	useEffect(() => {
@@ -347,7 +285,6 @@ export function TradingViewLiveChart({
 			const smaSeries = chart.addSeries(LineSeries, {
 				color: '#26a69a',  // Green color matching candle up color
 				lineWidth: 1,
-				title: 'SMA(20)',
 				priceLineVisible: false,
 				lastValueVisible: true,
 			});
@@ -374,9 +311,13 @@ export function TradingViewLiveChart({
 			}
 		}
 
-		// Add CVD (Cumulative Volume Delta) candlestick chart on separate pane (pane 2) - using memoized data
+		// Add CVD pane if checkbox is enabled (data is always fetched, showCVD controls visibility)
+		console.log('[CVD Debug] showCVD:', showCVD, 'cvdData.length:', cvdData.length);
+		
 		if (showCVD && cvdData.length > 0) {
 			const cvdPaneIndex = showVolume ? 2 : 1; // Pane 2 if volume shown, else pane 1
+			
+			console.log('[CVD Debug] Rendering CVD on pane index:', cvdPaneIndex);
 			
 			const cvdSeries = chart.addSeries(CandlestickSeries, {
 				upColor: '#26a69a',        // Teal for positive CVD
@@ -392,9 +333,13 @@ export function TradingViewLiveChart({
 			
 			// Set CVD pane height
 			const panes = chart.panes();
+			console.log('[CVD Debug] Total panes:', panes.length);
 			if (panes[cvdPaneIndex]) {
 				panes[cvdPaneIndex].setHeight(120);
+				console.log('[CVD Debug] CVD pane height set to 120px');
 			}
+		} else {
+			console.log('[CVD Debug] CVD not rendered - showCVD:', showCVD, 'cvdData.length:', cvdData.length);
 		}
 
 		// Fit content to view
@@ -409,7 +354,7 @@ export function TradingViewLiveChart({
 				chartRef.current = null;
 			}
 		};
-	}, [data, height, isDark, smaData, volumeData, cvdData, showSMA, showVolume, showGrid, showCVD]);
+	}, [data, height, isDark, smaData, volumeData, cvdData, showSMA, showVolume, showGrid, showCVD, uniqueBars]);
 
 	// Handle window resize
 	useEffect(() => {
@@ -425,13 +370,36 @@ export function TradingViewLiveChart({
 		return () => window.removeEventListener('resize', handleResize);
 	}, []);
 
-	if (loading) {
+	// Show loading if no data AND (fetching OR streaming)
+	const isLoading = !providedChartData && (loading || isStreaming);
+	const loadingMessage = isStreaming ? 'Waiting for chart stream...' : 'Loading chart data...';
+	
+	if (isLoading) {
 		return (
 			<div className="flex items-center justify-center bg-muted/30 rounded-lg" style={{ height }}>
 				<div className="text-center">
 					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto" />
-					<p className="mt-4 text-muted-foreground">Loading chart data...</p>
+					<p className="mt-4 text-muted-foreground">{loadingMessage}</p>
 					<p className="text-sm text-muted-foreground/70 mt-1">{symbol} • {resolution}</p>
+					{isStreaming && <p className="text-xs text-muted-foreground/50 mt-2">Charts are streaming in batches</p>}
+				</div>
+			</div>
+		);
+	}
+
+	// If no data available (neither streamed nor fetched), show error
+	if (!data) {
+		return (
+			<div className="flex items-center justify-center bg-yellow-50 dark:bg-yellow-950/20 rounded-lg" style={{ height }}>
+				<div className="text-center p-6 max-w-md">
+					<div className="text-yellow-600 dark:text-yellow-400 font-semibold mb-2">No Chart Data</div>
+					<p className="text-yellow-500 dark:text-yellow-300 text-sm mb-4">
+						Chart data not available from stream. Please refresh the page.
+					</p>
+					<div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+						<p>Symbol: {symbol}</p>
+						<p>Resolution: {resolution}</p>
+					</div>
 				</div>
 			</div>
 		);

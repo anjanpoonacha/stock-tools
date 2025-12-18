@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 		console.log('[EXTENSION-API] Received session from multi-platform browser extension');
 
 		const body = await req.json();
-		const { sessionKey, sessionValue, extractedAt, url, platform, userEmail, userPassword } = body;
+		const { sessionKey, sessionValue, extractedAt, url, platform, userEmail, userPassword, sessionid_sign } = body;
 
 		// Get existing session ID from cookie
 		const existingSessionId = req.cookies.get('myAppToken')?.value;
@@ -41,7 +41,8 @@ export async function POST(req: NextRequest) {
 			platform,
 			userEmail,
 			userPassword,
-			existingSessionId
+			existingSessionId,
+			sessionid_sign
 		} as SessionProcessRequest);
 
 		// Handle error responses

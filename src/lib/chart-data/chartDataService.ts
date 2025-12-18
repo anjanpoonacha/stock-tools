@@ -8,6 +8,8 @@
 import { SessionResolver } from '@/lib/SessionResolver';
 import { getDataAccessToken } from '@/lib/tradingview/jwtService';
 import { fetchHistoricalBars, type Resolution } from '@/lib/tradingview/historicalDataClient';
+import { getConnectionPool } from '@/lib/tradingview/connectionPool';
+import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
 import type { 
 	SessionResolutionResult, 
 	JWTTokenResult, 
@@ -15,6 +17,7 @@ import type {
 	ChartDataServiceResult 
 } from './types';
 import { validateChartDataRequest, validateUserCredentials } from './validators';
+import { getCachedSession, cacheSession, getCachedJWT, cacheJWT } from './sessionCache';
 
 /**
  * Configuration for chart data service (enables dependency injection)
@@ -52,6 +55,17 @@ export async function resolveUserSession(
 	userPassword: string,
 	config: ChartDataServiceConfig
 ): Promise<SessionResolutionResult> {
+	// Check cache first
+	const cached = getCachedSession(userEmail);
+	if (cached) {
+		return {
+			success: true,
+			sessionId: cached.sessionId,
+			sessionIdSign: cached.sessionIdSign,
+			userId: cached.userId
+		};
+	}
+
 	// Get TradingView session from KV storage
 	const sessionInfo = await config.sessionResolver.getLatestSessionForUser('tradingview', {
 		userEmail,
@@ -89,6 +103,9 @@ export async function resolveUserSession(
 		warnings.push('Please update the browser extension to capture both sessionid and sessionid_sign cookies.');
 	}
 	
+	// Cache the session for future requests
+	cacheSession(userEmail, sessionId, sessionIdSign || '', userId);
+	
 	return {
 		success: true,
 		sessionId,
@@ -113,12 +130,24 @@ export async function fetchJWTToken(
 	userId: number,
 	config: ChartDataServiceConfig
 ): Promise<JWTTokenResult> {
+	// Check cache first
+	const cachedToken = getCachedJWT(sessionId);
+	if (cachedToken) {
+		return {
+			success: true,
+			token: cachedToken
+		};
+	}
+
 	try {
 		const token = await config.jwtService.getDataAccessToken(
 			sessionId,
 			sessionIdSign || '', // Pass empty string if missing (will fail but with better error)
 			userId
 		);
+		
+		// Cache the JWT token
+		cacheJWT(sessionId, token);
 		
 		return {
 			success: true,
@@ -152,6 +181,8 @@ export async function fetchHistoricalData(
 		cvdEnabled?: boolean;
 		cvdAnchorPeriod?: string;
 		cvdTimeframe?: string;
+		sessionId?: string;
+		sessionIdSign?: string;
 	},
 	config: ChartDataServiceConfig
 ): Promise<HistoricalDataResult> {
@@ -164,7 +195,9 @@ export async function fetchHistoricalData(
 			{
 				cvdEnabled: cvdOptions.cvdEnabled,
 				cvdAnchorPeriod: cvdOptions.cvdAnchorPeriod,
-				cvdTimeframe: cvdOptions.cvdTimeframe
+				cvdTimeframe: cvdOptions.cvdTimeframe,
+				sessionId: cvdOptions.sessionId,
+				sessionIdSign: cvdOptions.sessionIdSign
 			}
 		);
 		
@@ -173,6 +206,73 @@ export async function fetchHistoricalData(
 			bars,
 			metadata,
 			indicators
+		};
+	} catch (error) {
+		return {
+			success: false,
+			error: `Failed to fetch chart data: ${error instanceof Error ? error.message : 'Unknown error'}`
+		};
+	}
+}
+
+/**
+ * Fetches historical bars using connection pool (for better performance)
+ * 
+ * Reuses WebSocket connections across multiple requests, eliminating handshake overhead.
+ * Uses modify_series to switch symbols on the same connection.
+ * 
+ * @param symbol - Stock symbol (e.g., 'NSE:JUNIPER')
+ * @param resolution - Time resolution (e.g., '1D', '1W')
+ * @param barsCount - Number of bars to fetch
+ * @param jwtToken - JWT authentication token
+ * @param cvdOptions - CVD indicator configuration
+ * @returns Historical data result
+ */
+export async function fetchHistoricalDataPooled(
+	symbol: string,
+	resolution: string,
+	barsCount: number,
+	jwtToken: string,
+	cvdOptions: {
+		cvdEnabled?: boolean;
+		cvdAnchorPeriod?: string;
+		cvdTimeframe?: string;
+		sessionId?: string;
+		sessionIdSign?: string;
+	}
+): Promise<HistoricalDataResult> {
+	try {
+		// Try to use persistent connection manager if active, otherwise fall back to regular pool
+		const persistentManager = getPersistentConnectionManager();
+		const pool = persistentManager.isManagerActive()
+			? persistentManager.getConnectionPool()
+			: getConnectionPool();
+		
+		if (persistentManager.isManagerActive()) {
+			console.log('[ChartDataService] Using persistent connection pool');
+		} else {
+			console.log('[ChartDataService] Using regular connection pool (persistent not active)');
+		}
+		
+		const result = await pool.fetchChartData(
+			jwtToken,
+			symbol,
+			resolution,
+			barsCount,
+			{
+				cvdEnabled: cvdOptions.cvdEnabled,
+				cvdAnchorPeriod: cvdOptions.cvdAnchorPeriod,
+				cvdTimeframe: cvdOptions.cvdTimeframe,
+				sessionId: cvdOptions.sessionId,
+				sessionIdSign: cvdOptions.sessionIdSign
+			}
+		);
+		
+		return {
+			success: true,
+			bars: result.bars,
+			metadata: result.metadata,
+			indicators: result.indicators
 		};
 	} catch (error) {
 		return {
@@ -206,6 +306,8 @@ export async function getChartData(
 	const serviceConfig = createChartDataServiceConfig(config);
 	
 	try {
+		const startTime = Date.now();
+		
 		// 1. Validate chart data request parameters
 		const requestValidation = validateChartDataRequest(
 			params.symbol,
@@ -240,6 +342,7 @@ export async function getChartData(
 		const { userEmail, userPassword } = credentialsValidation.credentials!;
 		
 		// 3. Resolve user session
+		const sessionStart = Date.now();
 		const sessionResult = await resolveUserSession(
 			userEmail,
 			userPassword,
@@ -253,6 +356,8 @@ export async function getChartData(
 				statusCode: 401
 			};
 		}
+		const sessionDuration = Date.now() - sessionStart;
+		console.log(`[Chart Data Service] Session resolved in ${sessionDuration}ms`);
 		
 		// Log warnings if any
 		if (sessionResult.warnings) {
@@ -262,6 +367,7 @@ export async function getChartData(
 		}
 		
 		// 4. Fetch JWT token
+		const jwtStart = Date.now();
 		const jwtResult = await fetchJWTToken(
 			sessionResult.sessionId!,
 			sessionResult.sessionIdSign || '',
@@ -276,20 +382,48 @@ export async function getChartData(
 				statusCode: 401
 			};
 		}
+		const jwtDuration = Date.now() - jwtStart;
+		console.log(`[Chart Data Service] JWT fetched in ${jwtDuration}ms`);
 		
 		// 5. Fetch historical data
-		const dataResult = await fetchHistoricalData(
-			symbol,
-			resolution,
-			barsCount,
-			jwtResult.token!,
-			{
-				cvdEnabled: params.cvdEnabled === 'true',
-				cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
-				cvdTimeframe: params.cvdTimeframe || undefined
-			},
-			serviceConfig
-		);
+		// Use connection pooling by default for better performance (3-5x faster)
+		// Set DISABLE_CONNECTION_POOL=true to disable
+		const useConnectionPool = !process.env.DISABLE_CONNECTION_POOL;
+		const dataStart = Date.now();
+		
+		// Warn if CVD is requested but credentials missing
+		if (params.cvdEnabled === 'true' && (!sessionResult.sessionId || !sessionResult.sessionIdSign)) {
+			console.warn('[Chart Data Service] ⚠️ CVD enabled but missing credentials (sessionId or sessionIdSign) - CVD will be skipped automatically');
+		}
+		
+		const dataResult = useConnectionPool
+			? await fetchHistoricalDataPooled(
+				symbol,
+				resolution,
+				barsCount,
+				jwtResult.token!,
+				{
+					cvdEnabled: params.cvdEnabled === 'true',
+					cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
+					cvdTimeframe: params.cvdTimeframe || undefined,
+					sessionId: sessionResult.sessionId,
+					sessionIdSign: sessionResult.sessionIdSign
+				}
+			)
+			: await fetchHistoricalData(
+				symbol,
+				resolution,
+				barsCount,
+				jwtResult.token!,
+				{
+					cvdEnabled: params.cvdEnabled === 'true',
+					cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
+					cvdTimeframe: params.cvdTimeframe || undefined,
+					sessionId: sessionResult.sessionId,
+					sessionIdSign: sessionResult.sessionIdSign
+				},
+				serviceConfig
+			);
 		
 		if (!dataResult.success) {
 			return {
@@ -298,8 +432,13 @@ export async function getChartData(
 				statusCode: 500
 			};
 		}
+		const dataDuration = Date.now() - dataStart;
+		console.log(`[Chart Data Service] Data fetched in ${dataDuration}ms`);
 		
 		// 6. Return successful response
+		const duration = Date.now() - startTime;
+		console.log(`[Chart Data Service] ✅ Success: ${symbol} ${resolution} - Total: ${duration}ms (Session: ${sessionDuration}ms, JWT: ${jwtDuration}ms, Data: ${dataDuration}ms)`);
+		
 		return {
 			success: true,
 			data: {

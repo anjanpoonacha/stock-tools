@@ -8,7 +8,7 @@
 import { BaseWebSocketClient, type BaseClientConfig } from './baseWebSocketClient';
 import { createSymbolSpec } from './protocol';
 import type { OHLCVBar, SymbolMetadata, StudyData, StudyConfig } from './types';
-import { CVD_ENCRYPTED_TEXT, CVD_PINE_FEATURES, CVD_PINE_METADATA } from './cvd-constants';
+import { getCVDConfig, CVD_PINE_FEATURES, type CVDConfig } from './cvdConfigService';
 
 interface HistoricalDataResult {
 	bars: OHLCVBar[];
@@ -26,6 +26,9 @@ interface ClientConfig extends BaseClientConfig {
 	cvdEnabled?: boolean;
 	cvdAnchorPeriod?: string;
 	cvdTimeframe?: string;
+	// Session credentials for fetching dynamic CVD config
+	sessionId?: string;
+	sessionIdSign?: string;
 }
 
 class TradingViewWebSocketClient extends BaseWebSocketClient {
@@ -35,6 +38,9 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 	private cvdEnabled: boolean;
 	private cvdAnchorPeriod: string;
 	private cvdTimeframe?: string;
+	private sessionId?: string;
+	private sessionIdSign?: string;
+	private cvdConfigCache?: CVDConfig; // Cache fetched CVD config
 	
 	constructor(config: ClientConfig) {
 		super(config);
@@ -44,6 +50,8 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 		this.cvdEnabled = config.cvdEnabled ?? false;
 		this.cvdAnchorPeriod = config.cvdAnchorPeriod ?? '3M';
 		this.cvdTimeframe = config.cvdTimeframe;
+		this.sessionId = config.sessionId;
+		this.sessionIdSign = config.sessionIdSign;
 	}
 	
 	/**
@@ -68,10 +76,21 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 		// Request historical bars
 		await this.createSeries(this.resolution, this.barsCount);
 		
-		// Request CVD indicator if enabled
+		// Request CVD indicator if enabled AND credentials are available
+		// Skip CVD entirely if credentials missing to avoid timeout
 		if (this.cvdEnabled) {
-			const cvdConfig = this.buildCVDConfig();
-			await this.createStudy('cvd_1', 'Script@tv-scripting-101!', cvdConfig);
+			if (!this.sessionId || !this.sessionIdSign) {
+				console.log('[HistoricalDataClient] ⚠️ CVD requested but credentials missing (sessionId or sessionIdSign) - skipping CVD');
+				// Don't add study, won't wait for timeout
+			} else {
+				try {
+					const cvdConfig = await this.buildCVDConfig();
+					await this.createStudy('cvd_1', 'Script@tv-scripting-101!', cvdConfig);
+				} catch (err) {
+					console.error('[HistoricalDataClient] ⚠️ Failed to build CVD config - skipping CVD:', err instanceof Error ? err.message : 'Unknown error');
+					// Don't propagate error, just skip CVD
+				}
+			}
 		}
 		
 		// Wait for data to arrive
@@ -80,13 +99,25 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 	}
 	
 	/**
-	 * Build CVD indicator configuration
+	 * Build CVD indicator configuration (uses dynamic config if available)
 	 */
-	private buildCVDConfig(): StudyConfig {
+	private async buildCVDConfig(): Promise<StudyConfig> {
+		// Fetch dynamic CVD config if not cached
+		if (!this.cvdConfigCache && this.sessionId) {
+			this.cvdConfigCache = await getCVDConfig(this.sessionId, this.sessionIdSign);
+			console.log(`[HistoricalDataClient] Using ${this.cvdConfigCache.source} CVD config (v${this.cvdConfigCache.pineVersion})`);
+		}
+		
+		// Use cached config or fall back to service defaults
+		const cvdConfig = this.cvdConfigCache;
+		if (!cvdConfig) {
+			throw new Error('CVD config unavailable: no session credentials provided');
+		}
+		
 		return {
-			text: CVD_ENCRYPTED_TEXT,
-			pineId: CVD_PINE_METADATA.pineId,
-			pineVersion: CVD_PINE_METADATA.pineVersion,
+			text: cvdConfig.text,
+			pineId: cvdConfig.pineId,
+			pineVersion: cvdConfig.pineVersion,
 			pineFeatures: CVD_PINE_FEATURES,
 			in_0: { v: this.cvdAnchorPeriod, f: true, t: 'resolution' },
 			in_1: { v: !!this.cvdTimeframe, f: true, t: 'bool' },
@@ -163,8 +194,16 @@ export async function fetchHistoricalBars(
 		cvdEnabled?: boolean;
 		cvdAnchorPeriod?: string;
 		cvdTimeframe?: string;
+		useConnectionPool?: boolean;
+		// Session credentials for dynamic CVD config
+		sessionId?: string;
+		sessionIdSign?: string;
 	}
 ): Promise<HistoricalDataResult> {
+	// Note: Connection pooling is implemented via getConnectionPool() in connectionPool.ts
+	// This function creates a new connection per request (non-pooled mode)
+	// For pooled mode, use fetchHistoricalDataPooled() in chartDataService.ts
+	
 	const client = new TradingViewWebSocketClient({
 		jwtToken,
 		symbol,

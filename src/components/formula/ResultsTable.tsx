@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { Stock } from '@/types/stock';
 import { getFormulaResultsPreferences, updateFormulaResultsPreferences } from '@/lib/utils/userPreferences';
+import { filterAndSortStocks, type SortField, type SortOrder } from '@/lib/utils/stockOrdering';
 import {
 	Table,
 	TableBody,
@@ -13,10 +14,9 @@ import {
 	TableRow,
 } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, Filter } from 'lucide-react';
+import { ArrowUpDown, Filter, BarChart3 } from 'lucide-react';
 import {
 	Select,
 	SelectContent,
@@ -27,19 +27,13 @@ import {
 
 interface ResultsTableProps {
 	stocks: Stock[];
-	selectedStocks: string[];
-	onSelectionChange: (selected: string[]) => void;
 	onViewCharts: () => void;
 }
 
-type SortField = 'symbol' | 'name' | 'price' | 'sector' | 'industry';
-type SortOrder = 'asc' | 'desc';
 type GroupBy = 'none' | 'sector' | 'industry';
 
 export default function ResultsTable({
 	stocks,
-	selectedStocks,
-	onSelectionChange,
 	onViewCharts,
 }: ResultsTableProps) {
 	const router = useRouter();
@@ -49,7 +43,7 @@ export default function ResultsTable({
 	// Load user preferences
 	const userPrefs = getFormulaResultsPreferences();
 
-	// Initialize state with priority: URL params > User preferences > Defaults
+	// Initialize state from URL or user preferences
 	const [sortField, setSortField] = useState<SortField>(
 		(searchParams.get('sortBy') as SortField) || userPrefs.sortBy || 'symbol'
 	);
@@ -66,37 +60,31 @@ export default function ResultsTable({
 		searchParams.get('industry') || 'all'
 	);
 
-	// Save user preferences when sort/group settings change
-	useEffect(() => {
-		updateFormulaResultsPreferences({
-			sortBy: sortField,
-			sortOrder: sortOrder,
-			groupBy: groupBy,
-		});
-	}, [sortField, sortOrder, groupBy]);
-
-	// Update URL when state changes
+	// Update URL when sort/filter changes
 	useEffect(() => {
 		const params = new URLSearchParams(searchParams.toString());
-
+		
 		params.set('sortBy', sortField);
 		params.set('sortOrder', sortOrder);
 		params.set('groupBy', groupBy);
-
-		if (sectorFilter !== 'all') {
-			params.set('sector', sectorFilter);
-		} else {
+		
+		if (sectorFilter === 'all') {
 			params.delete('sector');
-		}
-
-		if (industryFilter !== 'all') {
-			params.set('industry', industryFilter);
 		} else {
-			params.delete('industry');
+			params.set('sector', sectorFilter);
 		}
-
+		
+		if (industryFilter === 'all') {
+			params.delete('industry');
+		} else {
+			params.set('industry', industryFilter);
+		}
+		
 		const newUrl = `${pathname}?${params.toString()}`;
 		router.replace(newUrl, { scroll: false });
+		
+		// Save to user preferences
+		updateFormulaResultsPreferences({ sortBy: sortField, sortOrder, groupBy });
 	}, [sortField, sortOrder, groupBy, sectorFilter, industryFilter, pathname, router, searchParams]);
 
 	// Extract unique sectors and industries
@@ -110,40 +98,14 @@ export default function ResultsTable({
 		return Array.from(unique).sort();
 	}, [stocks]);
 
-	// Filter and sort stocks
+	// Filter and sort stocks using centralized utility
 	const filteredAndSortedStocks = useMemo(() => {
-		// Filter
-		let filtered = stocks.filter(stock => {
-			if (sectorFilter !== 'all' && stock.sector !== sectorFilter) return false;
-			if (industryFilter !== 'all' && stock.industry !== industryFilter) return false;
-			return true;
+		return filterAndSortStocks(stocks, {
+			sortField,
+			sortOrder,
+			sectorFilter,
+			industryFilter,
 		});
-
-		// Sort
-		filtered = filtered.sort((a, b) => {
-			const aVal = a[sortField];
-			const bVal = b[sortField];
-
-			// Handle undefined values
-			if (aVal === undefined) return 1;
-			if (bVal === undefined) return -1;
-
-			// String comparison
-			if (typeof aVal === 'string' && typeof bVal === 'string') {
-				return sortOrder === 'asc'
-					? aVal.localeCompare(bVal)
-					: bVal.localeCompare(aVal);
-			}
-
-			// Number comparison
-			if (typeof aVal === 'number' && typeof bVal === 'number') {
-				return sortOrder === 'asc' ? aVal - bVal : bVal - aVal;
-			}
-
-			return 0;
-		});
-
-		return filtered;
 	}, [stocks, sortField, sortOrder, sectorFilter, industryFilter]);
 
 	// Group stocks
@@ -173,244 +135,199 @@ export default function ResultsTable({
 		}
 	};
 
-	const handleSelectAll = (checked: boolean) => {
-		if (checked) {
-			onSelectionChange(filteredAndSortedStocks.map(s => s.symbol));
-		} else {
-			onSelectionChange([]);
-		}
-	};
-
-	const handleSelectStock = (symbol: string, checked: boolean) => {
-		if (checked) {
-			onSelectionChange([...selectedStocks, symbol]);
-		} else {
-			onSelectionChange(selectedStocks.filter(s => s !== symbol));
-		}
-	};
-
-	const isAllSelected = filteredAndSortedStocks.length > 0 && selectedStocks.length === filteredAndSortedStocks.length;
-	const isSomeSelected = selectedStocks.length > 0 && selectedStocks.length < filteredAndSortedStocks.length;
+	if (stocks.length === 0) {
+		return (
+			<Card>
+				<CardContent className='py-8'>
+					<div className='text-center text-muted-foreground'>
+						<p>No stocks found</p>
+					</div>
+				</CardContent>
+			</Card>
+		);
+	}
 
 	return (
-		<Card>
-			<CardHeader>
-				<div className='flex items-center justify-between'>
-					<div>
-						<CardTitle>Stock Results ({stocks.length})</CardTitle>
-						<CardDescription>
-							{selectedStocks.length > 0
-								? `${selectedStocks.length} stock${selectedStocks.length !== 1 ? 's' : ''} selected`
-								: 'Select stocks to view charts'}
-							{filteredAndSortedStocks.length !== stocks.length && ` • ${filteredAndSortedStocks.length} filtered`}
-						</CardDescription>
-					</div>
-					{selectedStocks.length > 0 && (
-						<div className='flex gap-2'>
-							<Button
-								variant='outline'
-								size='sm'
-								onClick={() => onSelectionChange([])}
-							>
-								Clear Selection
-							</Button>
-							<Button size='sm' onClick={onViewCharts}>
-								View Charts ({selectedStocks.length})
-							</Button>
-						</div>
-					)}
-				</div>
-
-				{/* Filter Bar */}
-				<div className='flex items-center gap-2 pt-4 flex-wrap'>
-					<Filter className='h-4 w-4 text-muted-foreground' />
-					<Select value={groupBy} onValueChange={(value) => setGroupBy(value as GroupBy)}>
-						<SelectTrigger className='w-[140px] h-8'>
-							<SelectValue placeholder='Group by' />
-						</SelectTrigger>
-						<SelectContent>
-							<SelectItem value='none'>No grouping</SelectItem>
-							<SelectItem value='sector'>Group by Sector</SelectItem>
-							<SelectItem value='industry'>Group by Industry</SelectItem>
-						</SelectContent>
-					</Select>
-
-					<Select value={sectorFilter} onValueChange={setSectorFilter}>
-						<SelectTrigger className='w-[180px] h-8'>
-							<SelectValue placeholder='Filter sector' />
-						</SelectTrigger>
-						<SelectContent>
+		<div className='space-y-4'>
+			{/* Filters and Controls */}
+			<Card>
+				<CardHeader className='py-3'>
+					<div className='flex items-center justify-between'>
+						<div className='flex items-center gap-4'>
+							<div className='flex items-center gap-2'>
+								<Filter className='h-4 w-4 text-muted-foreground' />
+								<span className='text-sm font-medium'>Filters:</span>
+							</div>
+							
+							<Select value={sectorFilter} onValueChange={setSectorFilter}>
+								<SelectTrigger className='h-8 w-[180px]'>
+									<SelectValue placeholder='All Sectors' />
+								</SelectTrigger>
+								<SelectContent>
 							<SelectItem value='all'>All Sectors</SelectItem>
 							{sectors.map(sector => (
-								<SelectItem key={sector} value={sector || 'unknown'}>{sector}</SelectItem>
+								<SelectItem key={sector || 'unknown'} value={sector || 'unknown'}>
+									{sector}
+								</SelectItem>
 							))}
-						</SelectContent>
-					</Select>
-
-					<Select value={industryFilter} onValueChange={setIndustryFilter}>
-						<SelectTrigger className='w-[200px] h-8'>
-							<SelectValue placeholder='Filter industry' />
-						</SelectTrigger>
-						<SelectContent>
+								</SelectContent>
+							</Select>
+							
+							<Select value={industryFilter} onValueChange={setIndustryFilter}>
+								<SelectTrigger className='h-8 w-[180px]'>
+									<SelectValue placeholder='All Industries' />
+								</SelectTrigger>
+								<SelectContent>
 							<SelectItem value='all'>All Industries</SelectItem>
 							{industries.map(industry => (
-								<SelectItem key={industry} value={industry || 'unknown'}>{industry}</SelectItem>
+								<SelectItem key={industry || 'unknown'} value={industry || 'unknown'}>
+									{industry}
+								</SelectItem>
 							))}
-						</SelectContent>
-					</Select>
-
-					{(sectorFilter !== 'all' || industryFilter !== 'all') && (
+								</SelectContent>
+							</Select>
+							
+							<Select value={groupBy} onValueChange={(v) => setGroupBy(v as GroupBy)}>
+								<SelectTrigger className='h-8 w-[140px]'>
+									<SelectValue />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value='none'>No Grouping</SelectItem>
+									<SelectItem value='sector'>Group by Sector</SelectItem>
+									<SelectItem value='industry'>Group by Industry</SelectItem>
+								</SelectContent>
+							</Select>
+						</div>
+						
 						<Button
-							variant='ghost'
+							onClick={onViewCharts}
 							size='sm'
-							onClick={() => {
-								setSectorFilter('all');
-								setIndustryFilter('all');
-							}}
-							className='h-8 px-2 text-xs'
+							disabled={filteredAndSortedStocks.length === 0}
 						>
-							Clear Filters
+							<BarChart3 className='h-4 w-4 mr-2' />
+							View Charts ({filteredAndSortedStocks.length})
 						</Button>
+					</div>
+				</CardHeader>
+			</Card>
+
+			{/* Results Table */}
+			{groupedStocks.map((group, groupIndex) => (
+				<Card key={groupIndex}>
+					{group.group && (
+						<CardHeader className='py-2 px-4'>
+							<CardTitle className='text-base'>{group.group}</CardTitle>
+							<CardDescription className='text-xs'>
+								{group.stocks.length} stocks
+							</CardDescription>
+						</CardHeader>
 					)}
+					<CardContent className='p-0'>
+						<div className='overflow-x-auto'>
+							<Table>
+								<TableHeader>
+									<TableRow>
+										<TableHead className='w-[40px] text-center'>#</TableHead>
+										<TableHead>
+											<Button
+												variant='ghost'
+												size='sm'
+												className='h-8 px-2'
+												onClick={() => handleSort('symbol')}
+											>
+												Symbol
+												<ArrowUpDown className='ml-2 h-3 w-3' />
+											</Button>
+										</TableHead>
+										<TableHead>
+											<Button
+												variant='ghost'
+												size='sm'
+												className='h-8 px-2'
+												onClick={() => handleSort('name')}
+											>
+												Name
+												<ArrowUpDown className='ml-2 h-3 w-3' />
+											</Button>
+										</TableHead>
+										<TableHead>
+											<Button
+												variant='ghost'
+												size='sm'
+												className='h-8 px-2'
+												onClick={() => handleSort('price')}
+											>
+												Price
+												<ArrowUpDown className='ml-2 h-3 w-3' />
+											</Button>
+										</TableHead>
+										<TableHead>
+											<Button
+												variant='ghost'
+												size='sm'
+												className='h-8 px-2'
+												onClick={() => handleSort('sector')}
+											>
+												Sector
+												<ArrowUpDown className='ml-2 h-3 w-3' />
+											</Button>
+										</TableHead>
+										<TableHead>
+											<Button
+												variant='ghost'
+												size='sm'
+												className='h-8 px-2'
+												onClick={() => handleSort('industry')}
+											>
+												Industry
+												<ArrowUpDown className='ml-2 h-3 w-3' />
+											</Button>
+										</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{group.stocks.map((stock, index) => (
+										<TableRow key={stock.symbol}>
+											<TableCell className='text-center text-muted-foreground text-xs'>
+												{index + 1}
+											</TableCell>
+											<TableCell className='font-mono text-sm'>
+												<Badge variant='outline'>{stock.symbol}</Badge>
+											</TableCell>
+											<TableCell>{stock.name}</TableCell>
+											<TableCell className='font-mono'>
+												{stock.price ? `₹${stock.price.toFixed(2)}` : 'N/A'}
+											</TableCell>
+											<TableCell>
+												<Badge variant='secondary' className='text-xs'>
+													{stock.sector || 'N/A'}
+												</Badge>
+											</TableCell>
+											<TableCell>
+												<Badge variant='outline' className='text-xs'>
+													{stock.industry || 'N/A'}
+												</Badge>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</div>
+					</CardContent>
+				</Card>
+			))}
+
+			{/* Summary Footer */}
+			{filteredAndSortedStocks.length > 0 && (
+				<div className='flex justify-between items-center text-sm text-muted-foreground px-2'>
+					<span>
+						Showing {filteredAndSortedStocks.length} of {stocks.length} stocks
+					</span>
+					<span>
+						Sorted by {sortField} ({sortOrder})
+					</span>
 				</div>
-			</CardHeader>
-			<CardContent>
-				<div className='rounded-md border max-h-[600px] overflow-auto'>
-					<Table>
-						<TableHeader>
-							<TableRow>
-								<TableHead className='w-[50px]'>
-									<Checkbox
-										checked={isAllSelected}
-										onCheckedChange={handleSelectAll}
-										aria-label='Select all'
-										className={isSomeSelected ? 'data-[state=checked]:bg-primary/50' : ''}
-									/>
-								</TableHead>
-								<TableHead>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => handleSort('symbol')}
-										className='h-8 px-2'
-									>
-										Symbol
-										<ArrowUpDown className='ml-2 h-4 w-4' />
-									</Button>
-								</TableHead>
-								<TableHead>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => handleSort('name')}
-										className='h-8 px-2'
-									>
-										Name
-										<ArrowUpDown className='ml-2 h-4 w-4' />
-									</Button>
-								</TableHead>
-								<TableHead>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => handleSort('sector')}
-										className='h-8 px-2'
-									>
-										Sector
-										<ArrowUpDown className='ml-2 h-4 w-4' />
-									</Button>
-								</TableHead>
-								<TableHead>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => handleSort('industry')}
-										className='h-8 px-2'
-									>
-										Industry
-										<ArrowUpDown className='ml-2 h-4 w-4' />
-									</Button>
-								</TableHead>
-								<TableHead>
-									<Button
-										variant='ghost'
-										size='sm'
-										onClick={() => handleSort('price')}
-										className='h-8 px-2'
-									>
-										Price
-										<ArrowUpDown className='ml-2 h-4 w-4' />
-									</Button>
-								</TableHead>
-								<TableHead>Change %</TableHead>
-							</TableRow>
-						</TableHeader>
-						<TableBody>
-							{filteredAndSortedStocks.length === 0 ? (
-								<TableRow>
-									<TableCell colSpan={7} className='text-center text-muted-foreground py-8'>
-										No stocks found
-									</TableCell>
-								</TableRow>
-							) : (
-								groupedStocks.map(({ group, stocks: groupStocks }) => (
-									<React.Fragment key={group || 'no-group'}>
-										{group && (
-											<TableRow className='bg-muted/50'>
-												<TableCell colSpan={7} className='font-semibold py-2'>
-													{group} ({groupStocks.length})
-												</TableCell>
-											</TableRow>
-										)}
-										{groupStocks.map(stock => (
-											<TableRow key={stock.symbol}>
-												<TableCell>
-													<Checkbox
-														checked={selectedStocks.includes(stock.symbol)}
-														onCheckedChange={(checked) =>
-															handleSelectStock(stock.symbol, checked === true)
-														}
-														aria-label={`Select ${stock.symbol}`}
-													/>
-												</TableCell>
-												<TableCell className='font-medium'>
-													<Badge variant='outline'>{stock.symbol}</Badge>
-												</TableCell>
-												<TableCell>{stock.name}</TableCell>
-												<TableCell className='text-muted-foreground'>
-													{stock.sector || '-'}
-												</TableCell>
-												<TableCell className='text-muted-foreground'>
-													{stock.industry || '-'}
-												</TableCell>
-												<TableCell>
-													{stock.price !== undefined ? `₹${stock.price.toFixed(2)}` : '-'}
-												</TableCell>
-												<TableCell>
-													{stock.priceChange !== undefined ? (
-														<span
-															className={
-																stock.priceChange >= 0
-																	? 'text-green-600'
-																	: 'text-red-600'
-															}
-														>
-															{stock.priceChange >= 0 ? '+' : ''}
-															{stock.priceChange.toFixed(2)}%
-														</span>
-													) : (
-														'-'
-													)}
-												</TableCell>
-											</TableRow>
-										))}
-									</React.Fragment>
-								))
-							)}
-						</TableBody>
-					</Table>
-				</div>
-			</CardContent>
-		</Card>
+			)}
+		</div>
 	);
 }

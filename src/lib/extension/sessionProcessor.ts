@@ -200,6 +200,8 @@ export interface SessionProcessRequest {
 	userEmail: string;
 	userPassword: string;
 	existingSessionId?: string;
+	// TradingView-specific: sessionid_sign cookie (required for JWT token)
+	sessionid_sign?: string;
 }
 
 export interface SessionProcessResult {
@@ -215,7 +217,7 @@ export interface SessionProcessResult {
 }
 
 export async function processAndStoreSession(request: SessionProcessRequest): Promise<SessionProcessResult> {
-	const { sessionKey, sessionValue, extractedAt, url, platform: providedPlatform, userEmail, userPassword, existingSessionId } = request;
+	const { sessionKey, sessionValue, extractedAt, url, platform: providedPlatform, userEmail, userPassword, existingSessionId, sessionid_sign } = request;
 
 	// Validate required fields
 	if (!userEmail || !userPassword) {
@@ -308,7 +310,9 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 		platform: platform as string,
 		// User credentials for identification
 		userEmail: userEmail,
-		userPassword: userPassword
+		userPassword: userPassword,
+		// TradingView-specific: sessionid_sign cookie (required for JWT data access token)
+		...(sessionid_sign && platform === PLATFORMS.TRADINGVIEW ? { sessionid_sign } : {})
 	};
 
 	// Platform-specific session data validation
@@ -328,7 +332,11 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 	} else if (platform === PLATFORMS.TRADINGVIEW) {
 		// TradingView uses different session structure, store as-is
 		validatedSessionData = sessionData;
-		console.log('[EXTENSION-API] TradingView session data prepared:', { sessionKey });
+		console.log('[EXTENSION-API] TradingView session data prepared:', { 
+			sessionKey,
+			hasSessionIdSign: !!sessionData.sessionid_sign,
+			sessionIdSignLength: sessionData.sessionid_sign ? sessionData.sessionid_sign.length : 0
+		});
 	}
 
 	console.log('[EXTENSION-API] Saving validated session:', {

@@ -1,0 +1,5 @@
+- ALWAYS use the shadcn ui components.
+- ALWAYS keep the components theme compliant - use theme variables (bg-muted, text-foreground, border-border, etc.) instead of hardcoded colors
+- ALWAYS add loading states when checking authentication - use isLoading from useAuth() to prevent misleading errors during the 5-second auth check
+- NEVER run the build command just to verify if the code is fine, pnpm dev command will break.
+- ALWAYS run the build command before commiting the changes.

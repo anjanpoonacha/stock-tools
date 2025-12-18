@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test SSE Streaming</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        #output {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .event {
+            padding: 10px;
+            margin: 10px 0;
+            border-left: 3px solid #4CAF50;
+            background: white;
+        }
+        .event.error {
+            border-left-color: #f44336;
+        }
+        .event-type {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s ease;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        input {
+            padding: 8px;
+            font-size: 14px;
+            width: 300px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Test SSE Streaming Endpoint</h1>
+    
+    <div>
+        <label>User Email: <input type="text" id="userEmail" value="your-email@example.com"></label><br><br>
+        <label>User Password: <input type="password" id="userPassword" value=""></label><br><br>
+        <label>Formula ID: <input type="text" id="formulaId" value="test-formula-id"></label><br><br>
+        <button onclick="startStream()">Start Stream</button>
+        <button onclick="stopStream()">Stop Stream</button>
+        <button onclick="clearOutput()">Clear</button>
+    </div>
+
+    <div id="progress" style="display: none;">
+        <h3>Progress: <span id="progressText">0/0</span></h3>
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div id="output"></div>
+
+    <script>
+        let eventSource = null;
+        let abortController = null;
+
+        async function startStream() {
+            const userEmail = document.getElementById('userEmail').value;
+            const userPassword = document.getElementById('userPassword').value;
+            const formulaId = document.getElementById('formulaId').value;
+
+            if (!userEmail || !userPassword || !formulaId) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            // Stop existing stream
+            stopStream();
+
+            // Clear output
+            const output = document.getElementById('output');
+            output.innerHTML = '<div class="event">Starting stream...</div>';
+
+            // Hide progress initially
+            document.getElementById('progress').style.display = 'none';
+
+            try {
+                // Make POST request to start SSE stream
+                abortController = new AbortController();
+                const response = await fetch('/api/formula-results-with-charts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        userEmail,
+                        userPassword,
+                        formulaId,
+                        resolutions: ['1W', '1D'],
+                        barsCount: 300,
+                    }),
+                    signal: abortController.signal,
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to start stream');
+                }
+
+                // Read SSE stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+
+                    if (done) {
+                        addEvent('Stream ended', 'complete');
+                        break;
+                    }
+
+                    // Decode chunk
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process complete messages
+                    const messages = buffer.split('\n\n');
+                    buffer = messages.pop() || '';
+
+                    for (const message of messages) {
+                        if (!message.trim() || !message.startsWith('data: ')) continue;
+
+                        try {
+                            const jsonStr = message.replace('data: ', '');
+                            const parsed = JSON.parse(jsonStr);
+                            handleEvent(parsed);
+                        } catch (err) {
+                            console.error('Failed to parse SSE message:', err);
+                        }
+                    }
+                }
+
+            } catch (err) {
+                if (err.name === 'AbortError') {
+                    addEvent('Stream cancelled', 'error');
+                } else {
+                    addEvent(`Error: ${err.message}`, 'error');
+                }
+            }
+        }
+
+        function stopStream() {
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+        }
+
+        function handleEvent(event) {
+            const { type, data } = event;
+
+            switch (type) {
+                case 'formula-results':
+                    addEvent(`Formula: ${data.formulaName} - ${data.stocks.length} stocks, ${data.totalCharts} charts`, type);
+                    document.getElementById('progress').style.display = 'block';
+                    updateProgress(0, data.totalCharts);
+                    break;
+
+                case 'chart-batch':
+                    addEvent(`Batch ${data.batchIndex}/${data.totalBatches}: ${data.symbols.length} symbols (${data.progress.percentage}%)`, type);
+                    updateProgress(data.progress.loaded, data.progress.total);
+                    break;
+
+                case 'complete':
+                    addEvent(`Complete! ${data.totalCharts} charts in ${(data.totalTime / 1000).toFixed(1)}s`, type);
+                    break;
+
+                case 'error':
+                    addEvent(`Error: ${data.message}`, type);
+                    break;
+
+                default:
+                    addEvent(`Unknown event: ${type}`, 'error');
+            }
+        }
+
+        function addEvent(message, type) {
+            const output = document.getElementById('output');
+            const div = document.createElement('div');
+            div.className = `event ${type === 'error' ? 'error' : ''}`;
+            div.innerHTML = `
+                <span class="event-type">[${type}]</span>
+                <span>${new Date().toLocaleTimeString()}</span> - ${message}
+            `;
+            output.appendChild(div);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateProgress(loaded, total) {
+            const percentage = total > 0 ? (loaded / total) * 100 : 0;
+            document.getElementById('progressText').textContent = `${loaded}/${total} (${percentage.toFixed(0)}%)`;
+            document.getElementById('progressFill').style.width = `${percentage}%`;
+        }
+
+        function clearOutput() {
+            document.getElementById('output').innerHTML = '';
+            document.getElementById('progress').style.display = 'none';
+        }
+    </script>
+</body>
+</html>

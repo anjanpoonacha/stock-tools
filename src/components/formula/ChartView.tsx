@@ -10,21 +10,24 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
 interface ChartViewProps {
-	selectedStocks: string[];
+	stockSymbols: string[];
 	currentIndex: number;
 	setCurrentIndex: (index: number) => void;
 	onBackToTable: () => void;
 }
 
 export default function ChartView({
-	selectedStocks,
+	stockSymbols,
 	currentIndex,
 	setCurrentIndex,
 	onBackToTable,
 }: ChartViewProps) {
-	const currentSymbol = selectedStocks[currentIndex];
-	const totalStocks = selectedStocks.length;
+	const currentSymbol = stockSymbols[currentIndex];
+	const totalStocks = stockSymbols.length;
 	const [showCVD, setShowCVD] = useState<boolean>(true);
+	
+	console.log('[ChartView] currentSymbol:', currentSymbol);
+	console.log('[ChartView] On-demand loading mode - no pre-fetched data');
 
 	const handlePrev = () => {
 		setCurrentIndex(Math.max(0, currentIndex - 1));
@@ -108,7 +111,7 @@ export default function ChartView({
 				</CardHeader>
 			</Card>
 
-			{/* Dual Charts */}
+			{/* Dual Charts - Fetched On-Demand */}
 			<div className='grid grid-cols-1 lg:grid-cols-2 gap-2'>
 				{/* Weekly Chart */}
 				<Card>
@@ -121,6 +124,8 @@ export default function ChartView({
 							resolution='1W'
 							height={600}
 							showCVD={showCVD}
+							cvdAnchorPeriod='3M'
+							// No chartData prop - triggers on-demand loading
 						/>
 					</CardContent>
 				</Card>
@@ -136,19 +141,21 @@ export default function ChartView({
 							resolution='1D'
 							height={600}
 							showCVD={showCVD}
+							cvdAnchorPeriod='3M'
+							// No chartData prop - triggers on-demand loading
 						/>
 					</CardContent>
 				</Card>
 			</div>
 
-			{/* Selected Stocks List */}
+			{/* All Stocks List */}
 			<Card>
 				<CardHeader className='py-2 px-3'>
-					<CardTitle className='text-xs font-medium'>Selected ({selectedStocks.length})</CardTitle>
+					<CardTitle className='text-xs font-medium'>All Stocks ({stockSymbols.length})</CardTitle>
 				</CardHeader>
 				<CardContent className='p-2'>
 					<div className='flex flex-wrap gap-1.5'>
-						{selectedStocks.map((symbol, index) => (
+						{stockSymbols.map((symbol: string, index: number) => (
 							<Badge
 								key={symbol}
 								variant={index === currentIndex ? 'default' : 'outline'}

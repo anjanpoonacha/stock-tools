@@ -24,7 +24,7 @@
 
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { 
 	createChart, 
@@ -36,6 +36,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import type { OHLCVBar } from '@/lib/tradingview/types';
 import type { IndicatorConfig } from '@/types/chartIndicators';
 import { IndicatorRenderer, extractIndicatorData } from '@/lib/chart-data/indicatorRenderer';
+import { useChartData, type ChartDataResponse } from '@/hooks/useChartData';
 
 export interface ReusableChartProps {
 	/** Trading symbol (e.g., 'NSE:RELIANCE', 'NASDAQ:AAPL') */
@@ -66,30 +67,8 @@ export interface ReusableChartProps {
 	onDataLoaded?: (data: ChartDataResponse) => void;
 }
 
-export interface ChartDataResponse {
-	success: boolean;
-	symbol: string;
-	resolution: string;
-	bars: OHLCVBar[];
-	metadata: {
-		name?: string;
-		exchange?: string;
-		currency_code?: string;
-		pricescale?: number;
-	};
-	indicators?: {
-		[key: string]: {
-			studyId: string;
-			studyName: string;
-			config: unknown;
-			values: Array<{
-				time: number;
-				values: number[];
-			}>;
-		};
-	};
-	error?: string;
-}
+// ChartDataResponse now imported from useChartData hook
+export type { ChartDataResponse } from '@/hooks/useChartData';
 
 /**
  * Reusable Chart Component
@@ -107,11 +86,25 @@ export function ReusableChart({
 }: ReusableChartProps) {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [data, setData] = useState<ChartDataResponse | null>(null);
 	const { authStatus, isLoading: authLoading } = useAuth();
 	const { theme, resolvedTheme } = useTheme();
+	
+	// Extract CVD indicator settings for visibility control
+	const enabledIndicators = indicators.filter(ind => ind.enabled);
+	const cvdIndicator = enabledIndicators.find(ind => ind.type === 'cvd');
+	
+	// Always fetch CVD data for caching consistency
+	// Indicator enabled/disabled only controls visibility
+	const { data, loading, error } = useChartData({
+		symbol,
+		resolution,
+		barsCount,
+		apiEndpoint,
+		cvdEnabled: true, // Always fetch CVD data
+		cvdAnchorPeriod: cvdIndicator?.options?.anchorPeriod || '3M',
+		cvdTimeframe: cvdIndicator?.options?.timeframe,
+		enabled: authStatus?.isAuthenticated && !authLoading
+	});
 	
 	// Determine if dark mode is active
 	const isDark = resolvedTheme === 'dark' || theme === 'dark';
@@ -126,102 +119,13 @@ export function ReusableChart({
 		return Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
 	}, [data?.bars]);
 
-	// Fetch chart data
+	// Data fetching is now handled by useChartData hook with caching
+	// Call onDataLoaded callback when data changes
 	useEffect(() => {
-		let mounted = true;
-
-		async function loadChart() {
-			try {
-				setLoading(true);
-				setError(null);
-
-				// Wait for auth to finish loading
-				if (authLoading) {
-					return;
-				}
-
-				// Check if authenticated
-				if (!authStatus?.isAuthenticated) {
-					throw new Error('Please log in to view charts');
-				}
-
-				// Get credentials
-				const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-				if (!storedCredentials) {
-					throw new Error('Authentication credentials not found. Please log in again.');
-				}
-
-				const credentials = JSON.parse(storedCredentials);
-
-				// Build API URL
-				const url = new URL(apiEndpoint, window.location.origin);
-				url.searchParams.set('symbol', symbol);
-				url.searchParams.set('resolution', resolution);
-				url.searchParams.set('barsCount', barsCount.toString());
-				
-				// Add indicator parameters
-				const enabledIndicators = indicators.filter(ind => ind.enabled);
-				for (const indicator of enabledIndicators) {
-					if (indicator.type === 'cvd') {
-						url.searchParams.set('cvdEnabled', 'true');
-						url.searchParams.set('cvdAnchorPeriod', indicator.options.anchorPeriod);
-						if (indicator.options.timeframe) {
-							url.searchParams.set('cvdTimeframe', indicator.options.timeframe);
-						}
-					}
-					// Add more indicator types here as needed
-				}
-
-				// Fetch data
-				const response = await fetch(url.toString(), {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json'
-					},
-					body: JSON.stringify({
-						userEmail: credentials.userEmail,
-						userPassword: credentials.userPassword
-					})
-				});
-
-				if (!response.ok) {
-					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-				}
-
-				const result: ChartDataResponse = await response.json();
-
-				if (!mounted) return;
-
-				if (!result.success) {
-					throw new Error(result.error || 'Failed to fetch chart data');
-				}
-
-				if (!result.bars || result.bars.length === 0) {
-					throw new Error('No chart data received');
-				}
-
-				setData(result);
-				setLoading(false);
-				
-				// Call callback
-				if (onDataLoaded) {
-					onDataLoaded(result);
-				}
-			} catch (err) {
-				console.error('[Chart] Error loading data:', err);
-				if (!mounted) return;
-				const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-				setError(errorMessage);
-				setLoading(false);
-			}
+		if (data && onDataLoaded) {
+			onDataLoaded(data);
 		}
-
-		loadChart();
-		
-		return () => {
-			mounted = false;
-		};
-	}, [symbol, resolution, barsCount, indicators, authStatus, authLoading, apiEndpoint, onDataLoaded]);
+	}, [data, onDataLoaded]);
 
 	// Create and render chart
 	useEffect(() => {

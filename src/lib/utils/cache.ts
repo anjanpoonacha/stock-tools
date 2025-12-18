@@ -45,10 +45,36 @@ export class LocalStorageCache {
 				data,
 				cachedAt: Date.now(),
 			};
-			localStorage.setItem(key, JSON.stringify(cachedData));
-			console.log(`[Cache] Saved ${key}`);
+			const jsonString = JSON.stringify(cachedData);
+			
+			// Check size (rough estimate: 1 char = ~2 bytes in UTF-16)
+			const sizeKB = (jsonString.length * 2) / 1024;
+			
+			if (sizeKB > 1024) { // Warn if > 1MB
+				console.warn(`[Cache] Large cache item (${sizeKB.toFixed(0)}KB): ${key}`);
+			}
+			
+			localStorage.setItem(key, jsonString);
+			console.log(`[Cache] Saved ${key} (${sizeKB.toFixed(1)}KB)`);
 		} catch (e) {
-			console.warn(`[Cache] Failed to set ${key}:`, e);
+			if (e instanceof DOMException && e.name === 'QuotaExceededError') {
+				console.warn(`[Cache] Quota exceeded. Clearing old cache items...`);
+				// Try to free up space by clearing old items
+				this.clearOldest(5); // Clear 5 oldest items
+				
+				// Try again
+				try {
+					const cachedData: CachedData<T> = { data, cachedAt: Date.now() };
+					localStorage.setItem(key, JSON.stringify(cachedData));
+					console.log(`[Cache] Saved ${key} after cleanup`);
+				} catch (retryError) {
+					console.error(`[Cache] Failed to set ${key} even after cleanup:`, retryError);
+					throw retryError; // Re-throw so caller knows it failed
+				}
+			} else {
+				console.warn(`[Cache] Failed to set ${key}:`, e);
+				throw e;
+			}
 		}
 	}
 
@@ -90,6 +116,39 @@ export class LocalStorageCache {
 			return Date.now() - cachedData.cachedAt;
 		} catch {
 			return null;
+		}
+	}
+
+	/**
+	 * Clear oldest cache items
+	 * @param count Number of items to clear
+	 */
+	static clearOldest(count: number): void {
+		try {
+			const keys = Object.keys(localStorage);
+			const cacheItems: Array<{ key: string; age: number }> = [];
+
+			// Get age for each cache item
+			for (const key of keys) {
+				const age = this.getAge(key);
+				if (age !== null) {
+					cacheItems.push({ key, age });
+				}
+			}
+
+			// Sort by age (oldest first)
+			cacheItems.sort((a, b) => b.age - a.age);
+
+			// Remove oldest items
+			const toRemove = cacheItems.slice(0, count);
+			toRemove.forEach(item => {
+				localStorage.removeItem(item.key);
+				console.log(`[Cache] Removed old item: ${item.key} (age: ${Math.round(item.age / 1000)}s)`);
+			});
+
+			console.log(`[Cache] Cleared ${toRemove.length} oldest items`);
+		} catch (e) {
+			console.warn('[Cache] Failed to clear oldest items:', e);
 		}
 	}
 }
