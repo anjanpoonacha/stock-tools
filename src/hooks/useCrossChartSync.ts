@@ -48,7 +48,25 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
   const hasLoggedWarning = useRef(false);
   const lastLoggedTime = useRef<number>(0);
 
+  // Refs to track last seen instances (for change detection with refs)
+  const lastChart1Ref = useRef<IChartApi | null>(null);
+  const lastChart2Ref = useRef<IChartApi | null>(null);
+  const lastBars1DRef = useRef<Array<{ time: number }> | null>(null);
+  const lastBars188mRef = useRef<Array<{ time: number; values?: number[] }> | null>(null);
+
   useEffect(() => {
+    // Detect if instances have actually changed (handles ref updates)
+    const chart1Changed = chart1 !== lastChart1Ref.current;
+    const chart2Changed = chart2 !== lastChart2Ref.current;
+    const bars1DChanged = bars1D !== lastBars1DRef.current;
+    const bars188mChanged = bars188m !== lastBars188mRef.current;
+
+    // Update tracking refs
+    lastChart1Ref.current = chart1;
+    lastChart2Ref.current = chart2;
+    lastBars1DRef.current = bars1D;
+    lastBars188mRef.current = bars188m;
+
     // Early exit if sync is disabled or charts are not ready
     if (!enabled || !chart1 || !chart2) {
       return;
@@ -93,11 +111,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
             const series = panes[0].getSeries();
             if (series.length > 0) {
               chart2.setCrosshairPosition(price as any, targetTime as Time, series[0]);
-            } else {
-              console.warn('[Cursor Sync] ❌ No series found on Chart2');
             }
-          } else {
-            console.warn('[Cursor Sync] ❌ No panes found on Chart2');
           }
 
           // Clear flag after short delay
@@ -115,7 +129,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
           timeoutRefs.current.push(timeout);
         }
       } catch (error) {
-        console.error('[Cursor Sync] Error Chart1 -> Chart2:', error);
+        // Error in crosshair sync
       }
     };
 
@@ -153,11 +167,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
             const series = panes[0].getSeries();
             if (series.length > 0) {
               chart1.setCrosshairPosition(price as any, targetTime as Time, series[0]);
-            } else {
-              console.warn('[Cursor Sync] ❌ No series found on Chart1');
             }
-          } else {
-            console.warn('[Cursor Sync] ❌ No panes found on Chart1');
           }
 
           // Clear flag after short delay
@@ -175,7 +185,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
           timeoutRefs.current.push(timeout);
         }
       } catch (error) {
-        console.error('[Cursor Sync] Error Chart2 -> Chart1:', error);
+        // Error in crosshair sync
       }
     };
 
@@ -205,7 +215,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
           timeoutRefs.current.push(timeout);
         }
       } catch (error) {
-        console.error('[Range Sync] Error Chart1 -> Chart2:', error);
+        // Error in range sync
       }
     };
 
@@ -235,7 +245,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
           timeoutRefs.current.push(timeout);
         }
       } catch (error) {
-        console.error('[Range Sync] Error Chart2 -> Chart1:', error);
+        // Error in range sync
       }
     };
 
@@ -256,7 +266,7 @@ export function useCrossChartSync(params: UseCrossChartSyncParams): void {
         chart1.timeScale().unsubscribeVisibleTimeRangeChange(handleChart1VisibleRangeChange);
         chart2.timeScale().unsubscribeVisibleTimeRangeChange(handleChart2VisibleRangeChange);
       } catch (error) {
-        console.error('[Cursor Sync] Cleanup error:', error);
+        // Cleanup error
       }
 
       // Clear all pending timeouts

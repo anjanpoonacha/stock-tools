@@ -17,6 +17,9 @@ export interface UseChartKeybindingsOptions {
 	onTimeframeBackspace?: () => void;
 	onSymbolInput?: (char: string) => void;
 	onSymbolBackspace?: () => void;
+	onSymbolSubmit?: () => void; // Submit symbol search (Enter key)
+	onTimeframeSubmit?: () => void; // Submit timeframe (Enter key)
+	onTabKeyPress?: () => void; // Cycle through charts in dual view
 	// Pass the current mode from parent to determine which overlay is active
 	inputMode: 'none' | 'timeframe' | 'symbol';
 	activeChartIndex?: number;
@@ -74,6 +77,9 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onTimeframeBackspace,
 		onSymbolInput,
 		onSymbolBackspace,
+		onSymbolSubmit,
+		onTimeframeSubmit,
+		onTabKeyPress,
 		inputMode,
 		enabled = true,
 	} = options;
@@ -114,6 +120,24 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 			if (event.key === 'ArrowDown') {
 				event.preventDefault();
 				onNavigateNext();
+				return;
+			}
+
+			// Tab key - cycle through charts in dual view (only when not in input mode)
+			if (event.key === 'Tab' && inputMode === 'none' && onTabKeyPress) {
+				event.preventDefault();
+				onTabKeyPress();
+				return;
+			}
+
+			// Enter key - submit current input mode
+			if (event.key === 'Enter') {
+				event.preventDefault();
+				if (inputMode === 'symbol' && onSymbolSubmit) {
+					onSymbolSubmit();
+				} else if (inputMode === 'timeframe' && onTimeframeSubmit) {
+					onTimeframeSubmit();
+				}
 				return;
 			}
 
@@ -189,6 +213,9 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onTimeframeBackspace,
 		onSymbolInput,
 		onSymbolBackspace,
+		onSymbolSubmit,
+		onTimeframeSubmit,
+		onTabKeyPress,
 		inputMode,
 	]);
 

@@ -102,6 +102,9 @@ export default function ChartView({
 	// Chart instance refs for synchronization (support dynamic number of charts)
 	const chartRefs = useRef<(IChartApi | null)[]>([]);
 	const barsRefs = useRef<OHLCVBar[][]>([]);
+	
+	// Chart sync readiness tracker - incremented when charts/data load to trigger re-sync
+	const [chartSyncVersion, setChartSyncVersion] = useState(0);
 
 	// Local state for search (not persisted)
 	const [searchQuery, setSearchQuery] = useState<string>('');
@@ -120,13 +123,6 @@ export default function ChartView({
 	// Determine if we're in dual view mode (2+ charts)
 	const isDualView = currentLayout.slots.length > 1;
 
-	console.log('[ChartView] 🎯 Using True DI system');
-	console.log('[ChartView] currentSymbol:', currentSymbol);
-	console.log('[ChartView] Active layout:', activeLayout);
-	console.log('[ChartView] Current layout:', currentLayout);
-	console.log('[ChartView] Panel layout:', panelLayout);
-	console.log('[ChartView] Global settings:', globalSettings);
-
 	// Navigation handlers
 	const handlePrev = useCallback(() => {
 		setCurrentIndex(Math.max(0, currentIndex - 1));
@@ -135,6 +131,13 @@ export default function ChartView({
 	const handleNext = useCallback(() => {
 		setCurrentIndex(Math.min(totalStocks - 1, currentIndex + 1));
 	}, [currentIndex, totalStocks, setCurrentIndex]);
+
+	// Tab key handler - cycle through charts in dual view
+	const handleTabKey = useCallback(() => {
+		if (isDualView) {
+			setFocusedChartIndex(prev => (prev + 1) % currentLayout.slots.length);
+		}
+	}, [isDualView, currentLayout.slots.length]);
 
 	const getResolutionConfig = (resolution: string) => {
 		const found = RESOLUTIONS.find(r => r.value === resolution);
@@ -195,18 +198,11 @@ export default function ChartView({
 		}
 	};
 
-	const parseSymbolInput = (input: string): string => {
-		if (!input) return '';
-		if (input.includes(':')) {
-			return input;
-		}
-		return `NSE:${input}`;
-	};
-
 	const findMatchingSymbols = (input: string): string[] => {
 		if (!input) return [];
-		const parsedInput = parseSymbolInput(input);
-		const searchUpper = parsedInput.toUpperCase();
+		// Search directly in symbol strings (e.g., "TCS" matches "TCS.NS")
+		// Don't add prefixes - symbols are already in "SYMBOL.NS" format
+		const searchUpper = input.toUpperCase();
 		return stockSymbols.filter(symbol =>
 			symbol.toUpperCase().includes(searchUpper)
 		);
@@ -234,7 +230,7 @@ export default function ChartView({
 		}
 	};
 
-	const jumpToSymbol = () => {
+	const jumpToSymbol = useCallback(() => {
 		const matches = findMatchingSymbols(symbolSearchBuffer);
 		if (matches.length > 0) {
 			const targetSymbol = matches[0];
@@ -246,7 +242,33 @@ export default function ChartView({
 		// Reset symbol search
 		setShowSymbolSearch(false);
 		setSymbolSearchBuffer('');
-	};
+	}, [symbolSearchBuffer, stockSymbols, setCurrentIndex]);
+
+	const submitTimeframe = useCallback(() => {
+		const parsed = parseTimeframe(timeframeBuffer);
+		const currentSlot = getSlot(focusedChartIndex);
+		if (parsed && currentSlot) {
+			updateSlot(focusedChartIndex, { resolution: parsed });
+			setShowTimeframeOverlay(false);
+			setTimeframeBuffer('');
+		}
+	}, [timeframeBuffer, focusedChartIndex, getSlot, updateSlot]);
+
+	// Chart ready callbacks that trigger sync re-initialization
+	// IMPORTANT: Only increment version if the chart instance actually changed
+	const handleChartReady = useCallback((chart: IChartApi, index: number) => {
+		if (chartRefs.current[index] !== chart) {
+			chartRefs.current[index] = chart;
+			setChartSyncVersion(v => v + 1); // Trigger re-sync
+		}
+	}, []);
+
+	const handleDataLoaded = useCallback((bars: OHLCVBar[], index: number) => {
+		if (barsRefs.current[index] !== bars) {
+			barsRefs.current[index] = bars;
+			setChartSyncVersion(v => v + 1); // Trigger re-sync
+		}
+	}, []);
 
 	// Handle panel resize - MUST be before early returns (React Hooks Rule)
 	const handleMainPanelResize = useCallback((layout: Record<string, number>) => {
@@ -256,28 +278,14 @@ export default function ChartView({
 
 		if (!toolbar || !chart || !stockList || 
 		    toolbar < 0 || chart < 0 || stockList < 0) {
-			console.warn('⚠️ [Panel Resize] Invalid panel sizes, ignoring', layout);
 			return;
 		}
 
 		const total = toolbar + chart + stockList;
 		
 		if (Math.abs(total - 100) > 5) {
-			console.warn('⚠️ [Panel Resize] Total not 100%, ignoring', {
-				toolbar: toolbar.toFixed(1),
-				chart: chart.toFixed(1),
-				stockList: stockList.toFixed(1),
-				total: total.toFixed(1)
-			});
 			return;
 		}
-
-		console.log('✅ [Panel Sizes]', {
-			toolbar: `${toolbar.toFixed(1)}%`,
-			chart: `${chart.toFixed(1)}%`,
-			stockList: `${stockList.toFixed(1)}%`,
-			total: `${total.toFixed(1)}%`
-		});
 
 		updatePanelLayout({
 			'toolbar-panel': toolbar,
@@ -298,20 +306,24 @@ export default function ChartView({
 		onNavigateNext: handleNext,
 		onTimeframeInput: handleTimeframeInput,
 		onTimeframeBackspace: handleTimeframeBackspace,
+		onTimeframeSubmit: submitTimeframe,
 		onSymbolInput: handleSymbolInput,
 		onSymbolBackspace: handleSymbolBackspace,
+		onSymbolSubmit: jumpToSymbol,
+		onTabKeyPress: handleTabKey,
 		inputMode,
 		activeChartIndex: focusedChartIndex,
 		enabled: true,
 	});
 
 	// Cross-chart synchronization (only for dual view)
+	// chartSyncVersion dependency forces re-sync when charts/data load
 	useCrossChartSync({
 		chart1: chartRefs.current[0],
 		chart2: chartRefs.current[1],
 		bars1D: barsRefs.current[0],
 		bars188m: barsRefs.current[1],
-		enabled: isDualView,
+		enabled: isDualView && chartSyncVersion > 0, // Only enable when charts have loaded
 		rangeSyncEnabled: globalSettings.rangeSync,
 	});
 
@@ -638,8 +650,8 @@ export default function ChartView({
 											zoomLevel={(currentLayout.slots[0].zoomLevel || ChartZoomLevel.MAX) as ChartZoomLevel}
 											indicators={currentLayout.slots[0].indicators}
 											global={globalSettings}
-											onChartReady={(chart) => { chartRefs.current[0] = chart; }}
-											onDataLoaded={(bars) => { barsRefs.current[0] = bars; }}
+											onChartReady={(chart) => handleChartReady(chart, 0)}
+											onDataLoaded={(bars) => handleDataLoaded(bars, 0)}
 										/>
 									</div>
 								</div>
@@ -685,8 +697,8 @@ export default function ChartView({
 														zoomLevel={(slot.zoomLevel || ChartZoomLevel.MAX) as ChartZoomLevel}
 														indicators={slot.indicators}
 														global={globalSettings}
-														onChartReady={(chart) => { chartRefs.current[slotIndex] = chart; }}
-														onDataLoaded={(bars) => { barsRefs.current[slotIndex] = bars; }}
+														onChartReady={(chart) => handleChartReady(chart, slotIndex)}
+														onDataLoaded={(bars) => handleDataLoaded(bars, slotIndex)}
 													/>
 												</div>
 											</div>
