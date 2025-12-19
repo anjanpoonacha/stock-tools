@@ -25,7 +25,7 @@ export function useSessionState() {
 	}, [auth]);
 
 	const refreshSession = useCallback(async () => {
-		await auth.checkAuthStatus();
+		await auth.checkSessionStatus();
 	}, [auth]);
 
 	// Auto-login now handled by AuthContext
@@ -94,14 +94,17 @@ export function useSessionStateReader() {
 
 	// Map AuthContext state to useSessionStateReader API
 	const mapSessionStats = (authStatus: typeof auth.authStatus) => {
-		if (!authStatus?.sessionStats) return null;
+		if (!authStatus?.sessionStats) {
+			return null;
+		}
 
 		const authSessionStats = authStatus.sessionStats;
-		return {
+
+		const mapped = {
 			hasSession: authSessionStats.platforms ?
-				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+				Object.values(authSessionStats.platforms).some(p => p && p.sessionAvailable) : false,
 			sessionAvailable: authSessionStats.platforms ?
-				Object.values(authSessionStats.platforms).some(p => p.sessionAvailable) : false,
+				Object.values(authSessionStats.platforms).some(p => p && p.sessionAvailable) : false,
 			availableUsers: authSessionStats.availableUsers || [],
 			currentUser: authSessionStats.currentUser,
 			platforms: authSessionStats.platforms ? {
@@ -116,10 +119,14 @@ export function useSessionStateReader() {
 			} : undefined,
 			message: authSessionStats.message
 		};
+
+		return mapped;
 	};
 
+	const mappedStats = mapSessionStats(auth.authStatus);
+
 	return {
-		sessionStats: mapSessionStats(auth.authStatus),
+		sessionStats: mappedStats,
 		isLoading: auth.isLoading,
 		error: auth.error,
 		credentials: auth.authStatus ? {

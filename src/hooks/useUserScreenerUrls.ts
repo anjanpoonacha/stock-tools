@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserScreenerUrl } from '@/app/api/screener-urls/route';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 interface UseUserScreenerUrlsReturn {
 	urls: UserScreenerUrl[];
@@ -20,24 +21,10 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 
 	const userEmail = getUserEmail();
 
-	// Get user credentials from localStorage
+	// Get user credentials
 	const getUserCredentials = (): { userEmail: string; userPassword: string } | null => {
 		if (typeof window === 'undefined') return null;
-
-		const authCredentials = localStorage.getItem('mio-tv-auth-credentials');
-		if (authCredentials) {
-			try {
-				const credentials = JSON.parse(authCredentials);
-				if (credentials.userEmail && credentials.userPassword) {
-					return {
-						userEmail: credentials.userEmail,
-						userPassword: credentials.userPassword
-					};
-				}
-			} catch {
-				// Fall through
-			}
-		}
+		return getStoredCredentials();
 
 		return null;
 	};

@@ -18,14 +18,14 @@ export function useFormulas(): UseFormulasResult {
 		setError(null);
 
 		try {
-			const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-			if (!storedCredentials) {
+			const { getStoredCredentials } = await import('@/lib/auth/authUtils');
+			const credentials = getStoredCredentials();
+			
+			if (!credentials) {
 				setFormulas([]);
 				setLoading(false);
 				return;
 			}
-
-			const credentials = JSON.parse(storedCredentials);
 			const params = new URLSearchParams({
 				userEmail: credentials.userEmail,
 				userPassword: credentials.userPassword,

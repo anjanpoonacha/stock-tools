@@ -16,6 +16,7 @@ import { SessionStatus } from '@/components/SessionStatus';
 import { API_ENDPOINTS, UI_CONSTANTS, SUCCESS_MESSAGES } from '@/lib/constants';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { Loader2 } from 'lucide-react';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 interface Watchlist {
     id: string;
@@ -59,18 +60,11 @@ function MioWatchlistPageContent() {
      * Makes API request with standardized error handling and authentication
      */
     const makeAPIRequest = async (method: string, body: object): Promise<APIResponse> => {
-        // Get stored credentials from localStorage (set by AuthContext)
-        const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+        // Get stored credentials using centralized utility
+        const credentials = getStoredCredentials();
 
-        if (!storedCredentials) {
+        if (!credentials) {
             throw new Error('Authentication required. Please log in first.');
-        }
-
-        let credentials;
-        try {
-            credentials = JSON.parse(storedCredentials);
-        } catch {
-            throw new Error('Invalid authentication data. Please log in again.');
         }
 
         const requestBody = {

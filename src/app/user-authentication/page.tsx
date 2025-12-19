@@ -68,9 +68,10 @@ export default function UserAuthTestPage() {
                                         <CardDescription>Sessions filtered by user credentials</CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        {isLoading ? (
-                                            <div className='flex items-center justify-center py-8'>
+                                        {isLoading || (credentials && !sessionStats) ? (
+                                            <div className='flex flex-col items-center justify-center py-8 gap-2'>
                                                 <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
+                                                <p className='text-sm text-muted-foreground'>Checking session availability...</p>
                                             </div>
                                         ) : sessionStats ? (
                                             <div className='space-y-4'>
@@ -141,11 +142,12 @@ export default function UserAuthTestPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <div className='text-center py-8 text-muted-foreground'>
-                                                No session data available
+                                        ) : credentials ? (
+                                            <div className='text-center py-8 text-muted-foreground space-y-2'>
+                                                <p>No session data available</p>
+                                                <p className='text-xs'>Please use the browser extension to capture sessions</p>
                                             </div>
-                                        )}
+                                        ) : null}
                                     </CardContent>
                                 </Card>
                             ) : (

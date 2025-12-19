@@ -8,26 +8,37 @@ export const UserCredentialsSchema = z.object({
 
 export type UserCredentials = z.infer<typeof UserCredentialsSchema>;
 
-// Authentication Status Schema
+// Session Statistics Schema (separate from authentication)
+export const SessionStatsSchema = z.object({
+	platforms: z.object({
+		marketinout: z.object({
+			hasSession: z.boolean().optional(),
+			sessionAvailable: z.boolean(),
+			currentSessionId: z.string().nullable()
+		}).optional(),
+		tradingview: z.object({
+			hasSession: z.boolean().optional(),
+			sessionAvailable: z.boolean(),
+			currentSessionId: z.string().nullable(),
+			sessionId: z.string().nullable()
+		}).optional()
+	}).optional(),
+	message: z.string(),
+	availableUsers: z.array(z.string()).optional(),
+	currentUser: z.string().optional(),
+	// New fields for connection status
+	offline: z.boolean().optional(),
+	error: z.string().optional(),
+	lastChecked: z.date().optional()
+});
+
+export type SessionStats = z.infer<typeof SessionStatsSchema>;
+
+// Authentication Status Schema (simplified - no longer clears on session errors)
 export const AuthStatusSchema = z.object({
 	isAuthenticated: z.boolean(),
-	userEmail: z.string().email().optional(),
-	sessionStats: z.object({
-		platforms: z.object({
-			marketinout: z.object({
-				sessionAvailable: z.boolean(),
-				currentSessionId: z.string().nullable()
-			}),
-			tradingview: z.object({
-				sessionAvailable: z.boolean(),
-				currentSessionId: z.string().nullable(),
-				sessionId: z.string().nullable()
-			})
-		}),
-		message: z.string(),
-		availableUsers: z.array(z.string()).optional(),
-		currentUser: z.string().optional()
-	}).optional()
+	userEmail: z.string().optional(),
+	sessionStats: SessionStatsSchema.nullable().optional()
 });
 
 export type AuthStatus = z.infer<typeof AuthStatusSchema>;
@@ -102,10 +113,12 @@ export const AuthCheckResponseSchema = z.object({
 	sessionStats: z.object({
 		platforms: z.object({
 			marketinout: z.object({
+				hasSession: z.boolean().optional(),
 				sessionAvailable: z.boolean(),
 				currentSessionId: z.string().nullable()
 			}),
 			tradingview: z.object({
+				hasSession: z.boolean().optional(),
 				sessionAvailable: z.boolean(),
 				currentSessionId: z.string().nullable(),
 				sessionId: z.string().nullable()

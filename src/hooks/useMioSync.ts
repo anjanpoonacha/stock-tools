@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/toast';
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { SessionError, SessionErrorType, Platform, ErrorSeverity, RecoveryAction } from '@/lib/sessionErrors';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 export interface SavedCombination {
     tvWlid: string;
@@ -130,18 +131,10 @@ export const useMioSync = (): UseMioSyncReturn => {
         setMioWatchlistsLoading(true);
         setMioWatchlistsError(null);
 
-        const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-        if (!storedCredentials) {
+        const credentials = getStoredCredentials();
+        
+        if (!credentials) {
             setMioWatchlistsError('Authentication required. Please log in first.');
-            setMioWatchlistsLoading(false);
-            return;
-        }
-
-        let credentials;
-        try {
-            credentials = JSON.parse(storedCredentials);
-        } catch {
-            setMioWatchlistsError('Invalid authentication data. Please log in again.');
             setMioWatchlistsLoading(false);
             return;
         }
@@ -270,14 +263,9 @@ export const useMioSync = (): UseMioSyncReturn => {
         e.preventDefault();
         setLoading(true);
         try {
-            const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-            if (!storedCredentials) throw new Error('Authentication required. Please log in first.');
-
-            let credentials;
-            try {
-                credentials = JSON.parse(storedCredentials);
-            } catch {
-                throw new Error('Invalid authentication data. Please log in again.');
+            const credentials = getStoredCredentials();
+            if (!credentials) {
+                throw new Error('Authentication required. Please log in first.');
             }
 
             const res = await fetch('/api/mio-action', {

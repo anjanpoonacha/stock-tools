@@ -37,14 +37,22 @@ export function UserCredentials({ availableUsers = [] }: UserCredentialsProps) {
 
     // Populate form fields immediately on component mount (before autologin)
     useEffect(() => {
-        const savedEmail = localStorage.getItem('userEmail');
-        const savedPassword = localStorage.getItem('userPassword');
-
-        if (savedEmail) {
-            setUserEmail(savedEmail);
-        }
-        if (savedPassword) {
-            setUserPassword(savedPassword);
+        // Use centralized auth storage key
+        const AUTH_STORAGE_KEY = 'mio-tv-auth-credentials';
+        const storedCredentials = localStorage.getItem(AUTH_STORAGE_KEY);
+        
+        if (storedCredentials) {
+            try {
+                const parsed = JSON.parse(storedCredentials);
+                if (parsed.userEmail) {
+                    setUserEmail(parsed.userEmail);
+                }
+                if (parsed.userPassword) {
+                    setUserPassword(parsed.userPassword);
+                }
+            } catch (error) {
+                console.error('[UserCredentials] Error reading stored credentials:', error);
+            }
         }
     }, []); // Run only once on mount
 
@@ -52,7 +60,21 @@ export function UserCredentials({ availableUsers = [] }: UserCredentialsProps) {
         autoLogin();
     }, [autoLogin]);
 
-    if (isLoggedIn && sessionStats) {
+    if (isLoggedIn) {
+        // Show loading while checking sessions
+        if (isLoading || !sessionStats) {
+            return (
+                <div className='w-full max-w-md'>
+                    <div className='bg-card text-card-foreground rounded-lg border shadow-sm p-6'>
+                        <div className='flex flex-col items-center justify-center py-8 gap-2'>
+                            <div className='animate-spin rounded-full h-8 w-8 border-b-2 border-primary' />
+                            <p className='text-sm text-muted-foreground'>Checking sessions...</p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        
         return (
             <div className='w-full max-w-md'>
                 <SessionDisplay sessionStats={sessionStats} onLogout={handleLogout} />

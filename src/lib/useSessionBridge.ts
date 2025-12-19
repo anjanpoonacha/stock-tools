@@ -1,5 +1,6 @@
 // src/lib/useSessionBridge.ts
 import { useState, useEffect } from 'react';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 /**
  * Hook to get session data from the browser extension via API
@@ -29,18 +30,11 @@ export function useSessionBridge(platform: Platform): [string | null, boolean, s
 				setLoading(true);
 				setError(null);
 
-				// Get stored credentials from localStorage (same as ShortlistFetcherClient)
-				const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+				// Get stored credentials using centralized utility
+				const credentials = getStoredCredentials();
 
-				if (!storedCredentials) {
+				if (!credentials) {
 					throw new Error('Authentication required. Please log in first.');
-				}
-
-				let credentials;
-				try {
-					credentials = JSON.parse(storedCredentials);
-				} catch {
-					throw new Error('Invalid authentication data. Please log in again.');
 				}
 
 				// Use POST with user credentials instead of GET

@@ -21,17 +21,10 @@ interface UseFormulaEditorReturn {
 	handleSubmit: (e: React.FormEvent) => Promise<void>;
 }
 
-const getCredentials = () => {
-	const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-	if (!storedCredentials) {
-		throw new Error('Authentication required. Please log in first.');
-	}
+import { requireCredentials } from '@/lib/auth/authUtils';
 
-	try {
-		return JSON.parse(storedCredentials);
-	} catch {
-		throw new Error('Invalid authentication data. Please log in again.');
-	}
+const getCredentials = () => {
+	return requireCredentials();
 };
 
 /**

@@ -21,6 +21,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit, BarChart3 } from 'lucide-react';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -85,7 +86,12 @@ const MioFormulasPageContent: React.FC = () => {
 				console.log('[MioFormulasPage] Fetching formula text from:', normalizedUrl);
 
 				try {
-					const credentials = JSON.parse(localStorage.getItem('mio-tv-auth-credentials') || '{}');
+					const credentials = getStoredCredentials();
+
+					if (!credentials) {
+						showToast('Authentication required. Please log in first.', 'error');
+						return;
+					}
 
 					const response = await fetch('/api/mio-formulas/extract-text', {
 						method: 'POST',
