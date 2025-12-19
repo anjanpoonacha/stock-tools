@@ -30,7 +30,7 @@ export class ChartErrorBoundary extends Component<Props, State> {
 	}
 
 	componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-		console.error('[ChartErrorBoundary] Chart crashed:', error, errorInfo);
+		// Chart crashed
 	}
 
 	handleReset = () => {

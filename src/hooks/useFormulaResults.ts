@@ -58,13 +58,12 @@ export function useFormulaResults(
 		try {
 			// Get user credentials using centralized utility
 			const { getStoredCredentials } = await import('@/lib/auth/authUtils');
-			const credentials = getStoredCredentials();
-			
-			if (!credentials) {
-				console.error('[useFormulaResults] No credentials found');
-				setError(null); // Don't show error, let AuthGuard handle it
-				return;
-			}
+		const credentials = getStoredCredentials();
+		
+		if (!credentials) {
+			setError(null); // Don't show error, let AuthGuard handle it
+			return;
+		}
 
 			const response = await fetch('/api/formula-results', {
 				method: 'POST',
@@ -90,9 +89,8 @@ export function useFormulaResults(
 		setError(null);
 
 	} catch (err) {
-			console.error('[useFormulaResults] Error:', err);
-			const errorMessage = err instanceof Error ? err.message : 'Failed to load formula results';
-			setError(errorMessage);
+		const errorMessage = err instanceof Error ? err.message : 'Failed to load formula results';
+		setError(errorMessage);
 			setStocks([]);
 			setFormulaName('');
 		} finally {

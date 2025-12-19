@@ -59,7 +59,6 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
     useEffect(() => {
         if (!sessionid) return;
         if (!tvSessionAvailable) {
-            console.log('[TV-SYNC] Skipping TradingView watchlists fetch - no session available');
             return;
         }
         if (fetchingRef.current) return;
@@ -126,18 +125,12 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
             });
 
             if (!res.ok) {
-                console.log(`Failed to fetch symbols from ${url}: ${res.status} ${res.statusText}`);
                 return [];
             }
 
             const { data } = await res.json();
             return parseMioSymbols(data);
         } catch (error) {
-            if (error instanceof Error && error.name === 'AbortError') {
-                console.log(`Request aborted for ${url}`);
-            } else {
-                console.log(`Network error fetching symbols from ${url}:`, error);
-            }
             return [];
         }
     }
@@ -187,11 +180,6 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
             // Remove duplicate symbols before sending to TradingView API
             const { unique: uniqueSymbols, duplicateCount } = removeDuplicateSymbols(symbols);
 
-            if (duplicateCount > 0) {
-                console.log(`Removed ${duplicateCount} duplicate symbol(s) before sending to TradingView`);
-            }
-
-            console.log({ symbols: uniqueSymbols, originalCount: symbols.length, uniqueCount: uniqueSymbols.length });
             const payload = uniqueSymbols;
 
             const res = await fetch('/api/proxy', {
@@ -220,7 +208,7 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
                     errorData = responseData.data || responseData;
                     detailedError = extractTradingViewError(errorData);
                 } catch (parseError) {
-                    console.error('Failed to parse error response:', parseError);
+                    // Failed to parse error response
                 }
 
                 const category = categorizeHttpError(res.status, detailedError);
@@ -279,7 +267,6 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
                         const mioSymbols = await fetchMioSymbols(url, abortController.signal);
                         allSymbols = allSymbols.concat(mioSymbols);
                     } catch (error) {
-                        console.log(`Failed to fetch symbols from ${url}:`, error);
                         continue;
                     }
                 }
@@ -289,7 +276,7 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
                     setOutput(groupSymbols(tvSymbols, grouping));
                 }
             } catch (error) {
-                console.log('Error in updateSymbolsAndOutput:', error);
+                // Error in updateSymbolsAndOutput
             }
         }
 

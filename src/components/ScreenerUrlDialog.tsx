@@ -96,7 +96,7 @@ export function ScreenerUrlDialog({
 				onOpenChange(false);
 			}
 		} catch (error) {
-			console.error('Error saving screener URL:', error);
+			// Error saving screener URL
 		} finally {
 			setSaving(false);
 		}

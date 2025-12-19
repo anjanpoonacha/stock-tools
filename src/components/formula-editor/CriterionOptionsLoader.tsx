@@ -68,7 +68,7 @@ export function CriterionOptionsLoader({
       // Reset after 2 seconds
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
-      console.error('[CriterionOptionsLoader] Failed to copy to clipboard:', err);
+      // Failed to copy to clipboard
     }
   }, []);
   

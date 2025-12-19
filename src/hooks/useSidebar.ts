@@ -13,7 +13,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => voi
                 setStoredValue(JSON.parse(item));
             }
         } catch (error) {
-            console.warn(`Error reading localStorage key "${key}":`, error);
+            // Error reading localStorage
         }
     }, [key]);
 
@@ -22,7 +22,7 @@ function useLocalStorage<T>(key: string, initialValue: T): [T, (value: T) => voi
             setStoredValue(value);
             window.localStorage.setItem(key, JSON.stringify(value));
         } catch (error) {
-            console.warn(`Error setting localStorage key "${key}":`, error);
+            // Error setting localStorage
         }
     };
 

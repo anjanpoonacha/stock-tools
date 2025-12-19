@@ -62,7 +62,7 @@ export default function TestMultiPaneChartPage() {
 	// Memoize chart ready callbacks
 	const handleChart1Ready = useCallback((chart: IChartApi) => {
 		if (!chart1Initialized.current) {
-			console.log('[Chart 1] Ready');
+
 			setChart1(chart);
 			chart1Initialized.current = true;
 		}
@@ -70,7 +70,7 @@ export default function TestMultiPaneChartPage() {
 	
 	const handleChart2Ready = useCallback((chart: IChartApi) => {
 		if (!chart2Initialized.current) {
-			console.log('[Chart 2] Ready');
+
 			setChart2(chart);
 			chart2Initialized.current = true;
 		}
@@ -82,21 +82,18 @@ export default function TestMultiPaneChartPage() {
 		if (chart1DataLoaded.current) {
 			return;
 		}
-		
-		console.log('[Chart 1] ========== DATA LOADED ==========');
-		console.log('[Chart 1] Number of bars:', data.bars?.length || 0);
-		console.log('[Chart 1] Has indicators?', !!data.indicators);
-		console.log('[Chart 1] Indicator keys:', data.indicators ? Object.keys(data.indicators) : 'none');
-		
+
+
+
+
 		if (data.bars.length > 0) {
-			console.log('[Chart 1] First bar:', JSON.stringify(data.bars[0]));
-			console.log('[Chart 1] Last bar:', JSON.stringify(data.bars[data.bars.length - 1]));
-			
+
+
 			chart1DataLoaded.current = true;
 			setBars1D(data.bars);
-			console.log('[Chart 1] ✓ Bars state updated with', data.bars.length, 'bars');
+
 		}
-		console.log('[Chart 1] ========== END DATA LOADED ==========');
+
 	}, []);
 	
 	// Handle data loaded from Chart 2 - wrapped in useCallback
@@ -106,12 +103,9 @@ export default function TestMultiPaneChartPage() {
 			return;
 		}
 
-		console.log('[Chart 2] ========== DATA LOADED ==========');
-		console.log('[Chart 2] Number of bars:', data.bars?.length || 0);
 
 		if (data.bars.length > 0) {
-			console.log('[Chart 2] First bar:', JSON.stringify(data.bars[0]));
-			console.log('[Chart 2] Last bar:', JSON.stringify(data.bars[data.bars.length - 1]));
+
 
 			chart2DataLoaded.current = true;
 			// For Chart 2, we'll use the same data structure as Chart 1
@@ -121,9 +115,9 @@ export default function TestMultiPaneChartPage() {
 				values: [bar.close] // Use close price as a dummy value
 			}));
 			setBars188m(barsForMapping);
-			console.log('[Chart 2] ✓ Bars state updated with', barsForMapping.length, 'bars');
+
 		}
-		console.log('[Chart 2] ========== END DATA LOADED ==========');
+
 	}, []);
 	
 	// Set up cross-chart synchronization

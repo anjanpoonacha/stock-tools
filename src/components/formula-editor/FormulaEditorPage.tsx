@@ -35,7 +35,7 @@ export function FormulaEditorPage() {
 					const formula = JSON.parse(storedData);
 					return { mode: 'edit', formula };
 				} catch (err) {
-					console.error('[FormulaEditorPage] Failed to parse stored formula data:', err);
+					// Failed to parse stored formula data
 				}
 			}
 			// If no stored data, return basic edit mode with screenId
@@ -84,7 +84,7 @@ export function FormulaEditorPage() {
 	// Show error if navigated without proper data
 	useEffect(() => {
 		if (mode === 'edit' && !screenId) {
-			console.error('[FormulaEditorPage] Edit mode requires screenId parameter');
+			// Edit mode requires screenId parameter
 		}
 	}, [mode, screenId]);
 

@@ -109,14 +109,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
                         checkSessionAvailability(validatedCredentials.data);
                     } else {
                         // Invalid format - clear only invalid data
-                        console.warn('[Auth] Invalid credential format, clearing');
                         localStorage.removeItem(AUTH_STORAGE_KEY);
                         localStorage.removeItem(AUTH_STATUS_KEY);
                     }
                 }
             } catch (error) {
-                console.error('[Auth] Error loading credentials:', error);
-                // Don't clear credentials on error - just log and continue
+                // Don't clear credentials on error - just continue
                 setError('Error loading saved credentials');
             } finally {
                 setIsLoading(false);
@@ -162,8 +160,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 }));
             } else {
                 // ⚠️ API error - mark as offline but keep user authenticated
-                console.warn('[Auth] Session check failed:', response.status);
-                
                 setAuthStatus(prev => ({
                     ...prev!,
                     sessionStats: {
@@ -177,8 +173,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             }
         } catch (error) {
             // ⚠️ Network error - mark as offline but keep user authenticated
-            console.warn('[Auth] Session check error:', error);
-            
             setAuthStatus(prev => ({
                 ...prev!,
                 sessionStats: {
@@ -220,7 +214,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
             return true;
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : 'Login failed';
-            console.error('[Auth] Login error:', errorMessage);
             setError(errorMessage);
             return false;
         } finally {
@@ -249,7 +242,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 const validatedCredentials = UserCredentialsSchema.parse(credentials);
                 await checkSessionAvailability(validatedCredentials);
             } catch (error) {
-                console.error('[Auth] Error checking session status:', error);
+                // Error checking session status
             }
         }
     };

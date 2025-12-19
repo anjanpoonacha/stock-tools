@@ -44,7 +44,6 @@ export default function SystemAnalyzerPage() {
       setMetrics(calculatedMetrics)
     } catch (error) {
       // Invalid state, don't update metrics
-      console.error("Calculation error:", error)
       setMetrics(null)
     }
   }, [breakevenSection, losingSection, winningSection, totalTrades, rValue, compoundQuarterly])

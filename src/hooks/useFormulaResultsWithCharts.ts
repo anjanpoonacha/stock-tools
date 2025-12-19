@@ -159,7 +159,6 @@ export function useFormulaResultsWithCharts(
 		const credentials = getStoredCredentials();
 		
 		if (!credentials) {
-			console.error('[useFormulaResultsWithCharts] No credentials found');
 			setError('Not authenticated. Please log in first.');
 			setLoading(false);
 			return;
@@ -293,12 +292,11 @@ export function useFormulaResultsWithCharts(
 
 							case 'error': {
 								const data = parsed.data as ErrorEvent;
-								console.error('[useFormulaResultsWithCharts] Stream error:', data.message);
 								throw new Error(data.message);
 							}
 						}
 					} catch (err) {
-						console.error('[useFormulaResultsWithCharts] Failed to parse SSE message:', err);
+						// Failed to parse SSE message
 					}
 				}
 			}
@@ -311,7 +309,6 @@ export function useFormulaResultsWithCharts(
 			const errorMessage = err instanceof Error ? err.message : 'Unknown error';
 			setError(errorMessage);
 			showToast(errorMessage, 'error');
-			console.error('[useFormulaResultsWithCharts] Error:', err);
 		} finally {
 			isStreamingRef.current = false;
 			setLoading(false);

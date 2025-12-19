@@ -160,12 +160,12 @@ function MioWatchlistPageContent() {
             // No MIO session available - don't make API call
             setWatchlistsLoading(false);
             setWatchlistsError('No MarketInOut session found. Please use the browser extension to capture sessions from marketinout.com');
-            console.log('[MIO-WATCHLIST] Skipping watchlists fetch - no session available');
+
             return;
         }
 
         // MIO session is available - proceed with fetching watchlists
-        console.log('[MIO-WATCHLIST] Fetching watchlists - session available');
+
         fetchWatchlists();
     }, [mioSessionAvailable, sessionAvailabilityLoading, fetchWatchlists]);
 

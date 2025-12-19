@@ -41,7 +41,6 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 		if (!credentials) {
 			setUrls([]);
 			setError(null); // Don't show error when credentials aren't available yet
-			console.log('[useUserScreenerUrls] User credentials not available, skipping fetch');
 			return;
 		}
 
@@ -61,7 +60,6 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to fetch screener URLs';
 			setError(errorMessage);
-			console.error('[useUserScreenerUrls] Error fetching URLs:', err);
 		} finally {
 			setLoading(false);
 		}
@@ -115,7 +113,6 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to add screener URL';
 			setError(errorMessage);
-			console.error('[useUserScreenerUrls] Error adding URL:', err);
 			return false;
 		}
 	}, [userEmail, isAuthenticated]);
@@ -168,7 +165,6 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to update screener URL';
 			setError(errorMessage);
-			console.error('[useUserScreenerUrls] Error updating URL:', err);
 			return false;
 		}
 	}, [userEmail, isAuthenticated]);
@@ -205,7 +201,6 @@ export function useUserScreenerUrls(): UseUserScreenerUrlsReturn {
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to delete screener URL';
 			setError(errorMessage);
-			console.error('[useUserScreenerUrls] Error deleting URL:', err);
 			return false;
 		}
 	}, [userEmail, isAuthenticated]);

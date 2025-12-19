@@ -49,29 +49,25 @@ export function useKVSettings() {
 				return;
 			}
 
-			// Only load if user credentials exist
-			if (!userEmail || !userPassword) {
-				console.log('⚠️ No user credentials, using defaults');
-				setIsLoading(false);
-				setIsLoaded(true);
-				return;
-			}
+		// Only load if user credentials exist
+		if (!userEmail || !userPassword) {
+			setIsLoading(false);
+			setIsLoaded(true);
+			return;
+		}
 
-			try {
-				const url = `${API_SETTINGS}?userEmail=${encodeURIComponent(userEmail)}&userPassword=${encodeURIComponent(userPassword)}`;
-				const response = await fetch(url);
-				const loadedSettings = await response.json();
+		try {
+			const url = `${API_SETTINGS}?userEmail=${encodeURIComponent(userEmail)}&userPassword=${encodeURIComponent(userPassword)}`;
+			const response = await fetch(url);
+			const loadedSettings = await response.json();
 
-				setSettings({
-					panelLayout: loadedSettings?.panelLayout || DEFAULT_ALL_SETTINGS.panelLayout,
-					chartSettings: loadedSettings?.chartSettings || DEFAULT_ALL_SETTINGS.chartSettings,
-				});
-
-				console.log(`✅ Loaded user-specific settings for: ${userEmail}`);
-			} catch (error) {
-				console.error('❌ Failed to load settings from KV:', error);
-				// Use defaults on error
-			} finally {
+			setSettings({
+				panelLayout: loadedSettings?.panelLayout || DEFAULT_ALL_SETTINGS.panelLayout,
+				chartSettings: loadedSettings?.chartSettings || DEFAULT_ALL_SETTINGS.chartSettings,
+			});
+		} catch (error) {
+			// Use defaults on error
+		} finally {
 				setIsLoading(false);
 				setIsLoaded(true);
 			}
@@ -82,33 +78,31 @@ export function useKVSettings() {
 	// Save settings with 1 second debounce
 	const saveSettings = useCallback(
 		(updatedSettings: AllSettings) => {
-			if (!isLoaded) return;
+		if (!isLoaded) return;
 
-			// Skip save if credentials missing
-			if (!userEmail || !userPassword) {
-				console.log('⚠️ No user credentials, skipping save');
-				return;
+		// Skip save if credentials missing
+		if (!userEmail || !userPassword) {
+			return;
+		}
+
+		if (saveTimer.current) {
+			clearTimeout(saveTimer.current);
+		}
+
+		saveTimer.current = setTimeout(async () => {
+			try {
+				await fetch(API_SETTINGS, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						userEmail,
+						userPassword,
+						settings: updatedSettings,
+					}),
+				});
+			} catch (error) {
+				// Save failed
 			}
-
-			if (saveTimer.current) {
-				clearTimeout(saveTimer.current);
-			}
-
-			saveTimer.current = setTimeout(async () => {
-				try {
-					await fetch(API_SETTINGS, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							userEmail,
-							userPassword,
-							settings: updatedSettings,
-						}),
-					});
-					console.log(`✅ Saved user-specific settings for: ${userEmail}`);
-				} catch (error) {
-					console.error('❌ Failed to save settings:', error);
-				}
 			}, 1000); // 1 second debounce
 		},
 		[isLoaded, userEmail, userPassword]

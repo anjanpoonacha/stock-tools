@@ -66,8 +66,7 @@ const MioFormulasPageContent: React.FC = () => {
 	const handleEditFormula = async (formula: MIOFormula) => {
 		try {
 			setEditingFormulaId(formula.id);
-			console.log('[MioFormulasPage] Edit clicked for:', formula.name);
-			console.log('[MioFormulasPage] Formula text exists:', !!formula.formulaText);
+
 
 			// If formula text doesn't exist, fetch it from the page URL
 			if (!formula.formulaText && formula.pageUrl) {
@@ -78,12 +77,10 @@ const MioFormulasPageContent: React.FC = () => {
 					const screenIdMatch = normalizedUrl.match(/screen_id=(\d+)/);
 					if (screenIdMatch) {
 						normalizedUrl = `https://www.marketinout.com/stock-screener/stocks.php?f=1&screen_id=${screenIdMatch[1]}`;
-						console.log('[MioFormulasPage] Normalized URL from:', formula.pageUrl);
-						console.log('[MioFormulasPage] Normalized URL to:', normalizedUrl);
+
+
 					}
 				}
-
-				console.log('[MioFormulasPage] Fetching formula text from:', normalizedUrl);
 
 				try {
 					const credentials = getStoredCredentials();
@@ -104,35 +101,27 @@ const MioFormulasPageContent: React.FC = () => {
 							pageUrl: normalizedUrl,
 						}),
 					});
-					console.log('[MioFormulasPage] Response status:', response.status, response.ok);
 
 					if (response.ok) {
 						const data = await response.json();
-						console.log('[MioFormulasPage] Response data:', {
-							success: data.success,
-							hasFormulaText: !!data.formulaText,
-							formulaTextLength: data.formulaText?.length,
-							hasApiUrl: !!data.apiUrl,
-							error: data.error,
-						});
 
 						if (data.formulaText) {
-							console.log('[MioFormulasPage] ✓ Extracted formula text:', data.formulaText.substring(0, 50));
+
 							// Update formula object with extracted text
 							formula = { ...formula, formulaText: data.formulaText };
 						} else {
-							console.warn('[MioFormulasPage] ✗ No formula text in response');
+
 							showToast('Could not extract formula text from page', 'error');
 							return; // Exit early - don't navigate on error
 						}
 					} else {
 						const errorData = await response.json().catch(() => ({}));
-						console.error('[MioFormulasPage] Failed to extract formula text:', errorData);
+
 						showToast(`Could not load formula text: ${errorData.error || 'Unknown error'}`, 'error');
 						return; // Exit early - don't navigate on error
 					}
 				} catch (error) {
-					console.error('[MioFormulasPage] Error fetching formula text:', error);
+
 					showToast('Error loading formula text', 'error');
 					return; // Exit early - don't navigate on error
 				}

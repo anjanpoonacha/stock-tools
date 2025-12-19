@@ -142,12 +142,12 @@ export default function TestErrorsPage() {
     };
 
     const handleRetry = () => {
-        console.log('Retry button clicked');
+
         setCurrentError(null);
     };
 
     const handleDismiss = () => {
-        console.log('Dismiss button clicked');
+
         setCurrentError(null);
     };
 

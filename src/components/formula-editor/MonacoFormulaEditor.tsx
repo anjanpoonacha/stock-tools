@@ -50,12 +50,6 @@ export function MonacoFormulaEditor({
 		? 'mio-formula-dark'
 		: 'mio-formula-light';
 
-	console.log('[MonacoFormulaEditor] Theme:', {
-		resolvedTheme,
-		monacoTheme,
-		mounted,
-	});
-
 	// Update editor theme when resolved theme changes
 	useEffect(() => {
 		if (editorRef.current && mounted) {
@@ -80,12 +74,6 @@ export function MonacoFormulaEditor({
 		// Only re-register if Monaco is already loaded
 		// Re-register even with empty data to ensure consistency
 		if (monacoRef.current) {
-			console.log('[MonacoFormulaEditor] Data changed, re-registering provider', {
-				indicators: indicators.length,
-				samples: samples.length,
-				monacoReady: !!monacoRef.current,
-			});
-
 			// Dispose old provider
 			if (completionDisposableRef.current) {
 				completionDisposableRef.current.dispose();
@@ -97,18 +85,12 @@ export function MonacoFormulaEditor({
 				indicators,
 				samples
 			);
-
-			console.log('[MonacoFormulaEditor] ✓ Re-registered autocomplete provider successfully');
-		} else {
-			console.log('[MonacoFormulaEditor] ✗ Cannot re-register - Monaco not ready');
 		}
 	}, [indicators, samples]);
 
 	function handleEditorDidMount(editor: editor.IStandaloneCodeEditor, monaco: Monaco) {
 		editorRef.current = editor;
 		monacoRef.current = monaco;
-
-		console.log('[MonacoFormulaEditor] Editor mounted, applying theme:', monacoTheme);
 
 		// Register custom language once (singleton pattern)
 		ensureLanguageRegistered(monaco);
@@ -128,11 +110,6 @@ export function MonacoFormulaEditor({
 			indicators,
 			samples
 		);
-
-		console.log('[MonacoFormulaEditor] Registered provider on mount with', {
-			indicators: indicators.length,
-			samples: samples.length,
-		});
 
 		// Listen to cursor position changes
 		if (onCursorChange) {

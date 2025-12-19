@@ -79,7 +79,6 @@ export function useChartCursorSync(): UseChartCursorSyncReturn {
    */
   const registerChart = useCallback((paneId: string, chart: IChartApi) => {
     if (!chart) {
-      console.warn(`[useChartCursorSync] Cannot register chart for pane ${paneId}: chart is null or undefined`);
       return;
     }
 
@@ -167,20 +166,9 @@ export function useChartCursorSync(): UseChartCursorSyncReturn {
             // Pass null for seriesApi to position on the time scale
             // Pass price if available for better visual alignment
             chart.setCrosshairPosition(price ?? 0, time, null as any);
-          } else if (chart && typeof chart.timeScale === 'function') {
-            // Fallback: If setCrosshairPosition is not available, we can't directly
-            // set the crosshair, but we can at least ensure the time scale is aligned
-            // This is a limitation of older lightweight-charts versions
-            console.debug(
-              `[useChartCursorSync] Chart ${paneId} does not support setCrosshairPosition`
-            );
           }
         } catch (error) {
           // Catch errors from destroyed or invalid chart instances
-          console.error(
-            `[useChartCursorSync] Error syncing crosshair to chart ${paneId}:`,
-            error
-          );
           // Optionally, unregister the chart if it's causing errors
           chartRegistryRef.current.delete(paneId);
         }

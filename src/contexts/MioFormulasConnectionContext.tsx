@@ -37,15 +37,12 @@ export function MioFormulasConnectionProvider({ children }: MioFormulasConnectio
 	 * Server-side API routes can check this to determine if persistent mode should be used
 	 */
 	useEffect(() => {
-		console.log('[MioFormulasConnection] Entered mio-formulas section');
-		
 		// Set flag in sessionStorage (available to server-side via cookies/headers)
 		sessionStorage.setItem('mio-formulas-active', 'true');
 		sessionStorage.setItem('mio-formulas-mount-time', String(mountTime));
 
 		// Cleanup on unmount
 		return () => {
-			console.log('[MioFormulasConnection] Left mio-formulas section');
 			sessionStorage.removeItem('mio-formulas-active');
 			sessionStorage.removeItem('mio-formulas-mount-time');
 		};

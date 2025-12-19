@@ -160,7 +160,6 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 				setData(result);
 				setLoading(false);
 			} catch (err) {
-				console.error('[useChartData] Error loading data:', err);
 				if (!mounted) return;
 				const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
 				setError(errorMessage);

@@ -38,7 +38,7 @@
  *     }
  *   ]}
  *   syncCrosshair={true}
- *   onPaneToggle={(paneId, enabled) => console.log(`Pane ${paneId} ${enabled ? 'enabled' : 'disabled'}`)}
+ *   onPaneToggle={(paneId, enabled) => handlePaneToggle(paneId, enabled)}
  * />
  * ```
  */
@@ -239,7 +239,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 	}
 
 	componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-		console.error(`[MultiPaneChart] Error in pane ${this.props.paneId}:`, error, errorInfo);
+		// Error caught in pane
 	}
 
 	render() {

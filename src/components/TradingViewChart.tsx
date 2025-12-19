@@ -116,7 +116,6 @@ export function TradingViewChart({
 				setIsLoading(false);
 				setError(null);
 			} catch (err) {
-				console.error('Error initializing TradingView widget:', err);
 				setError(err instanceof Error ? err.message : 'Failed to load chart');
 				setIsLoading(false);
 			}

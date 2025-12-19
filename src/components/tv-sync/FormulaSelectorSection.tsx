@@ -86,7 +86,6 @@ export function FormulaSelectorSection({
 
             return success;
         } catch (error) {
-            console.error('Error saving URL:', error);
             toast('Failed to save screener URL.', 'error');
             return false;
         }

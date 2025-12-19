@@ -21,8 +21,6 @@ export default function ResultsContent() {
 	const { stocks, formulaName, loading, error, refetch } =
 		useFormulaResults(formulaId);
 
-	console.log('[ResultsContent] Loaded stocks:', stocks.length);
-	console.log('[ResultsContent] Using on-demand chart loading (no pre-fetched data)');
 
 	// View settings with automatic persistence
 	const { viewMode, setViewMode } = useViewSettings();

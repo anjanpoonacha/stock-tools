@@ -66,7 +66,7 @@ export function SmartEditor({
             const text = await navigator.clipboard.readText();
             setInput(text);
         } catch (error) {
-            console.error('Failed to read clipboard:', error);
+            // Failed to read clipboard
         }
     };
 

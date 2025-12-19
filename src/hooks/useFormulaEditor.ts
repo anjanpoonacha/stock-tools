@@ -109,7 +109,6 @@ export function useFormulaEditor(
 				documentation: data.documentation || [],
 			});
 		} catch (err) {
-			console.error('[useFormulaEditor] Failed to load autocomplete data:', err);
 			const errorMessage = err instanceof Error ? err.message : 'Failed to load autocomplete data';
 			setError(errorMessage);
 			showToast(errorMessage, 'error');
@@ -164,7 +163,6 @@ export function useFormulaEditor(
 				onSuccess();
 			} catch (err) {
 				const errorMessage = err instanceof Error ? err.message : `Failed to ${mode.mode} formula`;
-				console.error(`[useFormulaEditor] Error ${mode.mode}ing formula:`, err);
 				setError(errorMessage);
 				showToast(errorMessage, 'error');
 			} finally {

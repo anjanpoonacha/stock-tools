@@ -29,7 +29,7 @@ export function useChartSettings() {
           setSettings(kvSettings as ChartSettings);
         }
       } catch (error) {
-        console.error('Failed to load chart settings from KV:', error);
+        // Failed to load settings
       } finally {
         setIsLoaded(true);
       }

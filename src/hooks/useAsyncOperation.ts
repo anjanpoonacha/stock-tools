@@ -63,7 +63,6 @@ export function useAsyncOperation<T = unknown>(
 		} catch (error) {
 			if (error instanceof Error) {
 				if (error.name === 'AbortError') {
-					console.log('Request was aborted');
 					return null;
 				}
 

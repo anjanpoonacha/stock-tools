@@ -18,7 +18,6 @@ export function UserCredentials({ availableUsers = [] }: UserCredentialsProps) {
 
     const handleLogin = async () => {
         if (!userEmail || !userPassword) {
-            console.error('Please enter both email and password');
             return;
         }
         await login({ userEmail, userPassword });
@@ -51,7 +50,7 @@ export function UserCredentials({ availableUsers = [] }: UserCredentialsProps) {
                     setUserPassword(parsed.userPassword);
                 }
             } catch (error) {
-                console.error('[UserCredentials] Error reading stored credentials:', error);
+                // Error reading stored credentials
             }
         }
     }, []); // Run only once on mount

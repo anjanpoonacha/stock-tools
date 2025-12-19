@@ -43,9 +43,8 @@ export function CriteriaReferencePanel({ editorContext }: CriteriaReferencePanel
       // Convert Map to array and cast to proper types
       const criteriaArray = Object.values(data.tree.criteriaById) as CriterionMetadata[];
       setAllCriteria(criteriaArray);
-      console.log(`[CriteriaReferencePanel] Loaded ${criteriaArray.length} criteria`);
     }).catch((error) => {
-      console.error('[CriteriaReferencePanel] Failed to load criteria data:', error);
+      // Failed to load criteria data
     });
   }, []);
   

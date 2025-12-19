@@ -117,13 +117,8 @@ export function registerFormulaCompletionProvider(
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		provideHover: (model: any, position: any) => {
 			const word = model.getWordAtPosition(position);
-			console.log('[HoverProvider] Hover triggered!');
-			console.log('[HoverProvider] Word at position:', word?.word);
-			console.log('[HoverProvider] Available indicators:', indicators.length);
-			console.log('[HoverProvider] Available samples:', samples.length);
 
 			if (!word) {
-				console.log('[HoverProvider] No word found at position');
 				return null;
 			}
 
@@ -132,14 +127,7 @@ export function registerFormulaCompletionProvider(
 				(i) => i.name.toLowerCase() === word.word.toLowerCase()
 			);
 
-			if (!indicator) {
-				console.log('[HoverProvider] Indicator not found for:', word.word);
-			} else {
-				console.log('[HoverProvider] Found indicator:', indicator.name);
-			}
-
 			if (indicator) {
-				console.log('[HoverProvider] Returning hover for:', indicator.name);
 
 				// Build markdown content
 				let markdownContent = `**${indicator.name}**\n\n${indicator.description}\n\n**Syntax:** \`${indicator.syntax}\``;
@@ -173,8 +161,6 @@ export function registerFormulaCompletionProvider(
 			});
 
 			if (sample) {
-				console.log('[HoverProvider] Returning hover for sample:', sample.name);
-
 				let sampleContent = `**${sample.name}**\n\n`;
 				if (sample.description) {
 					// Limit description length

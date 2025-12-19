@@ -13,8 +13,6 @@ localStorage.setItem('mio-tv-auth-credentials', JSON.stringify(mockCredentials))
 
 // Function to simulate the fetch request made by useSessionBridge
 async function testSessionBridgeFetch(platform) {
-    console.log(`Testing useSessionBridge for platform: ${platform}`);
-
     try {
         // Get stored credentials from localStorage
         const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
@@ -29,8 +27,6 @@ async function testSessionBridgeFetch(platform) {
         } catch {
             throw new Error('Invalid authentication data. Please log in again.');
         }
-
-        console.log(`Using credentials for user: ${credentials.userEmail}`);
 
         // Use POST with user credentials
         const response = await fetch(`/api/session/current`, {
@@ -49,30 +45,22 @@ async function testSessionBridgeFetch(platform) {
 
         const data = await response.json();
 
-        console.log('Response data:', data);
-
         if (data.hasSession && data.sessionId) {
-            console.log(`Session ID found: ${data.sessionId}`);
             return data.sessionId;
         } else {
-            console.log('No session ID found');
             return null;
         }
     } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-        console.error(`Error: ${errorMessage}`);
         return null;
     }
 }
 
 // Run the test
-console.log('Starting useSessionBridge test...');
 testSessionBridgeFetch('tradingview')
     .then((sessionId) => {
-        console.log(`Test completed. Session ID: ${sessionId || 'None'}`);
     })
     .catch((error) => {
-        console.error('Test failed:', error);
     });
 
 // Instructions for manual testing:

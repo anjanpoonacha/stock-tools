@@ -48,7 +48,6 @@ export function useChartDataCache() {
 						setProgress({ current: fetchedCount, total: totalFetches });
 					})
 						.catch(err => {
-							console.error(`Failed to fetch ${symbol} ${resolution}:`, err);
 							fetchedCount++;
 							setProgress({ current: fetchedCount, total: totalFetches });
 						});
@@ -69,7 +68,6 @@ export function useChartDataCache() {
 
 		showToast(`Fetched ${totalFetches} charts`, 'success');
 	} catch (err) {
-		console.error('[useChartDataCache] Batch fetch error:', err);
 		showToast('Failed to batch fetch chart data', 'error');
 	} finally {
 		setLoading(false);
