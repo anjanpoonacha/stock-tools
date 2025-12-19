@@ -23,7 +23,6 @@ export function getUserPreferences(): UserPreferences {
 		if (!stored) return {};
 		return JSON.parse(stored);
 	} catch (error) {
-		console.warn('[Preferences] Failed to load preferences:', error);
 		return {};
 	}
 }
@@ -44,9 +43,7 @@ export function updateUserPreferences(updates: Partial<UserPreferences>): void {
 			},
 		};
 		localStorage.setItem(PREFERENCES_KEY, JSON.stringify(updated));
-		console.log('[Preferences] Updated:', updates);
 	} catch (error) {
-		console.warn('[Preferences] Failed to save preferences:', error);
 	}
 }
 
@@ -56,9 +53,7 @@ export function updateUserPreferences(updates: Partial<UserPreferences>): void {
 export function clearUserPreferences(): void {
 	try {
 		localStorage.removeItem(PREFERENCES_KEY);
-		console.log('[Preferences] Cleared all preferences');
 	} catch (error) {
-		console.warn('[Preferences] Failed to clear preferences:', error);
 	}
 }
 

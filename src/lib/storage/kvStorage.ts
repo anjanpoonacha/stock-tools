@@ -65,12 +65,10 @@ export async function savePanelLayout(layout: PanelLayout): Promise<void> {
 			body: JSON.stringify(layout),
 		});
 		if (response.ok) {
-			console.log('✅ Saved panel layout to KV:', layout);
 		} else {
 			throw new Error('Failed to save');
 		}
 	} catch (error) {
-		console.error('❌ Failed to save panel layout:', error);
 	}
 }
 
@@ -79,11 +77,9 @@ export async function loadPanelLayout(): Promise<PanelLayout> {
 		const response = await fetch(API_ROUTES.PANEL_LAYOUT);
 		if (response.ok) {
 			const layout = await response.json();
-			console.log('✅ Loaded panel layout from KV:', layout);
 			return layout;
 		}
 	} catch (error) {
-		console.error('❌ Failed to load panel layout:', error);
 	}
 	return DEFAULT_PANEL_LAYOUT;
 }
@@ -99,12 +95,10 @@ export async function saveChartSettings(settings: ChartSettings): Promise<void> 
 			body: JSON.stringify(settings),
 		});
 		if (response.ok) {
-			console.log('✅ Saved chart settings to KV');
 		} else {
 			throw new Error('Failed to save');
 		}
 	} catch (error) {
-		console.error('❌ Failed to save chart settings:', error);
 	}
 }
 
@@ -114,12 +108,10 @@ export async function loadChartSettings(): Promise<ChartSettings | null> {
 		if (response.ok) {
 			const settings = await response.json();
 			if (settings) {
-				console.log('✅ Loaded chart settings from KV');
 				return settings;
 			}
 		}
 	} catch (error) {
-		console.error('❌ Failed to load chart settings:', error);
 	}
 	return null;
 }
@@ -135,12 +127,10 @@ export async function saveLayoutSettings(settings: LayoutSettings): Promise<void
 			body: JSON.stringify(settings),
 		});
 		if (response.ok) {
-			console.log('✅ Saved layout settings to KV:', settings);
 		} else {
 			throw new Error('Failed to save');
 		}
 	} catch (error) {
-		console.error('❌ Failed to save layout settings:', error);
 	}
 }
 
@@ -149,11 +139,9 @@ export async function loadLayoutSettings(): Promise<LayoutSettings> {
 		const response = await fetch(API_ROUTES.LAYOUT_SETTINGS);
 		if (response.ok) {
 			const settings = await response.json();
-			console.log('✅ Loaded layout settings from KV:', settings);
 			return settings;
 		}
 	} catch (error) {
-		console.error('❌ Failed to load layout settings:', error);
 	}
 	return DEFAULT_LAYOUT_SETTINGS;
 }
@@ -171,7 +159,6 @@ export async function saveAllSettings(data: {
 		saveChartSettings(data.chartSettings),
 		saveLayoutSettings(data.layoutSettings),
 	]);
-	console.log('✅ Saved all settings to KV');
 }
 
 /**
@@ -188,6 +175,5 @@ export async function loadAllSettings(): Promise<{
 		loadLayoutSettings(),
 	]);
 
-	console.log('✅ Loaded all settings from KV');
 	return { panelLayout, chartSettings, layoutSettings };
 }

@@ -92,23 +92,19 @@ export function validatePanelSizes(toolbar: number, chart: number, stockList: nu
 	
 	// Check total is approximately 100% (allow small floating point errors)
 	if (Math.abs(total - 100) > 1) {
-		console.warn(`[Panel Validation] Total panel size (${total.toFixed(1)}%) is not 100%`);
 		return false;
 	}
 	
 	// Check each panel is within bounds
 	if (toolbar < MIN_PANEL_SIZES.TOOLBAR || toolbar > MAX_PANEL_SIZES.TOOLBAR) {
-		console.warn(`[Panel Validation] Toolbar size (${toolbar.toFixed(1)}%) out of bounds [${MIN_PANEL_SIZES.TOOLBAR}%, ${MAX_PANEL_SIZES.TOOLBAR}%]`);
 		return false;
 	}
 	
 	if (chart < MIN_PANEL_SIZES.CHART || chart > MAX_PANEL_SIZES.CHART) {
-		console.warn(`[Panel Validation] Chart size (${chart.toFixed(1)}%) out of bounds [${MIN_PANEL_SIZES.CHART}%, ${MAX_PANEL_SIZES.CHART}%]`);
 		return false;
 	}
 	
 	if (stockList < MIN_PANEL_SIZES.STOCK_LIST || stockList > MAX_PANEL_SIZES.STOCK_LIST) {
-		console.warn(`[Panel Validation] Stock list size (${stockList.toFixed(1)}%) out of bounds [${MIN_PANEL_SIZES.STOCK_LIST}%, ${MAX_PANEL_SIZES.STOCK_LIST}%]`);
 		return false;
 	}
 	
@@ -132,12 +128,4 @@ export function logPanelSizes(
 	const stockListPx = Math.round((stockList / 100) * viewportWidth);
 	const total = toolbar + chart + stockList;
 	
-	console.log(`🎯 [${context}]`, {
-		toolbar: `${toolbar.toFixed(1)}% (${toolbarPx}px)`,
-		chart: `${chart.toFixed(1)}% (${chartPx}px)`,
-		stockList: `${stockList.toFixed(1)}% (${stockListPx}px)`,
-		total: `${total.toFixed(1)}%`,
-		viewport: `${viewportWidth}px`,
-		valid: validatePanelSizes(toolbar, chart, stockList),
-	});
 }

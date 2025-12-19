@@ -64,7 +64,6 @@ export async function performPlatformHealthCheck(
 		case 'tradingview':
 			return await checkTradingViewHealth(internalSessionId);
 		default:
-			console.warn(`[HealthChecker] Unknown platform: ${platform}`);
 			return false;
 	}
 }
@@ -87,7 +86,6 @@ async function checkTradingViewHealth(internalSessionId: string): Promise<boolea
 		}
 
 		// TODO: Implement TradingView session health check
-		console.log(`[HealthChecker] TradingView health check not yet implemented for ${internalSessionId}`);
 		return true; // Assume healthy for now
 	} catch (error) {
 		if (error instanceof SessionError) {
@@ -124,7 +122,6 @@ export async function refreshTradingViewSession(internalSessionId: string): Prom
 		}
 
 		// TODO: Implement TradingView session refresh
-		console.log(`[HealthChecker] TradingView session refresh not yet implemented for ${internalSessionId}`);
 		return true; // Assume success for now
 	} catch (error) {
 		if (error instanceof SessionError) {
@@ -186,7 +183,6 @@ function updateUnhealthyMetrics(metrics: SessionHealthMetrics): void {
 	if (metrics.consecutiveFailures >= HEALTH_CONFIG.MAX_CONSECUTIVE_FAILURES) {
 		metrics.status = 'expired';
 		metrics.isMonitoring = false;
-		console.error(`[HealthChecker] Session ${metrics.internalSessionId} for ${metrics.platform} marked as expired`);
 	} else if (metrics.consecutiveFailures >= 2) {
 		metrics.status = 'critical';
 		metrics.checkInterval = HEALTH_CONFIG.CRITICAL_CHECK_INTERVAL;
@@ -226,12 +222,6 @@ export function recordHealthCheckError(metrics: SessionHealthMetrics, error: Ses
 	// Log the error for monitoring
 	ErrorLogger.logError(error);
 
-	console.error(`[HealthChecker] Recorded error for ${metrics.platform}:${metrics.internalSessionId}:`, {
-		errorType: error.type,
-		errorCode: error.code,
-		message: error.message,
-		timestamp: error.timestamp
-	});
 }
 
 /**

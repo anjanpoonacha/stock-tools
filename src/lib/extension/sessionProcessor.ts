@@ -50,7 +50,6 @@ export function detectPlatform(url?: string, sessionKey?: string): Platform {
  */
 async function validateMIOSession(sessionKey: string, sessionValue: string): Promise<{ valid: boolean; error?: string }> {
 	try {
-		console.log('[EXTENSION-API] Validating MIO session from extension...');
 
 		const response = await fetch('https://www.marketinout.com/wl/watch_list.php?mode=list', {
 			headers: {
@@ -64,14 +63,12 @@ async function validateMIOSession(sessionKey: string, sessionValue: string): Pro
 		if (response.status === 302 || response.status === 301) {
 			const location = response.headers.get('location');
 			if (location && (location.includes('login') || location.includes('signin'))) {
-				console.log('[EXTENSION-API] Session invalid - redirected to login:', location);
 				return { valid: false, error: 'Session expired or invalid - redirected to login page' };
 			}
 		}
 
 		// Check if response is successful
 		if (!response.ok) {
-			console.log('[EXTENSION-API] Session validation failed - HTTP error:', response.status);
 			return { valid: false, error: `HTTP error: ${response.status}` };
 		}
 
@@ -83,23 +80,19 @@ async function validateMIOSession(sessionKey: string, sessionValue: string): Pro
 			html.includes('username') || html.includes('email')) {
 			// But also check for watchlist indicators to avoid false positives
 			if (!html.includes('watch_list') && !html.includes('watchlist') && !html.includes('sel_wlid')) {
-				console.log('[EXTENSION-API] Session invalid - response contains login form');
 				return { valid: false, error: 'Session invalid - login required' };
 			}
 		}
 
 		// Check for watchlist page indicators (positive validation)
 		if (html.includes('sel_wlid') || html.includes('watch_list') || html.includes('watchlist')) {
-			console.log('[EXTENSION-API] Session validation successful - watchlist page detected');
 			return { valid: true };
 		}
 
 		// If we can't determine the page type, consider it potentially valid
-		console.log('[EXTENSION-API] Session validation uncertain - assuming valid');
 		return { valid: true };
 
 	} catch (error) {
-		console.error('[EXTENSION-API] Session validation network error:', error);
 		return {
 			valid: false,
 			error: `Network error during validation: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -112,7 +105,6 @@ async function validateMIOSession(sessionKey: string, sessionValue: string): Pro
  */
 async function validateTradingViewSession(sessionKey: string, sessionValue: string): Promise<{ valid: boolean; error?: string }> {
 	try {
-		console.log('[EXTENSION-API] Validating TradingView session from extension...');
 
 		// TradingView uses different validation approach - check user profile or watchlist
 		const response = await fetch('https://www.tradingview.com/api/v1/user/', {
@@ -128,14 +120,12 @@ async function validateTradingViewSession(sessionKey: string, sessionValue: stri
 		if (response.status === 302 || response.status === 301) {
 			const location = response.headers.get('location');
 			if (location && (location.includes('login') || location.includes('signin'))) {
-				console.log('[EXTENSION-API] TradingView session invalid - redirected to login:', location);
 				return { valid: false, error: 'Session expired or invalid - redirected to login page' };
 			}
 		}
 
 		// Check if response is successful
 		if (!response.ok) {
-			console.log('[EXTENSION-API] TradingView session validation failed - HTTP error:', response.status);
 			// For TradingView, we'll be more lenient as their API might be restrictive
 			if (response.status === 403 || response.status === 401) {
 				return { valid: false, error: 'Session invalid - authentication required' };
@@ -148,24 +138,20 @@ async function validateTradingViewSession(sessionKey: string, sessionValue: stri
 			const data = await response.json();
 			// Check if we got user data (indicates valid session)
 			if (data && (data.id || data.username || data.user)) {
-				console.log('[EXTENSION-API] TradingView session validation successful - user data received');
 				return { valid: true };
 			}
 		} catch {
 			// If JSON parsing fails, check response text
 			const text = await response.text();
 			if (text.includes('login') || text.includes('signin')) {
-				console.log('[EXTENSION-API] TradingView session invalid - login page detected');
 				return { valid: false, error: 'Session invalid - login required' };
 			}
 		}
 
 		// If we can't determine the session validity, assume it's valid
-		console.log('[EXTENSION-API] TradingView session validation uncertain - assuming valid');
 		return { valid: true };
 
 	} catch (error) {
-		console.error('[EXTENSION-API] TradingView session validation network error:', error);
 		return {
 			valid: false,
 			error: `Network error during validation: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -183,7 +169,6 @@ export async function validateSession(platform: Platform, sessionKey: string, se
 		case PLATFORMS.TRADINGVIEW:
 			return validateTradingViewSession(sessionKey, sessionValue);
 		default:
-			console.warn('[EXTENSION-API] Unknown platform, skipping validation:', platform);
 			return { valid: true }; // Allow unknown platforms for now
 	}
 }
@@ -221,7 +206,6 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 
 	// Validate required fields
 	if (!userEmail || !userPassword) {
-		console.warn('[EXTENSION-API] Missing user credentials');
 		return {
 			success: false,
 			error: 'Authentication required',
@@ -230,13 +214,8 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 		};
 	}
 
-	console.log('[EXTENSION-API] User submitting session:', {
-		userEmail,
-		platform: providedPlatform
-	});
 
 	if (!sessionKey || !sessionValue) {
-		console.warn('[EXTENSION-API] Missing sessionKey or sessionValue');
 		return {
 			success: false,
 			error: 'Missing sessionKey or sessionValue',
@@ -248,17 +227,9 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 	const detectedPlatform = detectPlatform(url, sessionKey);
 	const platform = (providedPlatform as Platform) || detectedPlatform;
 
-	console.log('[EXTENSION-API] Platform detection:', {
-		provided: providedPlatform,
-		detected: detectedPlatform,
-		final: platform,
-		url,
-		sessionKey
-	});
 
 	// Validate and sanitize cookie inputs using CookieParser
 	if (!CookieParser.validateCookieFormat(sessionKey, sessionValue)) {
-		console.warn('[EXTENSION-API] Invalid cookie format provided:', { sessionKey, platform });
 		return {
 			success: false,
 			error: 'Invalid cookie format',
@@ -270,15 +241,12 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 	// Sanitize the cookie value for security
 	const sanitizedSessionValue = CookieParser.sanitizeCookieValue(sessionValue);
 	if (sanitizedSessionValue !== sessionValue) {
-		console.warn('[EXTENSION-API] Cookie value was sanitized for platform:', platform);
 	}
 
 	// Validate the session before storing it using platform-specific validation
-	console.log('[EXTENSION-API] Validating session before bridging:', { sessionKey, platform });
 	const validation = await validateSession(platform, sessionKey, sanitizedSessionValue);
 
 	if (!validation.valid) {
-		console.log('[EXTENSION-API] Session validation failed for platform:', platform, validation.error);
 		return {
 			success: false,
 			error: 'Invalid session credentials',
@@ -288,15 +256,12 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 		};
 	}
 
-	console.log('[EXTENSION-API] Session validation passed, bridging session:', { sessionKey, platform });
 
 	// Get or generate internal session ID
 	let internalSessionId = existingSessionId;
 	if (internalSessionId) {
-		console.log('[EXTENSION-API] Reusing existing internalSessionId from cookie:', internalSessionId);
 	} else {
 		internalSessionId = generateSessionId();
-		console.log('[EXTENSION-API] Generated new internalSessionId:', internalSessionId);
 	}
 
 	// Prepare session data with proper cookie handling
@@ -327,34 +292,14 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 		}
 		validatedSessionData = CookieParser.extractASPSESSION(cookieData);
 		if (Object.keys(validatedSessionData).length === 0) {
-			console.warn('[EXTENSION-API] No ASPSESSION cookies detected for MarketInOut, storing as-is:', { sessionKey });
 		}
 	} else if (platform === PLATFORMS.TRADINGVIEW) {
 		// TradingView uses different session structure, store as-is
 		validatedSessionData = sessionData;
-		console.log('[EXTENSION-API] TradingView session data prepared:', { 
-			sessionKey,
-			hasSessionIdSign: !!sessionData.sessionid_sign,
-			sessionIdSignLength: sessionData.sessionid_sign ? sessionData.sessionid_sign.length : 0
-		});
 	}
 
-	console.log('[EXTENSION-API] Saving validated session:', {
-		internalSessionId,
-		platform,
-		userEmail,
-		session: sessionData,
-		validationCount: Object.keys(validatedSessionData).length
-	});
 
 	const finalInternalSessionId = await savePlatformSessionWithCleanup(internalSessionId, platform as string, sessionData);
-	console.log('[EXTENSION-API] Successfully saved validated session with cleanup:', {
-		originalInternalSessionId: internalSessionId,
-		finalInternalSessionId,
-		sessionKey,
-		platform,
-		sessionDetected: platform === PLATFORMS.MARKETINOUT ? CookieParser.isASPSESSIONCookie(sessionKey) : true
-	});
 
 	// Update the internal session ID to use the final one (in case duplicates were cleaned up)
 	internalSessionId = finalInternalSessionId;
@@ -362,35 +307,19 @@ export async function processAndStoreSession(request: SessionProcessRequest): Pr
 	// Start health monitoring for the newly bridged session (currently only for MarketInOut)
 	let healthMonitoringActive = false;
 	if (platform === PLATFORMS.MARKETINOUT) {
-		console.log('[EXTENSION-API] Starting health monitoring for MarketInOut session:', internalSessionId);
 		try {
 			const healthIntegrationResult = await validateAndStartMonitoring(internalSessionId, platform as string);
 
 			if (healthIntegrationResult.isValid && healthIntegrationResult.monitoringStarted) {
-				console.log('[EXTENSION-API] Health monitoring started successfully:', {
-					internalSessionId,
-					platform,
-					healthStatus: healthIntegrationResult.healthStatus,
-					watchlistCount: healthIntegrationResult.watchlists?.length || 0
-				});
 				healthMonitoringActive = true;
 			} else {
-				console.warn('[EXTENSION-API] Health monitoring integration failed:', {
-					internalSessionId,
-					platform,
-					error: healthIntegrationResult.error?.message,
-					monitoringStarted: healthIntegrationResult.monitoringStarted
-				});
 			}
 		} catch (error) {
-			console.error('[EXTENSION-API] Error starting health monitoring:', error);
 			// Don't fail the entire bridging process if health monitoring fails
 		}
 	} else {
-		console.log('[EXTENSION-API] Health monitoring not available for platform:', platform);
 	}
 
-	console.log(`[EXTENSION-API] Multi-platform session bridge completed successfully: { platform: '${platform}', timestamp: '${getIndiaTimestamp()}' }`);
 
 	return {
 		success: true,

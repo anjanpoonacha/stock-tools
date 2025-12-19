@@ -10,7 +10,6 @@ describe('Parser Integration', () => {
   try {
     html = fs.readFileSync(htmlPath, 'utf-8');
   } catch (error) {
-    console.warn('Could not load samples.html for testing:', error);
     html = '';
   }
 
@@ -26,7 +25,6 @@ describe('Parser Integration', () => {
 
   it('parseSamplesHtml should work correctly', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -46,7 +44,6 @@ describe('Parser Integration', () => {
 
   it('SampleParser and parseSamplesHtml should produce identical results', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 

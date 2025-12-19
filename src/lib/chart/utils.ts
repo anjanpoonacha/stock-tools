@@ -85,7 +85,6 @@ export function applyZoom(
       });
     } catch (error) {
       // If setVisibleRange fails (e.g., timeScale not ready), fallback to fitContent
-      console.warn('[applyZoom] setVisibleRange failed, using fitContent:', error);
       timeScale.fitContent();
     }
   } else {

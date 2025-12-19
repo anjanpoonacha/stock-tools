@@ -14,7 +14,6 @@ import type { FormulaDocumentation } from '../../../types/formulaEditor';
  * const html = fs.readFileSync('output/raw/docs.html', 'utf-8');
  * const parser = new DocumentationParser(html);
  * const docs = parser.parse();
- * console.log(`Extracted ${docs.length} documentation entries`);
  */
 export class DocumentationParser extends BaseParser<FormulaDocumentation> {
   /**

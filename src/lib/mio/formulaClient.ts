@@ -51,11 +51,6 @@ export class FormulaClient {
 				vgroup: '',
 			});
 
-			console.log('[FormulaClient] Creating formula:', {
-				name: params.name,
-				formulaLength: params.formula.length,
-				url: FORMULA_SCREENER_URL,
-			});
 
 			const res = await fetch(FORMULA_SCREENER_URL, {
 				method: 'POST',
@@ -70,14 +65,12 @@ export class FormulaClient {
 				redirect: 'manual', // Don't follow redirects automatically
 			});
 
-			console.log('[FormulaClient] Response status:', res.status);
 
 			// Expect 302 redirect
 			if (res.status !== 302 && res.status !== 301) {
 				// If we get 200, the formula might have been created but we need to check
 				if (res.status === 200) {
 					const text = await res.text();
-					console.log('[FormulaClient] Got 200 response, checking for screen_id in response');
 
 					// Try to find screen_id in response HTML
 					const screenIdMatch = text.match(/screen_id[=:](\d+)/i);
@@ -94,7 +87,6 @@ export class FormulaClient {
 
 			// Extract Location header
 			const location = res.headers.get('location');
-			console.log('[FormulaClient] Redirect location:', location);
 
 			if (!location) {
 				throw new Error('No Location header in redirect response');
@@ -111,7 +103,6 @@ export class FormulaClient {
 			}
 
 			const screenId = screenIdMatch[1];
-			console.log('[FormulaClient] Extracted screen_id:', screenId);
 
 			// Build full URL if location is relative
 			const redirectUrl = location.startsWith('http')
@@ -158,11 +149,6 @@ export class FormulaClient {
 				vgroup: '',
 			});
 
-			console.log('[FormulaClient] Editing formula:', {
-				screenId: params.screenId,
-				name: params.name,
-				formulaLength: params.formula.length,
-			});
 
 			const res = await fetch(FORMULA_SCREENER_URL, {
 				method: 'POST',
@@ -177,7 +163,6 @@ export class FormulaClient {
 				redirect: 'manual',
 			});
 
-			console.log('[FormulaClient] Response status:', res.status);
 
 			if (res.status !== 302 && res.status !== 301) {
 				if (res.status === 200) {
@@ -195,7 +180,6 @@ export class FormulaClient {
 			}
 
 			const location = res.headers.get('location');
-			console.log('[FormulaClient] Redirect location:', location);
 
 			if (!location) {
 				throw new Error('No Location header in redirect response');
@@ -207,7 +191,6 @@ export class FormulaClient {
 			}
 
 			const screenId = screenIdMatch[1];
-			console.log('[FormulaClient] Confirmed screen_id:', screenId);
 
 			const redirectUrl = location.startsWith('http')
 				? location
@@ -244,7 +227,6 @@ export class FormulaClient {
 			const deleteParams = screenIds.map(id => `todelete=${id}`).join('&');
 			const url = `${MIO_URLS.MY_STOCK_SCREENS}?${deleteParams}&mode=delete`;
 
-			console.log('[FormulaClient] Deleting formulas:', { screenIds, url });
 
 			const res = await fetch(url, {
 				method: 'GET',
@@ -257,13 +239,11 @@ export class FormulaClient {
 				},
 			});
 
-			console.log('[FormulaClient] Delete response status:', res.status);
 
 			if (!res.ok && res.status !== 302 && res.status !== 301) {
 				throw new Error(`Failed to delete formula: ${res.status} ${res.statusText}`);
 			}
 
-			console.log('[FormulaClient] Formulas deleted successfully');
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(
 				error,

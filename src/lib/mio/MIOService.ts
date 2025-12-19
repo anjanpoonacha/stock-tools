@@ -131,7 +131,6 @@ export class MIOService {
 		} catch (error) {
 			// Health status will be updated automatically during next scheduled check
 			// or when validation is called again
-			console.warn('[MIOService] Operation failed, health status will be updated on next check');
 			throw error;
 		}
 	}
@@ -249,7 +248,6 @@ export class MIOService {
 				throw error;
 			}
 
-			console.error(`[MIOService] Error extracting data from ${formulaPageUrl}:`, error);
 			return { apiUrl: null, formulaText: null };
 		}
 	}

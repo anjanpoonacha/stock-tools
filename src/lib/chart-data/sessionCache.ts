@@ -41,7 +41,6 @@ export function getCachedSession(userEmail: string): CachedSession | null {
 		return null;
 	}
 
-	console.log(`[SessionCache] HIT for ${userEmail} (age: ${Math.round(ageMs / 1000)}s)`);
 	return cached;
 }
 
@@ -60,7 +59,6 @@ export function cacheSession(
 		userId,
 		timestamp: Date.now(),
 	});
-	console.log(`[SessionCache] Cached session for ${userEmail}`);
 }
 
 /**
@@ -78,12 +76,10 @@ export function getCachedJWT(sessionId: string): string | null {
 	// If token expires within buffer period, invalidate cache
 	if (expiresInSeconds < JWT_EXPIRY_BUFFER_SECONDS) {
 		jwtCache.delete(sessionId);
-		console.log(`[JWTCache] Token expiring soon (${expiresInSeconds}s left), invalidating`);
 		return null;
 	}
 
 	const ageSeconds = Math.floor((Date.now() - cached.timestamp) / 1000);
-	console.log(`[JWTCache] HIT for session (age: ${ageSeconds}s, expires in: ${expiresInSeconds}s)`);
 	return cached.token;
 }
 
@@ -112,17 +108,9 @@ export function cacheJWT(sessionId: string, token: string): void {
 			const expiresInSeconds = expiresAt - nowSeconds;
 			const cacheDuration = Math.max(0, expiresInSeconds - JWT_EXPIRY_BUFFER_SECONDS);
 			
-			console.log(`[JWTCache] JWT decoded:`, {
-				expiresAt: new Date(expiresAt * 1000).toISOString(),
-				expiresInSeconds,
-				cacheTTL: `${cacheDuration}s (${Math.round(cacheDuration / 60)}min)`,
-				bufferApplied: `${JWT_EXPIRY_BUFFER_SECONDS}s (${JWT_EXPIRY_BUFFER_SECONDS / 60}min)`
-			});
 		} else {
-			console.warn('[JWTCache] JWT missing exp field, using default TTL');
 		}
 	} catch (err) {
-		console.warn('[JWTCache] Failed to decode JWT:', err instanceof Error ? err.message : 'Unknown error');
 	}
 
 	jwtCache.set(sessionId, {
@@ -132,7 +120,6 @@ export function cacheJWT(sessionId: string, token: string): void {
 	});
 	
 	const effectiveTTL = expiresAt - nowSeconds - JWT_EXPIRY_BUFFER_SECONDS;
-	console.log(`[JWTCache] Cached JWT for session (effective TTL: ${Math.max(0, effectiveTTL)}s)`);
 }
 
 /**
@@ -141,5 +128,4 @@ export function cacheJWT(sessionId: string, token: string): void {
 export function clearCaches(): void {
 	sessionCache.clear();
 	jwtCache.clear();
-	console.log('[SessionCache] Cleared all caches');
 }

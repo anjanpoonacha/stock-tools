@@ -83,9 +83,7 @@ export class CookieParser {
       }
     }
 
-    console.log(`[CookieParser] Parsed ${result.cookies.length} cookies, ${result.aspSessionCookies.length} ASPSESSION cookies`);
     if (result.errors.length > 0) {
-      console.warn(`[CookieParser] Parse errors:`, result.errors);
     }
 
     return result;
@@ -119,7 +117,6 @@ export class CookieParser {
 
     const count = Object.keys(aspSessions).length;
     if (count > 0) {
-      console.log(`[CookieParser] Extracted ${count} ASPSESSION cookies:`, Object.keys(aspSessions));
     }
 
     return aspSessions;
@@ -145,7 +142,6 @@ export class CookieParser {
     for (const [name, value] of Object.entries(newCookies)) {
       // Validate cookie before merging
       if (!this.validateCookieFormat(name, value)) {
-        console.warn(`[CookieParser] Skipping invalid cookie: ${name}`);
         continue;
       }
 
@@ -169,7 +165,6 @@ export class CookieParser {
     }
 
     if (logChanges && changes.length > 0) {
-      console.log(`[CookieParser] Cookie merge changes:`, changes);
     }
 
     return merged;
@@ -185,12 +180,10 @@ export class CookieParser {
     }
 
     if (name.length > this.MAX_COOKIE_NAME_LENGTH) {
-      console.warn(`[CookieParser] Cookie name too long: ${name.length} chars`);
       return false;
     }
 
     if (!this.COOKIE_NAME_PATTERN.test(name)) {
-      console.warn(`[CookieParser] Invalid cookie name format: ${name}`);
       return false;
     }
 
@@ -200,14 +193,12 @@ export class CookieParser {
     }
 
     if (value.length > this.MAX_COOKIE_VALUE_LENGTH) {
-      console.warn(`[CookieParser] Cookie value too long: ${value.length} chars`);
       return false;
     }
 
     // Check for suspicious patterns
     for (const pattern of this.SUSPICIOUS_PATTERNS) {
       if (pattern.test(value)) {
-        console.warn(`[CookieParser] Suspicious pattern detected in cookie value: ${name}`);
         return false;
       }
     }
@@ -279,7 +270,6 @@ export class CookieParser {
     // Limit length
     if (sanitized.length > this.MAX_COOKIE_VALUE_LENGTH) {
       sanitized = sanitized.substring(0, this.MAX_COOKIE_VALUE_LENGTH);
-      console.warn(`[CookieParser] Cookie value truncated to ${this.MAX_COOKIE_VALUE_LENGTH} chars`);
     }
 
     return sanitized;
@@ -332,7 +322,6 @@ export class CookieParser {
     }
 
     if (changeCount > 0) {
-      console.log(`[CookieParser] Updated ${changeCount} ASPSESSION cookies`);
     }
 
     return updated;
@@ -451,7 +440,6 @@ export class CookieParser {
    */
   static logCookieOperation(operation: string, details: unknown): void {
     if (process.env.NODE_ENV === 'development') {
-      console.log(`[CookieParser] ${operation}:`, details);
     }
   }
 }

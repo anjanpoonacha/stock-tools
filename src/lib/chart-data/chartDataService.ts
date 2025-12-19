@@ -249,9 +249,7 @@ export async function fetchHistoricalDataPooled(
 			: getConnectionPool();
 		
 		if (persistentManager.isManagerActive()) {
-			console.log('[ChartDataService] Using persistent connection pool');
 		} else {
-			console.log('[ChartDataService] Using regular connection pool (persistent not active)');
 		}
 		
 		const result = await pool.fetchChartData(
@@ -357,12 +355,10 @@ export async function getChartData(
 			};
 		}
 		const sessionDuration = Date.now() - sessionStart;
-		console.log(`[Chart Data Service] Session resolved in ${sessionDuration}ms`);
 		
 		// Log warnings if any
 		if (sessionResult.warnings) {
 			for (const warning of sessionResult.warnings) {
-				console.warn(`[Chart Data Service] WARNING: ${warning}`);
 			}
 		}
 		
@@ -383,7 +379,6 @@ export async function getChartData(
 			};
 		}
 		const jwtDuration = Date.now() - jwtStart;
-		console.log(`[Chart Data Service] JWT fetched in ${jwtDuration}ms`);
 		
 		// 5. Fetch historical data
 		// Use connection pooling by default for better performance (3-5x faster)
@@ -392,22 +387,13 @@ export async function getChartData(
 		const dataStart = Date.now();
 		
 		// Log CVD request parameters
-		console.log('[ChartDataService] 🔍 CVD Diagnostic: request params', {
-			cvdEnabled: params.cvdEnabled,
-			cvdAnchorPeriod: params.cvdAnchorPeriod,
-			cvdTimeframe: params.cvdTimeframe,
-			sessionId: sessionResult.sessionId ? `${sessionResult.sessionId.substring(0, 10)}...` : 'MISSING',
-			sessionIdSign: sessionResult.sessionIdSign ? `${sessionResult.sessionIdSign.substring(0, 10)}...` : 'MISSING'
-		});
 		
 		// Warn if CVD is requested but credentials missing
 		if (params.cvdEnabled === 'true' && (!sessionResult.sessionId || !sessionResult.sessionIdSign)) {
-			console.warn('[Chart Data Service] ⚠️ CVD enabled but missing credentials (sessionId or sessionIdSign) - CVD will be skipped automatically');
 		}
 		
 		// Log before calling historical data client
 		if (params.cvdEnabled === 'true') {
-			console.log('[ChartDataService] 🔍 CVD Diagnostic: calling historical data client with CVD enabled');
 		}
 		
 		const dataResult = useConnectionPool
@@ -447,11 +433,9 @@ export async function getChartData(
 			};
 		}
 		const dataDuration = Date.now() - dataStart;
-		console.log(`[Chart Data Service] Data fetched in ${dataDuration}ms`);
 		
 		// 6. Return successful response
 		const duration = Date.now() - startTime;
-		console.log(`[Chart Data Service] ✅ Success: ${symbol} ${resolution} - Total: ${duration}ms (Session: ${sessionDuration}ms, JWT: ${jwtDuration}ms, Data: ${dataDuration}ms)`);
 		
 		return {
 			success: true,
@@ -466,7 +450,6 @@ export async function getChartData(
 		};
 		
 	} catch (error) {
-		console.error('[Chart Data Service] Unexpected error:', error);
 		return {
 			success: false,
 			error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`,

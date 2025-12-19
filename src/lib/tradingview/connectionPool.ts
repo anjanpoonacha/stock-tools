@@ -97,7 +97,6 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			if (this.requestCount === 1) {
 				// First request: create the series
 				await this.createSeries(request.resolution, request.barsCount);
-				console.log(`[PooledClient] Created series for ${request.symbol} (${turnaroundId})`);
 			} else {
 				// Subsequent requests: modify existing series
 				await this.modifySeries(
@@ -106,7 +105,6 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 					symbolSessionId,
 					request.resolution
 				);
-				console.log(`[PooledClient] Modified series for ${request.symbol} (${turnaroundId})`);
 			}
 			
 		// Request CVD if enabled
@@ -115,13 +113,8 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			
 			// Validate session credentials
 			if (!request.sessionId || !request.sessionIdSign) {
-				console.error('[ConnectionPool] ⚠️ CVD requested but credentials missing - skipping CVD', {
-					hasSessionId: !!request.sessionId,
-					hasSessionIdSign: !!request.sessionIdSign
-				});
 			} else {
 				try {
-					console.log('[ConnectionPool] 🔍 CVD Diagnostic: fetching dynamic CVD config');
 					
 					// Fetch dynamic CVD config using session credentials
 					const fetchedConfig = await getCVDConfig(request.sessionId, request.sessionIdSign);
@@ -137,16 +130,9 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 						__profile: { v: false, f: true, t: 'bool' }
 					};
 					
-					console.log(`[ConnectionPool] 🔍 CVD Diagnostic: creating CVD study in pool`, {
-						cvdId,
-						textLength: fetchedConfig.text.length,
-						pineVersion: fetchedConfig.pineVersion,
-						source: fetchedConfig.source
-					});
 					
 					await this.createStudy(cvdId, 'Script@tv-scripting-101!', cvdConfig);
 				} catch (error) {
-					console.error('[ConnectionPool] ❌ Failed to fetch CVD config - skipping CVD:', error instanceof Error ? error.message : String(error));
 				}
 			}
 		}
@@ -163,25 +149,13 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			const cvdId = `cvd_${this.requestCount}`;
 			const cvd = this.getStudy(cvdId);
 			
-			console.log(`[PooledClient] CVD Study Retrieved:`, {
-				cvdId,
-				hasCvd: !!cvd,
-				cvdValuesCount: cvd?.values?.length || 0,
-				firstCvdBar: cvd?.values?.[0],
-				lastCvdBar: cvd?.values?.[cvd.values.length - 1]
-			});
 			
-			console.log(`[PooledClient] Results: ${bars.length} bars, metadata=${JSON.stringify(metadata).substring(0, 100)}`);
 			
 			// Validate bars received
 			if (bars.length === 0) {
-				console.error(`[PooledClient] ❌ No bars received! Request #${this.requestCount}, symbol=${request.symbol}`);
-				console.error(`[PooledClient] Debug: chartSessionId=${this.chartSessionId}, seriesId=${this.seriesId}`);
-				console.error(`[PooledClient] Possible causes: invalid symbol, delisted stock, or data unavailable for resolution`);
 				throw new Error(`No bars received for symbol ${request.symbol}. Symbol may be invalid or delisted.`);
 			}
 			
-			console.log(`[PooledClient] ✅ Collected ${bars.length} bars for ${request.symbol}`);
 			
 			return {
 				bars,
@@ -189,7 +163,6 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 				indicators: cvd ? { cvd } : undefined
 			};
 		} catch (error) {
-			console.error(`[PooledClient] ❌ Error fetching ${request.symbol}:`, error);
 			throw error;
 		}
 	}
@@ -205,7 +178,6 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 		this.studies = new Map();
 		this['expectedStudyCount'] = 0; // Reset study counter for next request
 		
-		console.log(`[PooledClient] Cleared data (request #${this.requestCount + 1})`);
 	}
 	
 	/**
@@ -213,10 +185,8 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 	 */
 	protected async requestHistoricalBars(): Promise<void> {
 		// Initialize chart and quote sessions (called once during connection setup)
-		console.log('[PooledClient] Creating chart session...');
 		await this.createChartSession();
 		await this.createQuoteSession();
-		console.log('[PooledClient] Chart session created');
 	}
 	
 }
@@ -246,7 +216,6 @@ export class WebSocketConnectionPool {
 	 * Enable persistence mode - connections will not be automatically closed
 	 */
 	public enablePersistence(): void {
-		console.log('[ConnectionPool] Enabling persistence mode');
 		this.persistentMode = true;
 	}
 	
@@ -254,7 +223,6 @@ export class WebSocketConnectionPool {
 	 * Disable persistence mode - connections will be closed after use
 	 */
 	public disablePersistence(): void {
-		console.log('[ConnectionPool] Disabling persistence mode');
 		this.persistentMode = false;
 		this.closeAllPersistent();
 	}
@@ -302,7 +270,6 @@ export class WebSocketConnectionPool {
 			
 			this.processingTimer = setTimeout(() => {
 				this.processPendingRequests(jwtToken).catch(err => {
-					console.error('[ConnectionPool] Error processing pending requests:', err);
 				});
 			}, this.BATCH_DELAY_MS);
 		});
@@ -318,7 +285,6 @@ export class WebSocketConnectionPool {
 		// Clear pending queue
 		this.pendingRequests.delete(jwtToken);
 		
-		console.log(`[ConnectionPool] Processing ${requests.length} accumulated requests in parallel`);
 		
 		// Convert to batch format
 		const batchRequests = requests.map(r => ({
@@ -369,7 +335,6 @@ export class WebSocketConnectionPool {
 		}>
 	): Promise<Array<{ symbol: string; result?: ChartResult; error?: string }>> {
 		const startTime = Date.now();
-		console.log(`[ConnectionPool] Batch fetch: ${requests.length} symbols across ${Math.min(this.maxConnections, Math.ceil(requests.length / this.requestsPerConnection))} connections`);
 		
 		// Split requests into batches for parallel processing
 		const batchSize = this.requestsPerConnection;
@@ -380,7 +345,6 @@ export class WebSocketConnectionPool {
 		
 		// Limit number of parallel connections
 		const connectionsNeeded = Math.min(this.maxConnections, batches.length);
-		console.log(`[ConnectionPool] Using ${connectionsNeeded} parallel connections (${batchSize} symbols each)`);
 		
 		// Process batches in parallel
 		const batchPromises = batches.map(async (batch, batchIndex) => {
@@ -394,7 +358,6 @@ export class WebSocketConnectionPool {
 				const existingConnection = this.persistentConnections[0];
 				if (existingConnection.shouldRefresh()) {
 					needsRefresh = true;
-					console.log(`[ConnectionPool] 🔄 Connection stale (${existingConnection.getRequestCount()} requests), refreshing...`);
 					// Remove stale connection
 					this.persistentConnections.shift();
 					existingConnection.disconnect();
@@ -404,12 +367,10 @@ export class WebSocketConnectionPool {
 					// Reuse healthy connection
 					connection = existingConnection;
 					isExistingConnection = true;
-					console.log(`[ConnectionPool] ♻️ Reusing persistent connection (${existingConnection.getRequestCount()} requests)`);
 				}
 			} else {
 				// Create new connection
 				connection = new PooledWebSocketClient(jwtToken);
-				console.log(`[ConnectionPool] 🆕 Creating new connection for batch ${batchIndex + 1}`);
 			}
 			
 			try {
@@ -417,7 +378,6 @@ export class WebSocketConnectionPool {
 				if (!isExistingConnection || needsRefresh) {
 					const connStart = Date.now();
 					await connection.initialize();
-					console.log(`[ConnectionPool] Connection ${batchIndex + 1} established in ${Date.now() - connStart}ms`);
 				}
 				
 				// Process symbols on this connection sequentially (using modify_series)
@@ -439,10 +399,8 @@ export class WebSocketConnectionPool {
 							reject: () => {},
 						});
 						
-						console.log(`[ConnectionPool] ✅ ${req.symbol} in ${Date.now() - reqStart}ms (conn ${batchIndex + 1})`);
 						results.push({ symbol: req.symbol, result });
 					} catch (error) {
-						console.error(`[ConnectionPool] ❌ ${req.symbol}:`, error);
 						results.push({ 
 							symbol: req.symbol, 
 							error: error instanceof Error ? error.message : String(error) 
@@ -455,7 +413,6 @@ export class WebSocketConnectionPool {
 				// In persistent mode, keep connections open (but only add if it's new or refreshed)
 				if (this.persistentMode && (!isExistingConnection || needsRefresh)) {
 					this.persistentConnections.push(connection);
-					console.log(`[ConnectionPool] Keeping connection ${batchIndex + 1} alive (persistent mode)`);
 				} else if (!this.persistentMode) {
 					connection.disconnect();
 				}
@@ -470,7 +427,6 @@ export class WebSocketConnectionPool {
 		const duration = Date.now() - startTime;
 		const successful = flatResults.filter(r => r.result).length;
 		
-		console.log(`[ConnectionPool] Batch complete: ${successful}/${requests.length} successful in ${duration}ms (${Math.round(duration / requests.length)}ms avg)`);
 		
 		return flatResults;
 	}
@@ -479,12 +435,10 @@ export class WebSocketConnectionPool {
 	 * Close all connections in the pool
 	 */
 	async closeAll(): Promise<void> {
-		console.log('[ConnectionPool] Closing all connections...');
 		for (const connection of this.connections) {
 			try {
 				connection.disconnect();
 			} catch (err) {
-				console.warn(`[ConnectionPool] Error closing connection:`, err);
 			}
 		}
 		this.connections = [];
@@ -494,12 +448,10 @@ export class WebSocketConnectionPool {
 	 * Close all persistent connections
 	 */
 	async closeAllPersistent(): Promise<void> {
-		console.log(`[ConnectionPool] Closing ${this.persistentConnections.length} persistent connections...`);
 		for (const connection of this.persistentConnections) {
 			try {
 				connection.disconnect();
 			} catch (err) {
-				console.warn(`[ConnectionPool] Error closing persistent connection:`, err);
 			}
 		}
 		this.persistentConnections = [];

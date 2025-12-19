@@ -17,7 +17,6 @@ import type { FormulaSample } from '@/types/formulaEditor';
  * const html = fs.readFileSync('samples.html', 'utf-8');
  * const parser = new SampleParser(html);
  * const samples = parser.parse();
- * console.log(`Extracted ${samples.length} samples`);
  * ```
  */
 export class SampleParser extends BaseParser<FormulaSample> {

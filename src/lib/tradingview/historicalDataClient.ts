@@ -79,34 +79,19 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 		// Request CVD indicator if enabled AND credentials are available
 		// Skip CVD entirely if credentials missing to avoid timeout
 		if (this.cvdEnabled) {
-			console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: CVD enabled, checking credentials', {
-				hasSessionId: !!this.sessionId,
-				hasSessionIdSign: !!this.sessionIdSign
-			});
 			
 			if (!this.sessionId || !this.sessionIdSign) {
-				console.log('[HistoricalDataClient] ⚠️ CVD requested but credentials missing (sessionId or sessionIdSign) - skipping CVD');
 				// Don't add study, won't wait for timeout
 			} else {
 				try {
-					console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: attempting to build CVD config');
 					const cvdConfig = await this.buildCVDConfig();
 					const configText = typeof cvdConfig.text === 'string' ? cvdConfig.text : '';
-					console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: CVD config built successfully', {
-						textLength: configText.length,
-						pineId: cvdConfig.pineId,
-						pineVersion: cvdConfig.pineVersion
-					});
-					console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: creating CVD study');
 					await this.createStudy('cvd_1', 'Script@tv-scripting-101!', cvdConfig);
-					console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: CVD study creation message sent');
 				} catch (err) {
-					console.error('[HistoricalDataClient] ⚠️ Failed to build CVD config - skipping CVD:', err instanceof Error ? err.message : 'Unknown error');
 					// Don't propagate error, just skip CVD
 				}
 			}
 		} else {
-			console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: CVD not enabled');
 		}
 		
 		// Wait for data to arrive
@@ -118,37 +103,19 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 	 * Build CVD indicator configuration (uses dynamic config if available)
 	 */
 	private async buildCVDConfig(): Promise<StudyConfig> {
-		console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: buildCVDConfig called', {
-			hasCachedConfig: !!this.cvdConfigCache,
-			hasSessionId: !!this.sessionId
-		});
 		
 		// Fetch dynamic CVD config if not cached
 		if (!this.cvdConfigCache && this.sessionId) {
-			console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: fetching CVD config from service');
 			this.cvdConfigCache = await getCVDConfig(this.sessionId, this.sessionIdSign);
-			console.log(`[HistoricalDataClient] 🔍 CVD Diagnostic: received CVD config from ${this.cvdConfigCache.source}`, {
-				pineVersion: this.cvdConfigCache.pineVersion,
-				textLength: this.cvdConfigCache.text?.length || 0,
-				pineId: this.cvdConfigCache.pineId
-			});
-			console.log(`[HistoricalDataClient] Using ${this.cvdConfigCache.source} CVD config (v${this.cvdConfigCache.pineVersion})`);
 		}
 		
 		// Use cached config or fall back to service defaults
 		const cvdConfig = this.cvdConfigCache;
 		if (!cvdConfig) {
-			console.error('[HistoricalDataClient] 🔍 CVD Diagnostic: CVD config unavailable - no session credentials');
 			throw new Error('CVD config unavailable: no session credentials provided');
 		}
 		
 		const configText = typeof cvdConfig.text === 'string' ? cvdConfig.text : '';
-		console.log('[HistoricalDataClient] 🔍 CVD Diagnostic: returning study config', {
-			textLength: configText.length,
-			pineId: cvdConfig.pineId,
-			anchorPeriod: this.cvdAnchorPeriod,
-			hasTimeframe: !!this.cvdTimeframe
-		});
 		
 		return {
 			text: cvdConfig.text,
@@ -216,7 +183,6 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
  *     cvdTimeframe: '30S'
  *   }
  * );
- * console.log('CVD data points:', indicators?.cvd?.values.length);
  * ```
  */
 export async function fetchHistoricalBars(

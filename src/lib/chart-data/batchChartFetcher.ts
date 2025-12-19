@@ -101,8 +101,7 @@ export async function fetchChartsInBatches(
 		connectionPool, // Use provided pool or get global
 	} = options;
 
-	console.log(`[BatchChartFetcher] Starting batch fetch: ${symbols.length} symbols × ${resolutions.length} resolutions = ${symbols.length * resolutions.length} charts`);
-	console.log(`[BatchChartFetcher] Batch size: ${batchSize} symbols, Parallel connections: ${parallelConnections}`);
+
 
 	// Split symbols into batches
 	const symbolBatches: string[][] = [];
@@ -111,19 +110,15 @@ export async function fetchChartsInBatches(
 	}
 
 	const totalBatches = symbolBatches.length;
-	console.log(`[BatchChartFetcher] Split into ${totalBatches} batches`);
 
 	const allBatchResults: ChartBatchResult[] = [];
 	const pool = connectionPool || getConnectionPool(); // Use provided or get global
-	console.log(`[BatchChartFetcher] Using ${connectionPool ? 'provided' : 'global'} connection pool`);
 
 	// Process each batch sequentially (but charts within batch are parallel)
 	for (let batchIndex = 0; batchIndex < symbolBatches.length; batchIndex++) {
 		const batch = symbolBatches[batchIndex];
 		const batchStartTime = Date.now();
 		
-		console.log(`[BatchChartFetcher] Batch ${batchIndex + 1}/${totalBatches}: Processing ${batch.length} symbols (${batch.length * resolutions.length} charts)`);
-
 		// Create requests for all combinations of symbols × resolutions in this batch
 		const batchRequests = batch.flatMap(symbol =>
 			resolutions.map(resolution => ({
@@ -173,14 +168,13 @@ export async function fetchChartsInBatches(
 		allBatchResults.push(batchResult);
 
 		const successCount = charts.filter(c => !c.error).length;
-		console.log(`[BatchChartFetcher] Batch ${batchIndex + 1} complete: ${successCount}/${charts.length} successful in ${batchDuration}ms`);
 
 		// Call progress callback if provided
 		if (onBatchComplete) {
 			try {
 				await onBatchComplete(batchResult);
 			} catch (err) {
-				console.error('[BatchChartFetcher] Error in onBatchComplete callback:', err);
+				// Silently handle callback errors
 			}
 		}
 	}
@@ -201,11 +195,6 @@ export async function fetchChartsInBatches(
 		totalDurationMs: totalDuration,
 		avgChartDurationMs: Math.round(totalDuration / totalCharts),
 	};
-
-	console.log(`[BatchChartFetcher] ✅ Complete: ${successfulCharts}/${totalCharts} charts in ${totalDuration}ms (${summary.avgChartDurationMs}ms avg)`);
-	if (failedCharts > 0) {
-		console.warn(`[BatchChartFetcher] ⚠️ ${failedCharts} charts failed`);
-	}
 
 	return {
 		batches: allBatchResults,

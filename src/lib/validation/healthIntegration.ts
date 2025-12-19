@@ -136,7 +136,6 @@ export async function forceSessionRefreshAndValidation(
 			throw new Error('Missing required parameter: platform');
 		}
 
-		console.log(`[SessionValidation] Force refresh and validation for ${platform}:${internalSessionId}`);
 
 		let refreshSuccess = false;
 
@@ -162,7 +161,6 @@ export async function forceSessionRefreshAndValidation(
 
 	} catch (error) {
 		const errorMessage = error instanceof Error ? error.message : String(error);
-		console.error(`[SessionValidation] Force refresh failed for ${platform}:${internalSessionId}:`, errorMessage);
 		return { success: false, error: errorMessage };
 	}
 }
@@ -255,7 +253,6 @@ export async function refreshSessionWithHealthCheck(
 			return { refreshSuccess: false, error, monitoringActive: false };
 		}
 
-		console.log(`[SessionValidation] Refreshing session with health check for ${platform}:${internalSessionId}`);
 
 		let refreshSuccess = false;
 		let refreshError: SessionError | undefined;
@@ -302,9 +299,7 @@ export async function refreshSessionWithHealthCheck(
 				healthStatus = await sessionHealthMonitor.checkSessionHealth(internalSessionId, platform);
 				monitoringActive = sessionHealthMonitor.getSessionHealth(internalSessionId, platform)?.isMonitoring || false;
 
-				console.log(`[SessionValidation] Session refreshed and health checked for ${platform}:${internalSessionId} - Status: ${healthStatus}`);
 			} catch (error) {
-				console.warn(`[SessionValidation] Health check failed after refresh for ${platform}:${internalSessionId}:`, error);
 				// Don't fail the entire operation if health check fails
 			}
 		} else {
@@ -315,7 +310,6 @@ export async function refreshSessionWithHealthCheck(
 				ErrorLogger.logError(refreshError);
 			}
 
-			console.log(`[SessionValidation] Session refresh failed for ${platform}:${internalSessionId}`);
 		}
 
 		return {
@@ -361,7 +355,6 @@ export function stopMonitoringOnInvalidSession(
 		if (platform) {
 			// Stop monitoring for specific platform
 			sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
-			console.log(`[SessionValidation] Stopped monitoring for ${platform}:${internalSessionId}`);
 		} else {
 			// Stop monitoring for all platforms of this session
 			const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
@@ -369,10 +362,8 @@ export function stopMonitoringOnInvalidSession(
 				for (const platformName of Object.keys(healthReport.platforms)) {
 					sessionHealthMonitor.stopMonitoring(internalSessionId, platformName);
 				}
-				console.log(`[SessionValidation] Stopped monitoring for all platforms of session ${internalSessionId}`);
 			}
 		}
 	} catch (error) {
-		console.error(`[SessionValidation] Error stopping monitoring for ${internalSessionId}:`, error);
 	}
 }

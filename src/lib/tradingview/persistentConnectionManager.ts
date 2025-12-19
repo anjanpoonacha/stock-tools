@@ -48,7 +48,6 @@ export class PersistentConnectionManager {
 	private reconnectAttempts: number = 0;
 	
 	private constructor() {
-		console.log('[PersistentConnectionManager] Instance created');
 	}
 	
 	/**
@@ -69,13 +68,11 @@ export class PersistentConnectionManager {
 	 */
 	public async acquire(jwtToken: string): Promise<void> {
 		this.refCount++;
-		console.log(`[PersistentConnectionManager] Acquired (refCount: ${this.refCount})`);
 		
 		// Cancel idle timer if it was running
 		if (this.idleTimer) {
 			clearTimeout(this.idleTimer);
 			this.idleTimer = null;
-			console.log('[PersistentConnectionManager] Cancelled idle timer');
 		}
 		
 		// Initialize on first acquire or if not active
@@ -83,7 +80,6 @@ export class PersistentConnectionManager {
 			await this.initialize(jwtToken);
 		} else if (jwtToken !== this.jwtToken) {
 			// JWT token changed, reinitialize
-			console.log('[PersistentConnectionManager] JWT token changed, reinitializing...');
 			await this.closeAll();
 			await this.initialize(jwtToken);
 		}
@@ -95,7 +91,6 @@ export class PersistentConnectionManager {
 	 */
 	public release(): void {
 		this.refCount = Math.max(0, this.refCount - 1);
-		console.log(`[PersistentConnectionManager] Released (refCount: ${this.refCount})`);
 		
 		// Start idle timer when refCount reaches zero
 		if (this.refCount === 0) {
@@ -107,7 +102,6 @@ export class PersistentConnectionManager {
 	 * Initialize connection pool
 	 */
 	private async initialize(jwtToken: string): Promise<void> {
-		console.log('[PersistentConnectionManager] Initializing persistent connections...');
 		
 		this.jwtToken = jwtToken;
 		this.isActive = true;
@@ -127,17 +121,14 @@ export class PersistentConnectionManager {
 		// Start health monitoring
 		this.startHealthMonitoring();
 		
-		console.log('[PersistentConnectionManager] ✅ Initialized successfully');
 	}
 	
 	/**
 	 * Start idle timeout timer
 	 */
 	private startIdleTimer(): void {
-		console.log(`[PersistentConnectionManager] Starting idle timer (${this.IDLE_TIMEOUT_MS / 1000}s)`);
 		
 		this.idleTimer = setTimeout(() => {
-			console.log('[PersistentConnectionManager] Idle timeout reached - closing connections');
 			this.closeAll();
 		}, this.IDLE_TIMEOUT_MS);
 	}
@@ -154,7 +145,6 @@ export class PersistentConnectionManager {
 			this.performHealthCheck();
 		}, this.HEALTH_CHECK_INTERVAL_MS);
 		
-		console.log('[PersistentConnectionManager] Health monitoring started');
 	}
 	
 	/**
@@ -164,7 +154,6 @@ export class PersistentConnectionManager {
 		if (this.healthCheckTimer) {
 			clearInterval(this.healthCheckTimer);
 			this.healthCheckTimer = null;
-			console.log('[PersistentConnectionManager] Health monitoring stopped');
 		}
 	}
 	
@@ -178,13 +167,11 @@ export class PersistentConnectionManager {
 		// Check if connection is stale (no activity for 2 minutes)
 		const STALE_THRESHOLD_MS = 2 * 60 * 1000;
 		if (timeSinceLastActivity > STALE_THRESHOLD_MS && this.isActive) {
-			console.warn(`[PersistentConnectionManager] Connection stale (${Math.round(timeSinceLastActivity / 1000)}s since last activity)`);
 			this.health.isHealthy = false;
 		}
 		
 		// If unhealthy and we have active references, attempt reconnect
 		if (!this.health.isHealthy && this.refCount > 0) {
-			console.log('[PersistentConnectionManager] Attempting to reconnect unhealthy connection...');
 			this.attemptReconnect();
 		}
 	}
@@ -194,14 +181,12 @@ export class PersistentConnectionManager {
 	 */
 	private async attemptReconnect(): Promise<void> {
 		if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
-			console.error('[PersistentConnectionManager] Max reconnection attempts reached');
 			return;
 		}
 		
 		this.reconnectAttempts++;
 		const backoffMs = this.RECONNECT_BACKOFF_MS * Math.pow(2, this.reconnectAttempts - 1);
 		
-		console.log(`[PersistentConnectionManager] Reconnect attempt ${this.reconnectAttempts}/${this.MAX_RECONNECT_ATTEMPTS} (backoff: ${backoffMs}ms)`);
 		
 		await new Promise(resolve => setTimeout(resolve, backoffMs));
 		
@@ -209,11 +194,9 @@ export class PersistentConnectionManager {
 			await this.closeAll();
 			if (this.jwtToken) {
 				await this.initialize(this.jwtToken);
-				console.log('[PersistentConnectionManager] ✅ Reconnection successful');
 				this.reconnectAttempts = 0; // Reset on success
 			}
 		} catch (error) {
-			console.error('[PersistentConnectionManager] ❌ Reconnection failed:', error);
 			this.health.errorCount++;
 		}
 	}
@@ -264,7 +247,6 @@ export class PersistentConnectionManager {
 	 * Close all connections and cleanup
 	 */
 	public async closeAll(): Promise<void> {
-		console.log('[PersistentConnectionManager] Closing all connections...');
 		
 		this.isActive = false;
 		
@@ -285,14 +267,12 @@ export class PersistentConnectionManager {
 		
 		this.jwtToken = null;
 		
-		console.log('[PersistentConnectionManager] ✅ All connections closed');
 	}
 	
 	/**
 	 * Force cleanup (called on window unload)
 	 */
 	public forceCleanup(): void {
-		console.log('[PersistentConnectionManager] Force cleanup triggered');
 		this.refCount = 0;
 		this.closeAll();
 	}

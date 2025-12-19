@@ -238,11 +238,9 @@ export class IndicatorRenderer {
 			case 'macd':
 			case 'bollinger':
 			case 'custom':
-				console.warn(`Indicator type '${config.type}' not yet implemented`);
 				break;
 			
 			default:
-				console.warn(`Unknown indicator type: ${(config as IndicatorConfig).type}`);
 		}
 		
 		if (result) {

@@ -66,11 +66,9 @@ export async function validateAndCleanupMarketinoutSession(
 ): Promise<{ id: string; name: string }[]> {
 	try {
 		validateSessionId(internalSessionId, 'validateAndCleanupMarketinoutSession', Platform.MARKETINOUT);
-		console.log(`[SessionValidation] Validating MIO session: ${internalSessionId}`);
 
 		const watchlists = await MIOService.getWatchlistsWithSession(internalSessionId);
 		if (!watchlists || watchlists.length === 0) {
-			console.warn(`[SessionValidation] No watchlists found for session: ${internalSessionId}`);
 			await cleanupInvalidSession(internalSessionId, 'marketinout');
 
 			const error = ErrorHandler.createSessionExpiredError(
@@ -82,12 +80,10 @@ export async function validateAndCleanupMarketinoutSession(
 			throw error;
 		}
 
-		console.log(`[SessionValidation] Session validation successful for: ${internalSessionId}`);
 		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.startMonitoring(internalSessionId, 'marketinout');
 		return watchlists;
 	} catch (err: unknown) {
-		console.error(`[SessionValidation] Session validation failed for: ${internalSessionId}`, err);
 
 		// Always cleanup on any error
 		await cleanupInvalidSession(internalSessionId, 'marketinout');
@@ -121,11 +117,9 @@ export async function validateTradingViewSession(internalSessionId: string): Pro
 		const { validateTradingViewSession: validateTVSession } = await import('../tradingview');
 		const cookie = `sessionid=${session.tradingview.sessionId}`;
 
-		console.log(`[SessionValidation] Validating TradingView session: ${internalSessionId}`);
 		const validationResult = await validateTVSession(cookie);
 
 		if (!validationResult.isValid) {
-			console.warn(`[SessionValidation] TradingView session validation failed for ${internalSessionId}:`, validationResult.error);
 			await cleanupInvalidSession(internalSessionId, 'tradingview');
 
 			const error = ErrorHandler.createSessionExpiredError(
@@ -137,10 +131,6 @@ export async function validateTradingViewSession(internalSessionId: string): Pro
 			throw error;
 		}
 
-		console.log(`[SessionValidation] TradingView session validation successful for ${internalSessionId}:`, {
-			watchlistCount: validationResult.watchlistCount,
-			hasValidIds: validationResult.hasValidIds
-		});
 
 		const { sessionHealthMonitor } = await import('../health');
 		sessionHealthMonitor.startMonitoring(internalSessionId, 'tradingview');
@@ -200,7 +190,6 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 
 		const platforms = Object.keys(session);
 		results.summary.totalPlatforms = platforms.length;
-		console.log(`[SessionValidation] Validating ${platforms.length} platforms for session: ${internalSessionId}`);
 
 		const { sessionHealthMonitor } = await import('../health');
 
@@ -221,7 +210,6 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 						break;
 
 					default:
-						console.warn(`[SessionValidation] Unknown platform: ${platform}`);
 						isValid = false;
 						const unknownPlatformError = ErrorHandler.createGenericError(
 							Platform.UNKNOWN,
@@ -243,7 +231,6 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 				}
 
 			} catch (error) {
-				console.error(`[SessionValidation] Validation failed for ${platform}:`, error);
 
 				results.invalidPlatforms.push(platform);
 				results.summary.invalidCount++;
@@ -287,11 +274,6 @@ export async function validateAndMonitorAllPlatforms(internalSessionId: string):
 		// Remove duplicate recovery actions
 		results.summary.recoveryActions = [...new Set(results.summary.recoveryActions)];
 
-		console.log(`[SessionValidation] Validation complete for session ${internalSessionId}:`, {
-			valid: results.summary.validCount,
-			invalid: results.summary.invalidCount,
-			canAutoRecover: results.summary.canAutoRecover
-		});
 
 		return results;
 	} catch (error) {
@@ -339,7 +321,6 @@ export async function validateAndStartMonitoring(
 			return { isValid: false, error, monitoringStarted: false };
 		}
 
-		console.log(`[SessionValidation] Validating and starting monitoring for ${platform}:${internalSessionId}`);
 
 		let isValid = false;
 		let watchlists: { id: string; name: string }[] | undefined;
@@ -408,7 +389,6 @@ export async function validateAndStartMonitoring(
 			// Get initial health status
 			healthStatus = await sessionHealthMonitor.checkSessionHealth(internalSessionId, platform);
 
-			console.log(`[SessionValidation] Session validated and monitoring started for ${platform}:${internalSessionId}`);
 		} else {
 			// Stop any existing monitoring for invalid session
 			sessionHealthMonitor.stopMonitoring(internalSessionId, platform);
@@ -418,7 +398,6 @@ export async function validateAndStartMonitoring(
 				ErrorLogger.logError(validationError);
 			}
 
-			console.log(`[SessionValidation] Session validation failed for ${platform}:${internalSessionId}`);
 		}
 
 		return {

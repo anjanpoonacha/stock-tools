@@ -69,50 +69,27 @@ class CVDConfigService {
 	 * @returns CVD configuration
 	 */
 	async getConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: getConfig called', {
-			hasSessionId: !!sessionId,
-			hasSessionIdSign: !!sessionIdSign
-		});
 		
 		// If fetch already in progress, wait for it
 		if (this.fetchInProgress) {
-			console.log('[CVDConfigService] 🔍 CVD Diagnostic: fetch already in progress, waiting...');
-			console.log('[CVDConfigService] Fetch already in progress, waiting...');
 			return this.fetchInProgress;
 		}
 
 		// Try to get from KV cache first
 		try {
-			console.log('[CVDConfigService] 🔍 CVD Diagnostic: checking KV cache');
 			const cached = await this.getFromCache();
 			if (cached) {
-				console.log('[CVDConfigService] 🔍 CVD Diagnostic: KV cache HIT', {
-					textLength: cached.text?.length || 0,
-					pineVersion: cached.pineVersion
-				});
-				console.log('[CVDConfigService] ✅ Using KV cached config');
 				return cached;
 			} else {
-				console.log('[CVDConfigService] 🔍 CVD Diagnostic: KV cache MISS');
 			}
 		} catch (error) {
-			console.warn('[CVDConfigService] ⚠️  KV cache read failed:', error instanceof Error ? error.message : String(error));
-			console.log('[CVDConfigService] 🔍 CVD Diagnostic: KV cache error, continuing without cache');
-			console.log('[CVDConfigService] Continuing without cache...');
 		}
 
 		// Cache miss - fetch fresh config
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: cache miss, fetching from TradingView');
-		console.log('[CVDConfigService] Cache miss, fetching fresh config from TradingView...');
 		this.fetchInProgress = this.fetchAndCacheConfig(sessionId, sessionIdSign);
 
 		try {
 			const config = await this.fetchInProgress;
-			console.log('[CVDConfigService] 🔍 CVD Diagnostic: config fetch complete', {
-				source: config.source,
-				textLength: config.text?.length || 0,
-				pineVersion: config.pineVersion
-			});
 			return config;
 		} finally {
 			this.fetchInProgress = null;
@@ -134,7 +111,6 @@ class CVDConfigService {
 			}
 			return null;
 		} catch (error) {
-			console.error('[CVDConfigService] KV get error:', error);
 			return null;
 		}
 	}
@@ -145,10 +121,7 @@ class CVDConfigService {
 	private async storeInCache(config: CVDConfig): Promise<void> {
 		try {
 			await kv.set(CVD_CONFIG_KV_KEY, config, { ex: CACHE_TTL_SECONDS });
-			console.log(`[CVDConfigService] ✅ Cached config in KV (TTL: ${CACHE_TTL_SECONDS}s / 24h)`);
 		} catch (error) {
-			console.warn('[CVDConfigService] ⚠️  KV set failed:', error instanceof Error ? error.message : String(error));
-			console.log('[CVDConfigService] Continuing without caching...');
 		}
 	}
 
@@ -183,18 +156,12 @@ class CVDConfigService {
 			? `sessionid=${sessionId}; sessionid_sign=${sessionIdSign}`
 			: `sessionid=${sessionId}`;
 
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: fetching from TradingView', {
-			url: chartUrl,
-			hasSessionIdSign: !!sessionIdSign
-		});
-		console.log('[CVDConfigService] Fetching from TradingView...');
 		
 		let lastError: Error | null = null;
 		
 		// Try up to 2 times
 		for (let attempt = 1; attempt <= 2; attempt++) {
 			try {
-				console.log(`[CVDConfigService] 🔍 CVD Diagnostic: attempt ${attempt}/2`);
 				const response = await fetch(chartUrl, {
 					headers: {
 						'Cookie': cookies,
@@ -203,46 +170,25 @@ class CVDConfigService {
 					},
 				});
 
-				console.log(`[CVDConfigService] 🔍 CVD Diagnostic: fetch response`, {
-					status: response.status,
-					ok: response.ok
-				});
 
 				if (!response.ok) {
 					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 				}
 
 				const html = await response.text();
-				console.log(`[CVDConfigService] 🔍 CVD Diagnostic: HTML received`, {
-					length: html.length
-				});
 				
-				console.log('[CVDConfigService] 🔍 CVD Diagnostic: parsing HTML for CVD config');
 				const config = this.parseConfigFromHTML(html);
 
 				if (config) {
-					console.log('[CVDConfigService] 🔍 CVD Diagnostic: CVD config extraction SUCCESS', {
-						textLength: config.text?.length || 0,
-						textEmpty: !config.text || config.text.length === 0,
-						pineId: config.pineId,
-						pineVersion: config.pineVersion
-					});
-					console.log('[CVDConfigService] ✅ Successfully fetched CVD config');
-					console.log(`[CVDConfigService]    pineId: ${config.pineId}`);
-					console.log(`[CVDConfigService]    pineVersion: ${config.pineVersion}`);
-					console.log(`[CVDConfigService]    text length: ${config.text.length}`);
 					return config;
 				} else {
-					console.log('[CVDConfigService] 🔍 CVD Diagnostic: CVD config extraction FAILED - parseConfigFromHTML returned null');
 					throw new Error('Failed to parse CVD config from HTML');
 				}
 
 			} catch (error) {
 				lastError = error instanceof Error ? error : new Error(String(error));
-				console.error(`[CVDConfigService] ❌ Attempt ${attempt} failed:`, lastError.message);
 				
 				if (attempt < 2) {
-					console.log('[CVDConfigService] Retrying...');
 					await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s before retry
 				}
 			}
@@ -263,31 +209,18 @@ class CVDConfigService {
 	 * @returns CVD configuration or null if not found
 	 */
 	private parseConfigFromHTML(html: string): CVDConfig | null {
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: parseConfigFromHTML called', {
-			htmlLength: html.length
-		});
 		
 		// Find all encrypted texts
 		const encryptedPattern = /bmI9Ks46_[A-Za-z0-9+/=_]{1000,}/g;
 		const encryptedMatches = html.match(encryptedPattern);
 
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: encrypted text search', {
-			foundMatches: !!encryptedMatches,
-			matchCount: encryptedMatches?.length || 0
-		});
 
 		if (!encryptedMatches || encryptedMatches.length === 0) {
-			console.error('[CVDConfigService] 🔍 CVD Diagnostic: No encrypted texts found in HTML');
-			console.error('[CVDConfigService] No encrypted texts found in HTML');
 			return null;
 		}
 
 		// Sort by length (CVD is the longest at ~17KB)
 		const sortedByLength = [...encryptedMatches].sort((a, b) => b.length - a.length);
-		console.log('[CVDConfigService] 🔍 CVD Diagnostic: sorted encrypted texts', {
-			count: sortedByLength.length,
-			lengths: sortedByLength.slice(0, 3).map(t => t.length)
-		});
 
 		// Search for CVD indicator
 		for (const encryptedText of sortedByLength) {
@@ -303,13 +236,8 @@ class CVDConfigService {
 			const isCVD = contextWindow.includes('Cumulative%1Volume%1Delta') ||
 			              contextWindow.includes('Cumulative Volume Delta');
 
-			console.log('[CVDConfigService] 🔍 CVD Diagnostic: checking encrypted text', {
-				textLength: encryptedText.length,
-				isCVD
-			});
 
 			if (isCVD) {
-				console.log('[CVDConfigService] 🔍 CVD Diagnostic: CVD identified, extracting version');
 				
 				// Extract Pine version from study key
 				// Format: "Script$STD;Cumulative%1Volume%1Delta@tv-scripting-101[v.X.X]"
@@ -317,21 +245,11 @@ class CVDConfigService {
 					/"Script\$STD;Cumulative%1Volume%1Delta@tv-scripting-101\[v\.(\d+\.\d+)\]"/
 				);
 
-				console.log('[CVDConfigService] 🔍 CVD Diagnostic: version extraction', {
-					matched: !!studyKeyMatch,
-					version: studyKeyMatch?.[1]
-				});
 
 				if (studyKeyMatch) {
 					const pineVersion = studyKeyMatch[1];
 					const pineId = 'STD;Cumulative%1Volume%1Delta';
 
-					console.log('[CVDConfigService] 🔍 CVD Diagnostic: returning CVD config', {
-						textLength: encryptedText.length,
-						textNotEmpty: encryptedText.length > 0,
-						pineId,
-						pineVersion
-					});
 
 					return {
 						text: encryptedText,
@@ -344,8 +262,6 @@ class CVDConfigService {
 			}
 		}
 
-		console.error('[CVDConfigService] 🔍 CVD Diagnostic: Could not identify CVD from encrypted texts');
-		console.error('[CVDConfigService] Found encrypted texts but could not identify CVD');
 		return null;
 	}
 
@@ -356,10 +272,7 @@ class CVDConfigService {
 	async invalidateCache(): Promise<void> {
 		try {
 			await kv.del(CVD_CONFIG_KV_KEY);
-			console.log('[CVDConfigService] ✅ KV cache invalidated');
 		} catch (error) {
-			console.warn('[CVDConfigService] ⚠️  Failed to invalidate cache:', error instanceof Error ? error.message : String(error));
-			console.log('[CVDConfigService] (Cache invalidation skipped - KV unavailable)');
 		}
 	}
 
@@ -381,7 +294,6 @@ class CVDConfigService {
 				ttl: ttl > 0 ? ttl : undefined
 			};
 		} catch (error) {
-			console.error('[CVDConfigService] Failed to get cache status:', error);
 			return { cached: false };
 		}
 	}
@@ -400,8 +312,6 @@ export const cvdConfigService = new CVDConfigService();
  * @example
  * ```ts
  * const config = await getCVDConfig('your-session-id');
- * console.log('CVD version:', config.pineVersion);
- * console.log('Source:', config.source); // 'kv-cache' or 'fresh-fetch'
  * ```
  */
 export async function getCVDConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {

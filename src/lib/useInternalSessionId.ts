@@ -33,7 +33,6 @@ export async function getInternalSessionIdFromServer(): Promise<string> {
 		});
 
 		if (!response.ok) {
-			console.warn('[SESSION] Failed to fetch session from server:', response.status);
 			return '';
 		}
 
@@ -49,7 +48,6 @@ export async function getInternalSessionIdFromServer(): Promise<string> {
 
 		return '';
 	} catch (error) {
-		console.error('[SESSION] Error fetching session from server:', error);
 		return '';
 	}
 }

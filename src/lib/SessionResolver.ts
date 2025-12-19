@@ -121,7 +121,6 @@ export class SessionResolver {
 
 			return allSessions;
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions from KV:`, error);
 			return {};
 		}
 	}
@@ -216,7 +215,6 @@ export class SessionResolver {
 		const sessionKey = this.findSessionCookieKey(sessionData);
 
 		if (!sessionKey) {
-			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data`);
 			return null;
 		}
 
@@ -240,7 +238,6 @@ export class SessionResolver {
 
 			return sortedSessions.map(({ sessionData, internalId }) => ({ sessionData, internalId }));
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting all ${platform} sessions:`, error);
 			return [];
 		}
 	}
@@ -274,7 +271,6 @@ export class SessionResolver {
 
 			return { totalSessions, platformCounts };
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting session stats:`, error);
 			return { totalSessions: 0, platformCounts: {} };
 		}
 	}
@@ -313,7 +309,6 @@ export class SessionResolver {
 			};
 		} catch (error) {
 			const userContext = userCredentials ? ' for user' : '';
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting latest ${platform} session${userContext}:`, error);
 			return null;
 		}
 	}
@@ -333,7 +328,6 @@ export class SessionResolver {
 		const sessionKey = this.findSessionCookieKey(sessionData);
 
 		if (!sessionKey) {
-			console.warn(`${LOG_PREFIXES.SESSION_RESOLVER} No valid session cookie found in MIO session data for user: ${userCredentials.userEmail}`);
 			return null;
 		}
 
@@ -374,7 +368,6 @@ export class SessionResolver {
 
 			return Array.from(userEmails).sort();
 		} catch (error) {
-			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Error getting available users:`, error);
 			return [];
 		}
 	}

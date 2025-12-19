@@ -179,7 +179,6 @@ export function map188mTo1D(
  * @example
  * const timestamp = Date.now();
  * if (isWithinTradingHours(timestamp)) {
- *   console.log('Market is open');
  * }
  */
 export function isWithinTradingHours(timestamp: number): boolean {

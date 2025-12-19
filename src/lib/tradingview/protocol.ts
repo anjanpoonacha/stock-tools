@@ -46,7 +46,6 @@ export function parseFrame(frame: string): ParsedFrame {
 		const messageLength = parseInt(lengthStr, 10);
 
 		if (isNaN(messageLength)) {
-			console.warn('[TV Protocol] Invalid message length:', lengthStr);
 			break;
 		}
 
@@ -61,7 +60,6 @@ export function parseFrame(frame: string): ParsedFrame {
 			// Extract the full heartbeat message including frame markers
 			const heartbeatMessage = `~m~${messageLength}~m~${messagePayload}`;
 			heartbeats.push(heartbeatMessage);
-			console.log('[TV Protocol] 💓 Heartbeat received:', messagePayload);
 		} else {
 			// Regular message - try to parse as JSON
 			rawMessages.push(messagePayload);
@@ -69,7 +67,6 @@ export function parseFrame(frame: string): ParsedFrame {
 				const parsed = JSON.parse(messagePayload);
 				messages.push(parsed as TVMessage);
 			} catch (error) {
-				console.warn('[TV Protocol] Failed to parse message JSON:', messagePayload.substring(0, 100));
 			}
 		}
 

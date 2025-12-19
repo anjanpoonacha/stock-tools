@@ -29,22 +29,18 @@ export class FormulaCacheManager {
 
 			// Check if version matches
 			if (data.version !== this.CACHE_VERSION) {
-				console.log('[FormulaCacheManager] Cache version mismatch, clearing');
 				this.clear();
 				return null;
 			}
 
 			// Check if expired
 			if (this.isExpiredData(data)) {
-				console.log('[FormulaCacheManager] Cache expired, clearing');
 				this.clear();
 				return null;
 			}
 
-			console.log('[FormulaCacheManager] Returning cached data');
 			return data;
 		} catch (error) {
-			console.error('[FormulaCacheManager] Error reading cache:', error);
 			this.clear();
 			return null;
 		}
@@ -66,9 +62,7 @@ export class FormulaCacheManager {
 			};
 
 			localStorage.setItem(this.CACHE_KEY, JSON.stringify(cachedData));
-			console.log('[FormulaCacheManager] Data cached successfully');
 		} catch (error) {
-			console.error('[FormulaCacheManager] Error setting cache:', error);
 			// If quota exceeded, clear and try again
 			if (error instanceof DOMException && error.name === 'QuotaExceededError') {
 				this.clear();
@@ -108,9 +102,7 @@ export class FormulaCacheManager {
 
 		try {
 			localStorage.removeItem(this.CACHE_KEY);
-			console.log('[FormulaCacheManager] Cache cleared');
 		} catch (error) {
-			console.error('[FormulaCacheManager] Error clearing cache:', error);
 		}
 	}
 

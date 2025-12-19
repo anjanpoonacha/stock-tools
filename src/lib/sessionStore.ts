@@ -26,7 +26,6 @@ async function withKVStore<T>(operation: (kv: typeof import('./sessionStore.kv')
 		try {
 			kvStore = await import('./sessionStore.kv');
 		} catch (error) {
-			console.error('[SessionStore] Failed to load KV store:', error);
 			throw new Error('KV store is required but failed to load. Check your KV configuration.');
 		}
 	}

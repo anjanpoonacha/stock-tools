@@ -23,7 +23,6 @@
  *   }
  *   
  *   protected onMessageSent(message: TVMessage): void {
- *     console.log('📤 Sent:', message.m);
  *   }
  * }
  * ```
@@ -567,12 +566,6 @@ export abstract class BaseWebSocketClient {
 		// Track that we expect this study's data
 		this.expectedStudyCount++;
 		const configText = typeof config.text === 'string' ? config.text : '';
-		console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: study created, expecting ${this.expectedStudyCount} studies`, {
-			studyId,
-			configTextLength: configText.length,
-			configPineId: config.pineId
-		});
-		console.log(`[BaseWebSocket] Expecting ${this.expectedStudyCount} studies (added ${studyId})`);
 		
 		// Send create_study message
 		this.send(createMessage('create_study', [
@@ -605,8 +598,6 @@ export abstract class BaseWebSocketClient {
 			// Use REQUESTED bars, not received bars (which is 0 at this point)
 			const barBasedTimeout = Math.min(5000, 2000 + Math.max(0, (this.requestedBarsCount - 300) / 500 * 1000));
 			timeout = Math.min(timeout, barBasedTimeout);
-			console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: waiting for ${this.expectedStudyCount} studies (timeout: ${timeout}ms, requested bars: ${this.requestedBarsCount})`);
-			console.log(`[BaseWebSocket] Waiting max ${timeout}ms for ${this.expectedStudyCount} studies`);
 		}
 		if (!this.config.eventDrivenWaits) {
 			// Fallback to optimized sleep
@@ -628,8 +619,6 @@ export abstract class BaseWebSocketClient {
 			this.dataWaitTimeout = setTimeout(() => {
 				if (this.dataWaitResolver) {
 					if (this.expectedStudyCount > 0) {
-						console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: TIMEOUT after ${timeout}ms - no study data received`);
-						console.log(`[BaseWebSocket] ⏱️ Timeout waiting for studies after ${timeout}ms - proceeding without CVD data`);
 					}
 					this.dataWaitResolver(false);
 					this.dataWaitResolver = null;
@@ -677,8 +666,6 @@ export abstract class BaseWebSocketClient {
 	 */
 	protected handleSymbolError(msg: TVMessage): void {
 		const [, symbolName, errorReason] = msg.p as [string, string, string];
-		console.error(`[BaseWebSocket] ❌ Symbol error: ${symbolName} - ${errorReason}`);
-		console.error(`[BaseWebSocket] Symbol may be invalid, delisted, or not available on this exchange`);
 		
 		// Trigger data wait resolver to prevent hanging
 		if (this.dataWaitResolver) {
@@ -752,21 +739,11 @@ export abstract class BaseWebSocketClient {
 		const hasBars = this.bars.length > 0;
 		const hasAllStudies = this.hasAllStudyData();
 		
-		console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: data update received`, {
-			hasBars,
-			barsCount: this.bars.length,
-			hasAllStudies,
-			studiesReceived: this.studies.size,
-			studiesExpected: this.expectedStudyCount,
-			dataKey: Object.keys(dataObj).join(', ')
-		});
 		
 		if (hasBars && hasAllStudies && this.dataWaitResolver) {
-			console.log(`[BaseWebSocket] ✅ All data received - bars: ${this.bars.length}, studies: ${this.studies.size}/${this.expectedStudyCount}`);
 			this.dataWaitResolver(true);
 			this.dataWaitResolver = null;
 		} else if (hasBars && !hasAllStudies) {
-			console.log(`[BaseWebSocket] ⏳ Bars ready (${this.bars.length}) but waiting for study data...`);
 		}
 	}
 	
@@ -806,14 +783,11 @@ export abstract class BaseWebSocketClient {
 		for (const [studyId, studyData] of this.studies.entries()) {
 			if (studyData.values.length > 0) {
 				studiesWithData++;
-				console.log(`[BaseWebSocket] Study ${studyId} has ${studyData.values.length} values ✓`);
 			} else {
-				console.log(`[BaseWebSocket] Study ${studyId} has NO data yet ⏳`);
 			}
 		}
 		
 		const allReceived = studiesWithData >= this.expectedStudyCount;
-		console.log(`[BaseWebSocket] Study check: ${studiesWithData}/${this.expectedStudyCount} complete → ${allReceived ? 'READY' : 'WAITING'}`);
 		
 		return allReceived;
 	}
@@ -825,20 +799,16 @@ export abstract class BaseWebSocketClient {
 	 * @param series Series array
 	 */
 	private extractStudyData(dataKey: string, series: unknown[]): void {
-		console.log(`[BaseWebSocket] 🔍 extractStudyData called with dataKey='${dataKey}', series length=${series.length}`);
 		
 		// Log first item in series to see structure
 		if (series.length > 0) {
-			console.log(`[BaseWebSocket] 🔍 First series item:`, JSON.stringify(series[0]).substring(0, 200));
 		}
 		
 		// Try to find matching study
 		for (const [studyId, studyData] of this.studies.entries()) {
-			console.log(`[BaseWebSocket] 🔍 Checking if dataKey '${dataKey}' matches studyId '${studyId}'`);
 			
 			// Check if data key matches this study
 			if (dataKey.includes(studyId) || dataKey === studyId) {
-				console.log(`[BaseWebSocket] ✓ Match found! Extracting data for study '${studyId}'`);
 				
 				// Extract values
 				let extractedCount = 0;
@@ -846,7 +816,6 @@ export abstract class BaseWebSocketClient {
 					const barData = bar as { i?: number; v?: number[] };
 					
 					if (!barData.v || barData.v.length === 0) {
-						console.log(`[BaseWebSocket] ⚠️ Skipping bar - no v array or empty:`, JSON.stringify(barData).substring(0, 100));
 						continue;
 					}
 					
@@ -862,12 +831,10 @@ export abstract class BaseWebSocketClient {
 						studyData.values.push(studyBar);
 						extractedCount++;
 					} else {
-						console.log(`[BaseWebSocket] ⚠️ Skipping bar - invalid data: time=${time}, values=${JSON.stringify(values).substring(0, 50)}`);
 					}
 				}
 				
 				// Log when study data is received
-				console.log(`[BaseWebSocket] 📊 Study '${studyId}' received ${studyData.values.length} data points from key '${dataKey}' (extracted ${extractedCount} from ${series.length} series items)`);
 				
 				break;
 			}

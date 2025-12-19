@@ -43,7 +43,6 @@ function parseKVData(data: unknown, key: string): PlatformSessionData | undefine
 			throw new Error(`Unexpected data type: ${typeof data}`);
 		}
 	} catch (error) {
-		console.error(`[SessionStore-KV] Error processing session data for ${key}:`, error);
 		return undefined;
 	}
 }
@@ -109,7 +108,6 @@ export async function savePlatformSession(internalId: string, platform: string, 
 
 	await withCacheInvalidation(async () => {
 		await kv.set(key, JSON.stringify(sanitizedData));
-		console.log(`[SessionStore-KV] Successfully saved ${platform} session: ${internalId}`);
 	});
 }
 
@@ -178,14 +176,11 @@ export async function savePlatformSessionWithCleanup(internalId: string, platfor
 	// If user credentials are available, use deterministic session ID to ensure one session per user per platform
 	if (data.userEmail && data.userPassword) {
 		finalInternalId = await generateDeterministicSessionId(data.userEmail, data.userPassword, platform);
-		console.log(`[SessionStore-KV] Using deterministic session ID for user ${data.userEmail} on ${platform}: ${finalInternalId}`);
 	} else {
-		console.log(`[SessionStore-KV] No user credentials provided, using provided session ID for ${platform}: ${finalInternalId}`);
 	}
 
 	// Save the session data (deterministic IDs will automatically overwrite existing sessions)
 	await savePlatformSession(finalInternalId, platform, data);
-	console.log(`[SessionStore-KV] Saved ${platform} session: ${finalInternalId}`);
 	return finalInternalId;
 }
 
@@ -220,7 +215,6 @@ export async function deletePlatformSession(internalId: string, platform: string
 
 	await withCacheInvalidation(async () => {
 		await kv.del(key);
-		console.log(`[SessionStore-KV] Deleted ${platform} session: ${internalId}`);
 	});
 }
 
@@ -234,7 +228,6 @@ export async function deleteSession(internalId: string): Promise<void> {
 	if (keys.length > 0) {
 		await withCacheInvalidation(async () => {
 			await Promise.all(keys.map(key => kv.del(key)));
-			console.log(`[SessionStore-KV] Deleted all sessions for: ${internalId}`);
 		});
 	}
 }

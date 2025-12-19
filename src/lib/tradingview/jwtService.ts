@@ -36,14 +36,11 @@ export async function getDataAccessToken(
 	try {
 		const cached = await kv.get<TokenCacheEntry>(cacheKey);
 		if (cached && cached.expiresAt > Date.now() / 1000) {
-			console.log('[JWT Service] Using cached token');
 			return cached.token;
 		}
 	} catch (error) {
-		console.warn('[JWT Service] Cache check failed:', error);
 	}
 	
-	console.log('[JWT Service] Fetching fresh token from TradingView...');
 	
 	// Build cookie header with BOTH cookies (critical!)
 	const cookies = `sessionid=${sessionId}; sessionid_sign=${sessionIdSign}`;
@@ -93,12 +90,6 @@ export async function getDataAccessToken(
 			throw new Error('Token is already expired');
 		}
 		
-		console.log('[JWT Service] Token obtained successfully:', {
-			userId: payload.user_id,
-			plan: payload.plan,
-			permissions: payload.perm,
-			expiresIn: Math.round((payload.exp - Date.now() / 1000) / 60) + ' minutes'
-		});
 		
 		// Cache the token
 		try {
@@ -107,9 +98,7 @@ export async function getDataAccessToken(
 				expiresAt: payload.exp,
 				userId: payload.user_id
 			}, { ex: TOKEN_CACHE_TTL });
-			console.log('[JWT Service] Token cached for 14 minutes');
 		} catch (error) {
-			console.warn('[JWT Service] Failed to cache token:', error);
 		}
 		
 		return token;
@@ -131,8 +120,6 @@ export async function invalidateToken(userId: number): Promise<void> {
 	const cacheKey = `tv:jwt:${userId}`;
 	try {
 		await kv.del(cacheKey);
-		console.log('[JWT Service] Token cache invalidated for user:', userId);
 	} catch (error) {
-		console.warn('[JWT Service] Failed to invalidate cache:', error);
 	}
 }

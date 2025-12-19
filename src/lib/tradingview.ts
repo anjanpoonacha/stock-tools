@@ -62,12 +62,10 @@ export async function fetchWatchlistsWithAuth(url: string, cookie: string): Prom
 		});
 		if (!res.ok) {
 			const text = await res.text();
-			console.error(`[TradingView API] HTTP ${res.status}: ${res.statusText}\nResponse body: ${text}`);
 			throw new Error(`Failed to fetch: ${res.status} ${res.statusText}`);
 		}
 		const data = await res.json();
 		if (!Array.isArray(data)) {
-			console.error('[TradingView API] Unexpected response format:', data);
 			throw new Error('Unexpected response format from TradingView API');
 		}
 		// Only return id, name, and symbols for each watchlist
@@ -88,7 +86,6 @@ export async function fetchWatchlistsWithAuth(url: string, cookie: string): Prom
 				symbols: list.symbols,
 			}));
 	} catch (err) {
-		console.error('[TradingView API] fetchWatchlistsWithAuth error:', err);
 		throw err;
 	}
 }
@@ -171,7 +168,6 @@ export async function validateTradingViewSession(cookie: string): Promise<{
 		};
 
 	} catch (err) {
-		console.error('[TradingView Validation] Error validating session:', err);
 		return {
 			isValid: false,
 			watchlistCount: 0,

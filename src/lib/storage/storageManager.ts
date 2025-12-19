@@ -60,7 +60,6 @@ export class StorageManager {
 
       return parsed.data as T;
     } catch (error) {
-      console.error(`[StorageManager] Error reading ${config.key}:`, error);
       return config.defaultValue;
     }
   }
@@ -83,7 +82,6 @@ export class StorageManager {
 
       backend.setItem(config.key, JSON.stringify(payload));
     } catch (error) {
-      console.error(`[StorageManager] Error writing ${config.key}:`, error);
     }
   }
 
@@ -112,7 +110,6 @@ export class StorageManager {
     try {
       backend.removeItem(config.key);
     } catch (error) {
-      console.error(`[StorageManager] Error removing ${config.key}:`, error);
     }
   }
 
@@ -138,7 +135,6 @@ export class StorageManager {
     try {
       backendInstance.clear();
     } catch (error) {
-      console.error(`[StorageManager] Error clearing ${backend}:`, error);
     }
   }
 }

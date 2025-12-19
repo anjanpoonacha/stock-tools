@@ -11,13 +11,11 @@ describe('SampleParser', () => {
   try {
     html = fs.readFileSync(htmlPath, 'utf-8');
   } catch (error) {
-    console.warn('Could not load samples.html for testing:', error);
     html = '';
   }
 
   it('should extract all 76 samples from real HTML (100% extraction)', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -35,7 +33,6 @@ describe('SampleParser', () => {
 
   it('should skip section headers with colspan', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -75,7 +72,6 @@ describe('SampleParser', () => {
 
   it('should extract valid sample structure', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -104,7 +100,6 @@ describe('SampleParser', () => {
 
   it('should clean formula text properly', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -123,7 +118,6 @@ describe('SampleParser', () => {
 
   it('should extract first sample correctly', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -148,7 +142,6 @@ describe('SampleParser', () => {
 
   it('should handle formulas with various MIO syntax elements', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 
@@ -169,7 +162,6 @@ describe('SampleParser', () => {
 
   it('should generate meaningful names from formulas', () => {
     if (!html) {
-      console.warn('Skipping test: samples.html not found');
       return;
     }
 

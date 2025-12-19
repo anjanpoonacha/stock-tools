@@ -34,16 +34,11 @@ export async function validateUserCredentials(
 		throw new Error('Authentication required - userEmail and userPassword must be provided');
 	}
 
-	console.log(`${LOG_PREFIXES.API} Validating credentials for user: ${userEmail}`);
-
 	const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 
 	if (!sessionInfo) {
-		console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
 		throw new Error(`Authentication failed for user ${userEmail}. Please log in to MarketInOut first.`);
 	}
-
-	console.log(`${LOG_PREFIXES.API} Successfully authenticated user: ${userEmail} with session: ${sessionInfo.internalId}`);
 	return sessionInfo;
 }
 

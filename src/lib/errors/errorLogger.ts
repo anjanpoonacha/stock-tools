@@ -33,15 +33,6 @@ export class ErrorLogger {
 
     // Console logging for development
     if (process.env.NODE_ENV === 'development') {
-      console.error(`[SessionError] ${error.errorCode}:`, {
-        userMessage: error.userMessage,
-        technicalMessage: error.technicalMessage,
-        platform: error.platform,
-        operation: error.context.operation,
-        severity: error.severity,
-        recoverySteps: error.getRecoveryInstructions(),
-        context: logEntry.context
-      });
     }
 
     // In production, you might want to send to external logging service
@@ -120,6 +111,5 @@ export class ErrorLogger {
   }): void {
     // TODO: Implement external logging service integration
     // This could be Sentry, LogRocket, DataDog, etc.
-    console.log('[ErrorLogger] Would send to external service:', logEntry);
   }
 }

@@ -22,7 +22,6 @@ export function getViewMode(): ViewMode {
 		const saved = localStorage.getItem(VIEW_MODE_KEY);
 		return (saved === 'chart' ? 'chart' : 'table') as ViewMode;
 	} catch (error) {
-		console.warn('[SessionState] Failed to get view mode:', error);
 		return 'table';
 	}
 }
@@ -36,9 +35,7 @@ export function setViewMode(mode: ViewMode): void {
 	
 	try {
 		localStorage.setItem(VIEW_MODE_KEY, mode);
-		console.log('[SessionState] Saved view mode:', mode);
 	} catch (error) {
-		console.warn('[SessionState] Failed to save view mode:', error);
 	}
 }
 
@@ -55,7 +52,6 @@ export function getChartIndex(formulaId: string): number {
 		const saved = sessionStorage.getItem(key);
 		return saved ? parseInt(saved, 10) : 0;
 	} catch (error) {
-		console.warn('[SessionState] Failed to get chart index:', error);
 		return 0;
 	}
 }
@@ -72,7 +68,6 @@ export function setChartIndex(formulaId: string, index: number): void {
 		const key = `${CHART_INDEX_KEY_PREFIX}:${formulaId}`;
 		sessionStorage.setItem(key, index.toString());
 	} catch (error) {
-		console.warn('[SessionState] Failed to save chart index:', error);
 	}
 }
 
@@ -87,6 +82,5 @@ export function clearChartIndex(formulaId: string): void {
 		const key = `${CHART_INDEX_KEY_PREFIX}:${formulaId}`;
 		sessionStorage.removeItem(key);
 	} catch (error) {
-		console.warn('[SessionState] Failed to clear chart index:', error);
 	}
 }

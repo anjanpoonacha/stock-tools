@@ -20,7 +20,6 @@ describe('DocumentationParser', () => {
   describe('parse()', () => {
     it('should extract at least 107 documentation entries', () => {
       expect(docs.length).toBeGreaterThanOrEqual(107);
-      console.log(`Extracted ${docs.length} documentation entries`);
     });
 
     it('should extract entries with the correct structure', () => {

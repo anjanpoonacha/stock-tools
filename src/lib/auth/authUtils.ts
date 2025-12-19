@@ -18,7 +18,6 @@ export function getStoredCredentials(): UserCredentials | null {
         const stored = localStorage.getItem(AUTH_STORAGE_KEY);
         
         if (!stored) {
-            console.warn('[AuthUtils] No credentials found in localStorage');
             return null;
         }
 
@@ -29,10 +28,8 @@ export function getStoredCredentials(): UserCredentials | null {
             return validated.data;
         }
 
-        console.warn('[AuthUtils] Invalid credentials format in localStorage');
         return null;
     } catch (error) {
-        console.error('[AuthUtils] Error reading credentials:', error);
         return null;
     }
 }

@@ -106,7 +106,6 @@ export class SessionManager {
 				response.url
 			);
 			ErrorLogger.logError(sessionError);
-			console.error('[SessionManager] Failed to extract session from response:', error);
 			return null;
 		}
 	}
@@ -158,7 +157,6 @@ export class SessionManager {
 				URLS.WATCHLIST_PAGE
 			);
 			ErrorLogger.logError(sessionError);
-			console.error('[SessionManager] Session health check failed:', error);
 			return false;
 		}
 	}

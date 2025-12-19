@@ -27,7 +27,6 @@ export async function fetchCriterionOptions(
 ): Promise<CriterionOption[]> {
   const url = `${API_BASE}/ajax_get_options.php?crit_id=${criterionId}`;
   
-  console.log(`[CriteriaOptionsFetcher] Fetching options for ${criterionId}`);
   
   // Retry logic with exponential backoff
   for (let attempt = 1; attempt <= 3; attempt++) {
@@ -48,13 +47,11 @@ export async function fetchCriterionOptions(
       const html = await response.text();
       const options = parseOptionsHTML(html, criterionId);
       
-      console.log(`[CriteriaOptionsFetcher] Successfully fetched ${options.length} options for ${criterionId}`);
       
       return options;
       
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.warn(`[CriteriaOptionsFetcher] Attempt ${attempt}/3 failed for ${criterionId}: ${errorMessage}`);
       
       // If this was the last attempt, throw the error
       if (attempt === 3) {
@@ -63,7 +60,6 @@ export async function fetchCriterionOptions(
       
       // Wait before retrying (exponential backoff: 1s, 2s, 4s)
       const delay = 1000 * Math.pow(2, attempt - 1);
-      console.log(`[CriteriaOptionsFetcher] Retrying in ${delay}ms...`);
       await sleep(delay);
     }
   }
@@ -109,7 +105,6 @@ function parseOptionsHTML(html: string, criterionId: string): CriterionOption[] 
   
   // Handle empty responses (user-specific criteria like watchlists/portfolios)
   if (options.length === 0) {
-    console.log(`[CriteriaOptionsFetcher] No options found for ${criterionId} (may be user-specific or empty)`);
   }
   
   return options;

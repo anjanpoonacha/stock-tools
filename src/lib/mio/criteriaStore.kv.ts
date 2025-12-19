@@ -46,9 +46,7 @@ export class CriteriaKVStore {
       };
 
       await kv.set(this.METADATA_KEY, JSON.stringify(serializable));
-      console.log('[CriteriaKVStore] Successfully saved criteria metadata');
     } catch (error) {
-      console.error('[CriteriaKVStore] Error saving criteria metadata:', error);
       throw error;
     }
   }
@@ -62,7 +60,6 @@ export class CriteriaKVStore {
       const data = await kv.get(this.METADATA_KEY);
       
       if (!data) {
-        console.log('[CriteriaKVStore] No metadata in KV, attempting local fallback');
         return await this.loadLocalMetadata();
       }
 
@@ -77,10 +74,8 @@ export class CriteriaKVStore {
         timestamp: new Date(parsed.timestamp),
       };
 
-      console.log('[CriteriaKVStore] Successfully loaded criteria metadata from KV');
       return tree;
     } catch (error) {
-      console.error('[CriteriaKVStore] Error loading criteria metadata from KV:', error);
       return await this.loadLocalMetadata();
     }
   }
@@ -92,7 +87,6 @@ export class CriteriaKVStore {
     try {
       // Dynamic import to avoid bundling issues
       const localData = await import('@/data/mio-criteria.json');
-      console.log('[CriteriaKVStore] Loaded criteria metadata from local JSON file');
       
       // Convert plain objects back to Maps
       const treeData = localData.default.tree || localData.default;
@@ -105,7 +99,6 @@ export class CriteriaKVStore {
       
       return tree;
     } catch (error) {
-      console.error('[CriteriaKVStore] Error loading local criteria metadata:', error);
       return null;
     }
   }
@@ -118,9 +111,7 @@ export class CriteriaKVStore {
     
     try {
       await kv.set(key, JSON.stringify(options), { ex: this.OPTIONS_TTL });
-      console.log(`[CriteriaKVStore] Saved options for ${criterionId} (${options.length} options, TTL: 24h)`);
     } catch (error) {
-      console.error(`[CriteriaKVStore] Error saving options for ${criterionId}:`, error);
       throw error;
     }
   }
@@ -140,11 +131,9 @@ export class CriteriaKVStore {
       }
 
       const options = typeof data === 'string' ? JSON.parse(data) : data;
-      console.log(`[CriteriaKVStore] Retrieved ${options.length} options for ${criterionId} from cache`);
       
       return options as CriterionOption[];
     } catch (error) {
-      console.error(`[CriteriaKVStore] Error getting options for ${criterionId}:`, error);
       return null;
     }
   }
@@ -164,9 +153,7 @@ export class CriteriaKVStore {
         await Promise.all(optionKeys.map(key => kv.del(key)));
       }
       
-      console.log(`[CriteriaKVStore] Cleared all MIO data (${optionKeys.length + 1} keys)`);
     } catch (error) {
-      console.error('[CriteriaKVStore] Error clearing MIO data:', error);
       throw error;
     }
   }
@@ -187,7 +174,6 @@ export class CriteriaKVStore {
         criteriaWithOptions,
       };
     } catch (error) {
-      console.error('[CriteriaKVStore] Error getting stats:', error);
       return { totalOptions: 0, criteriaWithOptions: [] };
     }
   }

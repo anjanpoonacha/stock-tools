@@ -51,11 +51,9 @@ export class CriteriaOptionsClient {
     // Check memory cache first
     const memoryCached = this.memoryCache.get(criterionId);
     if (memoryCached) {
-      console.log(`[CriteriaOptionsClient] Memory cache hit for ${criterionId}`);
       return memoryCached;
     }
 
-    console.log(`[CriteriaOptionsClient] Memory cache miss for ${criterionId}, calling API...`);
     
     // Fetch from our API route
     const url = `/api/mio-criteria/options?criterionId=${encodeURIComponent(criterionId)}`;
@@ -82,10 +80,6 @@ export class CriteriaOptionsClient {
     // Update memory cache
     this.memoryCache.set(criterionId, options);
     
-    console.log(
-      `[CriteriaOptionsClient] Fetched ${options.length} options for ${criterionId} ` +
-      `(cached: ${data.cached})`
-    );
     
     return options;
   }
@@ -101,7 +95,6 @@ export class CriteriaOptionsClient {
     // Clear memory cache for this criterion
     this.memoryCache.delete(criterionId);
     
-    console.log(`[CriteriaOptionsClient] Refreshing ${criterionId} (bypassing memory cache)`);
     
     // Fetch fresh data (API route will check its caches)
     return await this.getOptions(criterionId);
@@ -113,7 +106,6 @@ export class CriteriaOptionsClient {
    */
   clearCache(): void {
     this.memoryCache.clear();
-    console.log('[CriteriaOptionsClient] Cleared memory cache');
   }
 
   /**
@@ -138,7 +130,6 @@ export class CriteriaOptionsClient {
   async batchGetOptions(criterionIds: string[]): Promise<Map<string, CriterionOption[]>> {
     const results = new Map<string, CriterionOption[]>();
     
-    console.log(`[CriteriaOptionsClient] Batch fetching ${criterionIds.length} criteria`);
     
     // Fetch all in parallel (API route handles rate limiting)
     const promises = criterionIds.map(async (criterionId) => {
@@ -146,7 +137,6 @@ export class CriteriaOptionsClient {
         const options = await this.getOptions(criterionId);
         results.set(criterionId, options);
       } catch (error) {
-        console.error(`[CriteriaOptionsClient] Error fetching ${criterionId} in batch:`, error);
         // Store empty array for failed fetches
         results.set(criterionId, []);
       }
