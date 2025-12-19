@@ -13,9 +13,9 @@
 
 import { useEffect, useRef, useMemo } from 'react';
 import { useTheme } from 'next-themes';
-import { 
-	createChart, 
-	type IChartApi, 
+import {
+	createChart,
+	type IChartApi,
 	ColorType,
 	CandlestickSeries,
 	LineSeries,
@@ -24,18 +24,24 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import type { OHLCVBar, SymbolMetadata, StudyData } from '@/lib/tradingview/types';
 import { useChartData } from '@/hooks/useChartData';
+import { useChartDimensions } from '@/hooks/useChartDimensions';
+import { parseChartHeight, applyZoom } from '@/lib/chart/utils';
+import { DEFAULT_CHART_HEIGHT } from '@/lib/chart/constants';
+import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
+import { ChartZoomLevel, type ChartHeight } from '@/lib/chart/types';
 
 interface TradingViewLiveChartProps {
 	symbol?: string;
 	resolution?: string;
 	barsCount?: number;
-	height?: number;
+	height?: ChartHeight; // Support both number and '100%'
 	showSMA?: boolean;
 	showVolume?: boolean;
 	showGrid?: boolean;
 	showCVD?: boolean;
 	cvdAnchorPeriod?: string;
 	cvdTimeframe?: string;
+	zoomLevel?: ChartZoomLevel; // Zoom level control
 	chartData?: {
 		bars: OHLCVBar[];
 		metadata: Partial<SymbolMetadata>;
@@ -87,13 +93,14 @@ export function TradingViewLiveChart({
 	symbol = 'NSE:JUNIPER',
 	resolution = '1D',
 	barsCount = 300,
-	height = 500,
+	height = DEFAULT_CHART_HEIGHT,
 	showSMA = true,
 	showVolume = true,
 	showGrid = true,
 	showCVD = false,
 	cvdAnchorPeriod = '3M',
 	cvdTimeframe,
+	zoomLevel = ChartZoomLevel.MAX,
 	chartData: providedChartData,
 	isStreaming = false
 }: TradingViewLiveChartProps) {
@@ -101,6 +108,9 @@ export function TradingViewLiveChart({
 	const chartRef = useRef<IChartApi | null>(null);
 	const { authStatus, isLoading: authLoading } = useAuth();
 	const { theme, resolvedTheme } = useTheme();
+
+	// Track container dimensions for responsive sizing
+	const containerDimensions = useChartDimensions(chartContainerRef);
 	
 	// If chartData is provided (from SSE stream), use it directly
 	// If streaming is active, wait for data (don't fetch)
@@ -148,13 +158,27 @@ export function TradingViewLiveChart({
 	// Memoize volume data to avoid recalculating on every render
 	const volumeData = useMemo(() => {
 		if (!data || uniqueBars.length === 0) return [];
-		return uniqueBars.map(bar => ({
+		
+		const volumes = uniqueBars.map(bar => ({
 			time: bar.time,
 			value: bar.volume,
 			color: bar.close >= bar.open 
-				? (isDark ? 'rgba(38, 166, 154, 0.4)' : 'rgba(38, 166, 154, 0.5)') 
-				: (isDark ? 'rgba(239, 83, 80, 0.4)' : 'rgba(239, 83, 80, 0.5)')
+				? (isDark ? 'rgba(38, 166, 154, 0.8)' : 'rgba(38, 166, 154, 0.9)')  // Increased opacity from 0.4/0.5 to 0.8/0.9
+				: (isDark ? 'rgba(239, 83, 80, 0.8)' : 'rgba(239, 83, 80, 0.9)')
 		}));
+		
+		// Debug: Check volume values
+		const hasVolume = volumes.some(v => v.value > 0);
+		const avgVolume = volumes.reduce((sum, v) => sum + v.value, 0) / volumes.length;
+		console.log('[Volume Debug] Volume data generated:', {
+			count: volumes.length,
+			hasVolume,
+			avgVolume,
+			firstVolume: volumes[0]?.value,
+			lastVolume: volumes[volumes.length - 1]?.value
+		});
+		
+		return volumes;
 	}, [data, uniqueBars, isDark]);
 
 	// Memoize CVD candlestick data (Cumulative Volume Delta)
@@ -219,8 +243,13 @@ export function TradingViewLiveChart({
 			chartRef.current = null;
 		}
 
-		// Get container dimensions
-		const containerWidth = chartContainerRef.current.clientWidth || 800;
+		// Calculate chart dimensions
+		const chartWidth = containerDimensions.width || 800;
+		const chartHeight = parseChartHeight(
+			height,
+			containerDimensions.height,
+			DEFAULT_CHART_HEIGHT
+		);
 
 		// Theme-aware colors
 		const chartColors = {
@@ -231,8 +260,8 @@ export function TradingViewLiveChart({
 		};
 
 		const chart = createChart(chartContainerRef.current, {
-			width: containerWidth,
-			height: height,
+			width: chartWidth,
+			height: chartHeight,
 			layout: {
 				background: { type: ColorType.Solid, color: chartColors.background },
 				textColor: chartColors.textColor,
@@ -293,22 +322,27 @@ export function TradingViewLiveChart({
 		}
 
 		// Add volume histogram on separate pane (pane 1) - using memoized data
+		console.log('[Volume Debug] showVolume:', showVolume, 'volumeData.length:', volumeData.length);
+		
 		if (showVolume && volumeData.length > 0) {
+			console.log('[Volume Debug] Creating volume series...');
+			console.log('[Volume Debug] Sample volume data:', volumeData.slice(0, 3));
+			
 			const volumeSeries = chart.addSeries(HistogramSeries, {
 				priceFormat: {
 					type: 'volume',
 				},
+				base: 0,  // Ensure bars start from 0
+				priceScaleId: '',  // Use default price scale for volume pane
 			});
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			volumeSeries.setData(volumeData as any);
 			// Move to pane 1 (creates pane if it doesn't exist)
 			volumeSeries.moveToPane(1);
 			
-			// Set volume pane height
-			const panes = chart.panes();
-			if (panes[1]) {
-				panes[1].setHeight(100);
-			}
+			console.log('[Volume Debug] Volume series moved to pane 1');
+		} else {
+			console.log('[Volume Debug] Volume not rendered - showVolume:', showVolume, 'volumeData.length:', volumeData.length);
 		}
 
 		// Add CVD pane if checkbox is enabled (data is always fetched, showCVD controls visibility)
@@ -350,15 +384,35 @@ export function TradingViewLiveChart({
 			// Move to appropriate pane (creates pane if it doesn't exist)
 			cvdSeries.moveToPane(cvdPaneIndex);
 			
-			// Set CVD pane height
-			const panes = chart.panes();
-			console.log('[CVD Debug] Total panes:', panes.length);
-			if (panes[cvdPaneIndex]) {
-				panes[cvdPaneIndex].setHeight(120);
-				console.log('[CVD Debug] CVD pane height set to 120px');
-			}
+			console.log('[CVD Debug] CVD series moved to pane', cvdPaneIndex);
 		} else {
 			console.log('[CVD Debug] CVD not rendered - showCVD:', showCVD, 'cvdData.length:', cvdData.length);
+		}
+
+		// ✅ FIX: Set pane heights using stretch factors (relative sizing)
+		// This avoids the synchronous setHeight() timing issue in lightweight-charts v5
+		const panes = chart.panes();
+		console.log('[Pane Debug] Total panes:', panes.length);
+
+		if (showVolume && showCVD) {
+			// 3 panes: Price (0), Volume (1), CVD (2)
+			// Ratio: 50% : 25% : 25%
+			panes[0].setStretchFactor(2);  // Main chart: 2 parts (50%)
+			if (panes[1]) panes[1].setStretchFactor(1);  // Volume: 1 part (25%)
+			if (panes[2]) panes[2].setStretchFactor(1);  // CVD: 1 part (25%)
+			console.log('[Pane Debug] Set stretch factors: Price=2, Volume=1, CVD=1');
+		} else if (showVolume) {
+			// 2 panes: Price (0), Volume (1)
+			// Ratio: 66% : 33%
+			panes[0].setStretchFactor(2);  // Main chart: 2 parts (66%)
+			if (panes[1]) panes[1].setStretchFactor(1);  // Volume: 1 part (33%)
+			console.log('[Pane Debug] Set stretch factors: Price=2, Volume=1');
+		} else if (showCVD) {
+			// 2 panes: Price (0), CVD (1)
+			// Ratio: 66% : 33%
+			panes[0].setStretchFactor(2);  // Main chart: 2 parts (66%)
+			if (panes[1]) panes[1].setStretchFactor(1);  // CVD: 1 part (33%)
+			console.log('[Pane Debug] Set stretch factors: Price=2, CVD=1');
 		}
 
 		// Fit content to view
@@ -373,7 +427,15 @@ export function TradingViewLiveChart({
 				chartRef.current = null;
 			}
 		};
-	}, [data, height, isDark, smaData, volumeData, cvdData, showSMA, showVolume, showGrid, showCVD, uniqueBars]);
+	}, [data, height, isDark, smaData, volumeData, cvdData, showSMA, showVolume, showGrid, showCVD, uniqueBars, containerDimensions]);
+
+	// Apply zoom level when it changes
+	useEffect(() => {
+		if (!chartRef.current || !data || uniqueBars.length === 0) return;
+
+		const timeScale = chartRef.current.timeScale();
+		applyZoom(timeScale, zoomLevel, uniqueBars, resolution);
+	}, [zoomLevel, uniqueBars, resolution, data]);
 
 	// Handle window resize
 	useEffect(() => {
@@ -392,57 +454,49 @@ export function TradingViewLiveChart({
 	// Show loading if no data AND (fetching OR streaming)
 	const isLoading = !providedChartData && (loading || isStreaming);
 	const loadingMessage = isStreaming ? 'Waiting for chart stream...' : 'Loading chart data...';
-	
-	if (isLoading) {
-		return (
-			<div className="flex items-center justify-center bg-muted/30 rounded-lg" style={{ height }}>
-				<div className="text-center">
-					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-foreground mx-auto" />
-					<p className="mt-4 text-muted-foreground">{loadingMessage}</p>
-					<p className="text-sm text-muted-foreground/70 mt-1">{symbol} • {resolution}</p>
-					{isStreaming && <p className="text-xs text-muted-foreground/50 mt-2">Charts are streaming in batches</p>}
-				</div>
-			</div>
-		);
-	}
-
-	// If no data available (neither streamed nor fetched), show error
-	if (!data) {
-		return (
-			<div className="flex items-center justify-center bg-yellow-50 dark:bg-yellow-950/20 rounded-lg" style={{ height }}>
-				<div className="text-center p-6 max-w-md">
-					<div className="text-yellow-600 dark:text-yellow-400 font-semibold mb-2">No Chart Data</div>
-					<p className="text-yellow-500 dark:text-yellow-300 text-sm mb-4">
-						Chart data not available from stream. Please refresh the page.
-					</p>
-					<div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-						<p>Symbol: {symbol}</p>
-						<p>Resolution: {resolution}</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
-	if (error) {
-		return (
-			<div className="flex items-center justify-center bg-red-50 dark:bg-red-950/20 rounded-lg" style={{ height }}>
-				<div className="text-center p-6 max-w-md">
-					<div className="text-red-600 dark:text-red-400 font-semibold mb-2">Failed to load chart</div>
-					<p className="text-red-500 dark:text-red-300 text-sm mb-4">{error}</p>
-					<div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-						<p>Symbol: {symbol}</p>
-						<p>Resolution: {resolution}</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
 
 	return (
-		<div>
-			{/* Chart Container */}
-			<div ref={chartContainerRef} className="border border-gray-200 dark:border-gray-800 rounded-lg" />
+		<div className='h-full w-full relative'>
+			{/* Chart Container - Always rendered */}
+			<div ref={chartContainerRef} className="h-full w-full border border-gray-200 dark:border-gray-800 rounded-lg" />
+
+			{/* Loading Overlay */}
+			{isLoading && (
+				<ChartLoadingOverlay
+					message={loadingMessage}
+					subtitle={`${symbol} • ${resolution}${isStreaming ? ' • Streaming in batches' : ''}`}
+				/>
+			)}
+
+			{/* No Data State */}
+			{!data && !isLoading && (
+				<div className="absolute inset-0 flex items-center justify-center bg-yellow-50 dark:bg-yellow-950/20 rounded-lg">
+					<div className="text-center p-6 max-w-md">
+						<div className="text-yellow-600 dark:text-yellow-400 font-semibold mb-2">No Chart Data</div>
+						<p className="text-yellow-500 dark:text-yellow-300 text-sm mb-4">
+							Chart data not available. Please refresh the page.
+						</p>
+						<div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+							<p>Symbol: {symbol}</p>
+							<p>Resolution: {resolution}</p>
+						</div>
+					</div>
+				</div>
+			)}
+
+			{/* Error State */}
+			{error && (
+				<div className="absolute inset-0 flex items-center justify-center bg-red-50 dark:bg-red-950/20 rounded-lg">
+					<div className="text-center p-6 max-w-md">
+						<div className="text-red-600 dark:text-red-400 font-semibold mb-2">Failed to load chart</div>
+						<p className="text-red-500 dark:text-red-300 text-sm mb-4">{error}</p>
+						<div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+							<p>Symbol: {symbol}</p>
+							<p>Resolution: {resolution}</p>
+						</div>
+					</div>
+				</div>
+			)}
 		</div>
 	);
 }
