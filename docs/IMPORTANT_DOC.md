@@ -123,6 +123,26 @@ chart.moveToPane(volumeSeries, 1); // Move to pane 1 (below price)
 
 ---
 
+## 👤 User-Scoped Settings Storage (CRITICAL)
+
+**Issue**: Settings must be stored per-user, not globally  
+**Pattern**: Reuses session storage pattern with SHA-256 hashed user IDs  
+**Implementation**: `src/lib/storage/userIdentity.ts` + `src/app/api/kv/settings/route.ts`
+
+```typescript
+// Key format: settings:user_{hash32}
+const userId = await generateUserId(userEmail, userPassword);
+const key = `settings:${userId}`;  // e.g., settings:user_a1b2c3d4...
+
+// Each user gets isolated settings in KV
+await kv.set(key, userSettings);
+```
+
+**Auto-Migration**: First load tries global key `mio-tv:all-settings-v2`, then saves to user key  
+**Privacy**: Email/password never stored, only SHA-256 hash used in keys
+
+---
+
 ## 📝 Note
 
 **This is a LEAN document** - only critical production issues/quirks that cause bugs.  

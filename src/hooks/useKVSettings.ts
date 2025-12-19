@@ -20,6 +20,7 @@ import {
 	GlobalSettings,
 } from '@/types/chartSettings';
 import { DEFAULT_ALL_SETTINGS } from '@/lib/chart/defaults';
+import { useAuth } from '@/contexts/AuthContext';
 
 // API endpoint - single unified endpoint
 const API_SETTINGS = '/api/kv/settings';
@@ -32,6 +33,11 @@ export function useKVSettings() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isLoaded, setIsLoaded] = useState(false);
 
+	// Get user credentials
+	const { authStatus } = useAuth();
+	const userEmail = authStatus?.userEmail;
+	const userPassword = authStatus?.userPassword;
+
 	// Single debounce timer for all settings saves
 	const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -43,8 +49,17 @@ export function useKVSettings() {
 				return;
 			}
 
+			// Only load if user credentials exist
+			if (!userEmail || !userPassword) {
+				console.log('⚠️ No user credentials, using defaults');
+				setIsLoading(false);
+				setIsLoaded(true);
+				return;
+			}
+
 			try {
-				const response = await fetch(API_SETTINGS);
+				const url = `${API_SETTINGS}?userEmail=${encodeURIComponent(userEmail)}&userPassword=${encodeURIComponent(userPassword)}`;
+				const response = await fetch(url);
 				const loadedSettings = await response.json();
 
 				setSettings({
@@ -52,7 +67,7 @@ export function useKVSettings() {
 					chartSettings: loadedSettings?.chartSettings || DEFAULT_ALL_SETTINGS.chartSettings,
 				});
 
-				console.log('✅ Loaded settings from KV');
+				console.log(`✅ Loaded user-specific settings for: ${userEmail}`);
 			} catch (error) {
 				console.error('❌ Failed to load settings from KV:', error);
 				// Use defaults on error
@@ -62,12 +77,18 @@ export function useKVSettings() {
 			}
 		}
 		loadAll();
-	}, [isLoaded]);
+	}, [isLoaded, userEmail, userPassword]);
 
 	// Save settings with 1 second debounce
 	const saveSettings = useCallback(
 		(updatedSettings: AllSettings) => {
 			if (!isLoaded) return;
+
+			// Skip save if credentials missing
+			if (!userEmail || !userPassword) {
+				console.log('⚠️ No user credentials, skipping save');
+				return;
+			}
 
 			if (saveTimer.current) {
 				clearTimeout(saveTimer.current);
@@ -78,15 +99,19 @@ export function useKVSettings() {
 					await fetch(API_SETTINGS, {
 						method: 'POST',
 						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify(updatedSettings),
+						body: JSON.stringify({
+							userEmail,
+							userPassword,
+							settings: updatedSettings,
+						}),
 					});
-					console.log('✅ Saved settings to KV');
+					console.log(`✅ Saved user-specific settings for: ${userEmail}`);
 				} catch (error) {
 					console.error('❌ Failed to save settings:', error);
 				}
 			}, 1000); // 1 second debounce
 		},
-		[isLoaded]
+		[isLoaded, userEmail, userPassword]
 	);
 
 	// ============================================

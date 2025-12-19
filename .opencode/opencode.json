@@ -3,6 +3,7 @@
   "permission": {
     "bash": {
       "pnpm run build*": "deny",
+      "pnpm build*": "deny",
       "next build*": "deny"
     }
   }

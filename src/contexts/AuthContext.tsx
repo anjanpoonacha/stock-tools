@@ -76,6 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     setAuthStatus({
                         isAuthenticated: true,
                         userEmail: validatedCredentials.userEmail,
+                        userPassword: validatedCredentials.userPassword,
                         sessionStats: null, // Will be checked in background
                     });
 
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                         setAuthStatus({
                             isAuthenticated: true,
                             userEmail: validatedCredentials.data.userEmail,
+                            userPassword: validatedCredentials.data.userPassword,
                             sessionStats: null, // Will be checked in background
                         });
 
@@ -208,6 +210,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             setAuthStatus({
                 isAuthenticated: true,
                 userEmail: validatedCredentials.userEmail,
+                userPassword: validatedCredentials.userPassword,
                 sessionStats: null, // Will be checked next
             });
 

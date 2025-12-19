@@ -3,6 +3,7 @@
 
 import { kv } from '@vercel/kv';
 import { SessionResolver } from './SessionResolver';
+import { generateUserId } from '@/lib/storage/userIdentity';
 
 export type PlatformSessionData = {
 	sessionId: string;
@@ -83,22 +84,20 @@ async function withCacheInvalidation<T>(operation: () => Promise<T>): Promise<T>
 /**
  * Generate a deterministic session ID based on user credentials and platform.
  * This ensures one session per user per platform - new sessions will overwrite existing ones.
+ * 
+ * Uses the shared `generateUserId` utility from `@/lib/storage/userIdentity` to create
+ * a consistent user identifier, then appends the platform to create a session-specific key.
+ * This maintains backward compatibility while centralizing user ID generation logic.
  */
-export async function generateDeterministicSessionId(userEmail: string, userPassword: string, platform: string): Promise<string> {
-	// Create a consistent input string
-	const input = `${userEmail.toLowerCase().trim()}:${userPassword}:${platform}`;
-
-	// Use Web Crypto API to generate a secure hash
-	const encoder = new TextEncoder();
-	const data = encoder.encode(input);
-	const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-
-	// Convert to hex string
-	const hashArray = Array.from(new Uint8Array(hashBuffer));
-	const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-
-	// Return a shorter, more manageable ID (first 32 characters of hash)
-	return `det_${hashHex.substring(0, 32)}`;
+export async function generateDeterministicSessionId(
+	userEmail: string,
+	userPassword: string,
+	platform: string
+): Promise<string> {
+	// Use shared utility to generate deterministic user ID
+	const userId = await generateUserId(userEmail, userPassword);
+	// Use userId as base, append platform for session key
+	return `${userId}_${platform}`;
 }
 
 /**

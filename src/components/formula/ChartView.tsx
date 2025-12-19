@@ -236,109 +236,19 @@ export default function ChartView({
 
 	const jumpToSymbol = () => {
 		const matches = findMatchingSymbols(symbolSearchBuffer);
-
 		if (matches.length > 0) {
 			const targetSymbol = matches[0];
 			const targetIndex = stockSymbols.indexOf(targetSymbol);
 			if (targetIndex !== -1) {
 				setCurrentIndex(targetIndex);
 			}
-			setSymbolSearchBuffer('');
-			setShowSymbolSearch(false);
-		} else if (symbolSearchBuffer && onSymbolJump) {
-			const parsedSymbol = parseSymbolInput(symbolSearchBuffer);
-			onSymbolJump(parsedSymbol);
-			setSymbolSearchBuffer('');
-			setShowSymbolSearch(false);
 		}
+		// Reset symbol search
+		setShowSymbolSearch(false);
+		setSymbolSearchBuffer('');
 	};
 
-	// Apply chart synchronization
-	// Note: Expects OHLCVBar[] format but sync hook is type-checking incorrectly
-	useCrossChartSync({
-		chart1: chartRefs.current[0],
-		chart2: chartRefs.current[1],
-		bars1D: barsRefs.current[0] || [],
-		bars188m: barsRefs.current[1] || [],
-		enabled: isDualView,
-		rangeSyncEnabled: globalSettings.rangeSync,
-	} as any);
-
-	// Force chart resize when layout changes
-	useEffect(() => {
-		const timer = setTimeout(() => {
-			console.log('[Layout Debug] Layout changed - activeLayout:', activeLayout, 'mode:', currentLayout.mode);
-
-			chartRefs.current.forEach((chart, index) => {
-				if (chart) {
-					const container = chart.chartElement()?.parentElement;
-					if (container) {
-						const { width, height } = container.getBoundingClientRect();
-						chart.applyOptions({
-							width: Math.floor(width),
-							height: Math.floor(height),
-						});
-						console.log(`[Layout Debug] Resized chart${index}:`, width, 'x', height);
-					}
-				}
-			});
-		}, 150);
-
-		return () => clearTimeout(timer);
-	}, [activeLayout, currentLayout.mode]);
-
-	// Tab key focus switching between charts
-	useEffect(() => {
-		if (!isDualView) return;
-
-		const handleKeyDown = (e: KeyboardEvent) => {
-			if (showTimeframeOverlay || showSymbolSearch) return;
-
-			if (e.key === 'Tab' && !e.shiftKey) {
-				e.preventDefault();
-				setFocusedChartIndex(prev => (prev + 1) % currentLayout.slots.length);
-			}
-		};
-
-		window.addEventListener('keydown', handleKeyDown);
-		return () => window.removeEventListener('keydown', handleKeyDown);
-	}, [isDualView, showTimeframeOverlay, showSymbolSearch, currentLayout.slots.length]);
-
-	const inputMode = showTimeframeOverlay ? 'timeframe' : showSymbolSearch ? 'symbol' : 'none';
-
-	// Centralized keyboard shortcuts
-	useChartKeybindings({
-		onNavigatePrev: handlePrev,
-		onNavigateNext: handleNext,
-		onTimeframeInput: handleTimeframeInput,
-		onTimeframeBackspace: handleTimeframeBackspace,
-		onSymbolInput: handleSymbolInput,
-		onSymbolBackspace: handleSymbolBackspace,
-		inputMode,
-		activeChartIndex: focusedChartIndex,
-		enabled: true,
-	});
-
-	// Filter stocks based on search
-	const filteredStockSymbols = stockSymbols.filter(symbol =>
-		symbol.toLowerCase().includes(searchQuery.toLowerCase())
-	);
-
-	if (!currentSymbol) {
-		return (
-			<div className='flex items-center justify-center h-full'>
-				<div className='text-center text-muted-foreground'>
-					<p>No stock selected</p>
-					<Button className='mt-4' onClick={onBackToTable}>
-						<ArrowLeft className='h-4 w-4 mr-2' />
-						Back to Table
-					</Button>
-				</div>
-			</div>
-		);
-	}
-
-	// Handle panel resize
+	// Handle panel resize - MUST be before early returns (React Hooks Rule)
 	const handleMainPanelResize = useCallback((layout: Record<string, number>) => {
 		const toolbar = layout['toolbar-panel'];
 		const chart = layout['chart-panel'];
@@ -376,6 +286,35 @@ export default function ChartView({
 		});
 	}, [updatePanelLayout]);
 
+	// Keyboard shortcuts - MUST be before early returns (React Hooks Rule)
+	const inputMode: 'none' | 'timeframe' | 'symbol' = showTimeframeOverlay 
+		? 'timeframe' 
+		: showSymbolSearch 
+		? 'symbol' 
+		: 'none';
+
+	useChartKeybindings({
+		onNavigatePrev: handlePrev,
+		onNavigateNext: handleNext,
+		onTimeframeInput: handleTimeframeInput,
+		onTimeframeBackspace: handleTimeframeBackspace,
+		onSymbolInput: handleSymbolInput,
+		onSymbolBackspace: handleSymbolBackspace,
+		inputMode,
+		activeChartIndex: focusedChartIndex,
+		enabled: true,
+	});
+
+	// Cross-chart synchronization (only for dual view)
+	useCrossChartSync({
+		chart1: chartRefs.current[0],
+		chart2: chartRefs.current[1],
+		bars1D: barsRefs.current[0],
+		bars188m: barsRefs.current[1],
+		enabled: isDualView,
+		rangeSyncEnabled: globalSettings.rangeSync,
+	});
+
 	// Show loading state while fetching settings
 	if (isLoading) {
 		return (
@@ -387,6 +326,13 @@ export default function ChartView({
 
 	// Get focused slot for resolution/zoom controls
 	const focusedSlot = getSlot(focusedChartIndex);
+
+	// Filter stock symbols based on search query
+	const filteredStockSymbols = searchQuery
+		? stockSymbols.filter(symbol => 
+			symbol.toLowerCase().includes(searchQuery.toLowerCase())
+		  )
+		: stockSymbols;
 
 	return (
 		<div className='h-full w-full flex overflow-hidden bg-background'>

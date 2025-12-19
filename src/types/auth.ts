@@ -38,6 +38,7 @@ export type SessionStats = z.infer<typeof SessionStatsSchema>;
 export const AuthStatusSchema = z.object({
 	isAuthenticated: z.boolean(),
 	userEmail: z.string().optional(),
+	userPassword: z.string().optional(),
 	sessionStats: SessionStatsSchema.nullable().optional()
 });
 
