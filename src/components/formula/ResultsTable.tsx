@@ -159,9 +159,9 @@ export default function ResultsTable({
 	}
 
 	return (
-		<div className='space-y-4'>
+		<div className='overflow-y-auto h-full'>
 			{/* Filters and Controls */}
-			<Card>
+			<Card className='sticky top-0 z-10 bg-background m-4 mb-4'>
 				<CardHeader className='py-3'>
 					<div className='flex items-center justify-between'>
 						<div className='flex items-center gap-4'>
@@ -223,6 +223,7 @@ export default function ResultsTable({
 			</Card>
 
 			{/* Results Table */}
+			<div className='space-y-4 px-4'>
 			{groupedStocks.map((group, groupIndex) => (
 				<Card key={groupIndex}>
 					{group.group && (
@@ -327,10 +328,11 @@ export default function ResultsTable({
 					</CardContent>
 				</Card>
 			))}
+			</div>
 
 			{/* Summary Footer */}
 			{filteredAndSortedStocks.length > 0 && (
-				<div className='flex justify-between items-center text-sm text-muted-foreground px-2'>
+				<div className='flex justify-between items-center text-sm text-muted-foreground px-6 py-4'>
 					<span>
 						Showing {filteredAndSortedStocks.length} of {stocks.length} stocks
 					</span>
