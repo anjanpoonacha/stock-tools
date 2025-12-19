@@ -4,7 +4,6 @@
 (function () {
     'use strict';
 
-    console.log('[SETTINGS-UI] Settings UI controller loading...');
 
     // UI State Management
     let settingsManager = null;
@@ -87,7 +86,6 @@
         elementIds.forEach((id) => {
             elements[id] = document.getElementById(id);
             if (!elements[id]) {
-                console.warn(`[SETTINGS-UI] Element not found: ${id}`);
             }
         });
 
@@ -129,9 +127,7 @@
             initializePresets();
 
             updateStatus('Settings loaded successfully', 'success');
-            console.log('[SETTINGS-UI] Settings UI initialized successfully');
         } catch (error) {
-            console.error('[SETTINGS-UI] Failed to initialize:', error);
             updateStatus('Failed to load settings', 'error');
         } finally {
             setLoading(false);
@@ -148,7 +144,6 @@
             isDirty = false;
             updateSaveButton();
         } catch (error) {
-            console.error('[SETTINGS-UI] Error loading settings:', error);
             throw error;
         }
     }
@@ -159,7 +154,6 @@
     function populateUI(settings) {
         // Ensure settings structure exists
         if (!settings) {
-            console.warn('[SETTINGS-UI] Settings object is null or undefined');
             return;
         }
 
@@ -477,10 +471,6 @@
             card.classList.toggle('active', card.dataset.preset === activePreset);
         });
 
-        console.log(`[SETTINGS-UI] Active preset detected: ${activePreset}`, {
-            currentIntervals,
-            detectedPreset: activePreset,
-        });
     }
 
     /**
@@ -581,10 +571,8 @@
                     preset: presetName,
                 });
             } catch (error) {
-                console.warn('[SETTINGS-UI] Could not notify content scripts:', error);
             }
         } catch (error) {
-            console.error('[SETTINGS-UI] Error applying preset:', error);
             updateStatus('Failed to apply preset', 'error');
 
             // Reload settings to ensure UI is in sync
@@ -592,7 +580,6 @@
                 await loadSettings();
                 updateActivePresetCard();
             } catch (reloadError) {
-                console.error('[SETTINGS-UI] Error reloading settings after preset failure:', reloadError);
             }
         } finally {
             setLoading(false);
@@ -873,10 +860,8 @@
                     settings: formValues,
                 });
             } catch (error) {
-                console.warn('[SETTINGS-UI] Could not notify extension components:', error);
             }
         } catch (error) {
-            console.error('[SETTINGS-UI] Error saving settings:', error);
             updateStatus('Failed to save settings', 'error');
         } finally {
             setLoading(false);
@@ -905,7 +890,6 @@
 
             updateStatus('Settings reset to defaults', 'success');
         } catch (error) {
-            console.error('[SETTINGS-UI] Error resetting settings:', error);
             updateStatus('Failed to reset settings', 'error');
         } finally {
             setLoading(false);
@@ -931,7 +915,6 @@
 
             updateStatus('Settings exported successfully', 'success');
         } catch (error) {
-            console.error('[SETTINGS-UI] Error exporting settings:', error);
             updateStatus('Failed to export settings', 'error');
         }
     }
@@ -962,7 +945,6 @@
 
             updateStatus('Settings imported successfully', 'success');
         } catch (error) {
-            console.error('[SETTINGS-UI] Error importing settings:', error);
             updateStatus('Failed to import settings', 'error');
         } finally {
             setLoading(false);
@@ -988,7 +970,6 @@
 
             updateStatus('Extension storage cleared', 'success');
         } catch (error) {
-            console.error('[SETTINGS-UI] Error clearing storage:', error);
             updateStatus('Failed to clear storage', 'error');
         } finally {
             setLoading(false);
@@ -1159,5 +1140,4 @@
         initializeUI();
     }
 
-    console.log('[SETTINGS-UI] Settings UI controller loaded');
 })();

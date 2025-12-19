@@ -4,7 +4,6 @@
 (function testCredentialPersistence() {
     'use strict';
 
-    console.log('[TEST] Starting credential persistence test...');
 
     // Test configuration
     const testEmail = 'test@example.com';
@@ -33,7 +32,6 @@
 
     // Test functions
     async function testQuickSettingsCredentials() {
-        console.log('[TEST] Testing Quick Settings credentials...');
 
         const quickEmailInput = document.getElementById('quickUserEmail');
         const quickPasswordInput = document.getElementById('quickUserPassword');
@@ -61,7 +59,6 @@
             throw new Error('Password not synced from Quick Settings to General Settings');
         }
 
-        console.log('[TEST] ✓ Quick Settings to General Settings sync working');
 
         // Trigger save
         const saveBtn = document.getElementById('saveBtn');
@@ -71,14 +68,12 @@
             // Wait for save to complete
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            console.log('[TEST] ✓ Settings saved');
         }
 
         return true;
     }
 
     async function testGeneralSettingsCredentials() {
-        console.log('[TEST] Testing General Settings credentials...');
 
         const quickEmailInput = document.getElementById('quickUserEmail');
         const quickPasswordInput = document.getElementById('quickUserPassword');
@@ -109,7 +104,6 @@
             throw new Error('Password not synced from General Settings to Quick Settings');
         }
 
-        console.log('[TEST] ✓ General Settings to Quick Settings sync working');
 
         // Trigger save
         const saveBtn = document.getElementById('saveBtn');
@@ -119,26 +113,18 @@
             // Wait for save to complete
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            console.log('[TEST] ✓ Settings saved');
         }
 
         return true;
     }
 
     async function testPersistence() {
-        console.log('[TEST] Testing persistence after reload...');
 
         const settingsManager = await waitForSettingsManager();
 
         // Get current settings
         const currentSettings = await settingsManager.loadSettings(true); // Force reload
 
-        console.log('[TEST] Current settings:', {
-            quickEmail: currentSettings.quickSettings?.userEmail,
-            quickPassword: currentSettings.quickSettings?.userPassword,
-            generalEmail: currentSettings.general?.userEmail,
-            generalPassword: currentSettings.general?.userPassword,
-        });
 
         // Check if credentials are persisted in both locations
         if (!currentSettings.quickSettings?.userEmail || !currentSettings.quickSettings?.userPassword) {
@@ -157,13 +143,11 @@
             throw new Error('Password mismatch between quickSettings and general settings');
         }
 
-        console.log('[TEST] ✓ Credentials properly persisted and synchronized');
 
         return true;
     }
 
     async function testSpacing() {
-        console.log('[TEST] Testing Quick Settings spacing...');
 
         const quickSettingsCards = document.querySelectorAll('.quick-setting-card');
 
@@ -175,21 +159,12 @@
             const settingItems = card.querySelectorAll('.setting-item');
             const computedStyle = window.getComputedStyle(card);
 
-            console.log(`[TEST] Card ${index + 1}:`, {
-                padding: computedStyle.padding,
-                marginBottom: computedStyle.marginBottom,
-                settingItemsCount: settingItems.length,
-            });
 
             settingItems.forEach((item, itemIndex) => {
                 const itemStyle = window.getComputedStyle(item);
-                console.log(`[TEST]   Setting item ${itemIndex + 1}:`, {
-                    marginBottom: itemStyle.marginBottom,
-                });
             });
         });
 
-        console.log('[TEST] ✓ Quick Settings spacing checked (see console for details)');
 
         return true;
     }
@@ -197,24 +172,20 @@
     // Run all tests
     async function runAllTests() {
         try {
-            console.log('[TEST] Waiting for settings manager...');
             await waitForSettingsManager();
 
-            console.log('[TEST] Running credential persistence tests...');
 
             await testQuickSettingsCredentials();
             await testGeneralSettingsCredentials();
             await testPersistence();
             await testSpacing();
 
-            console.log('[TEST] ✅ All tests passed! Credential persistence is working correctly.');
 
             return {
                 success: true,
                 message: 'All credential persistence tests passed',
             };
         } catch (error) {
-            console.error('[TEST] ❌ Test failed:', error.message);
 
             return {
                 success: false,
@@ -235,5 +206,4 @@
         setTimeout(runAllTests, 1000);
     }
 
-    console.log('[TEST] Test script loaded. You can also run tests manually with: testCredentialPersistence()');
 })();

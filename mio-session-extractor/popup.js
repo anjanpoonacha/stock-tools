@@ -2,7 +2,6 @@
 // Handles popup UI interactions and communication with content script for MarketInOut and TradingView
 
 document.addEventListener('DOMContentLoaded', async () => {
-    console.log('[MULTI-EXTRACTOR] Performance-optimized multi-platform popup loaded');
 
     // Platform Detection
     const PLATFORMS = {
@@ -114,15 +113,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const maxAge = 30 * 60 * 1000; // 30 minutes
 
                 if (sessionAge < maxAge) {
-                    console.log('[MULTI-EXTRACTOR] Found stored session for platform:', platform || 'any');
                     return sessionData;
                 } else {
-                    console.log('[MULTI-EXTRACTOR] Stored session is too old, ignoring');
                 }
             }
             return null;
         } catch (error) {
-            console.error('[MULTI-EXTRACTOR] Error reading stored session:', error);
             return null;
         }
     }
@@ -182,7 +178,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             const platformName = getPlatformDisplayName(currentPlatform);
-            console.log(`[MULTI-EXTRACTOR] Checking status for ${platformName}`);
 
             // First, check stored session data for current platform
             const storedSession = await getStoredSession(currentPlatform);
@@ -194,7 +189,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     action: 'getStatus',
                 });
             } catch (error) {
-                console.log(`[MULTI-EXTRACTOR] Could not reach ${platformName} content script:`, error.message);
             }
 
             if (response) {
@@ -236,7 +230,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Check app connection by trying to reach it
             await checkAppConnection();
         } catch (error) {
-            console.error('[MULTI-EXTRACTOR] Error getting status:', error);
             updateStatus(elements.loginStatus, 'Error', 'error');
             updateStatus(elements.sessionStatus, 'Error', 'error');
             updateStatus(elements.appStatus, 'Error', 'error');
@@ -288,7 +281,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 } catch (e) {
                     if (e.name === 'AbortError') {
-                        console.log('[MIO-EXTRACTOR] App connection check timed out for:', url);
                     }
                     // Continue to next URL
                 }
@@ -299,7 +291,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             lastAppConnectionCheck = now;
             updateStatus(elements.appStatus, 'Disconnected', 'warning');
         } catch (error) {
-            console.error('[MIO-EXTRACTOR] Error checking app connection:', error);
             appConnectionStatus = { text: 'Error', type: 'error' };
             lastAppConnectionCheck = now;
             updateStatus(elements.appStatus, 'Error', 'error');
@@ -344,7 +335,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 throw new Error(`${platformName} extraction failed`);
             }
         } catch (error) {
-            console.error('[MULTI-EXTRACTOR] Error extracting session:', error);
             updateStatus(elements.sessionStatus, 'Failed', 'error');
 
             // Show error message briefly
@@ -429,13 +419,11 @@ For more help, check the extension documentation.
 
         // Prevent concurrent updates
         if (isUpdating && !forceRefresh) {
-            console.log('[MULTI-EXTRACTOR] Status update already in progress, skipping');
             return;
         }
 
         // Throttle updates (minimum interval between updates)
         if (!forceRefresh && now - lastStatusUpdate < 5000) {
-            console.log('[MULTI-EXTRACTOR] Status update throttled');
             return;
         }
 
@@ -445,7 +433,6 @@ For more help, check the extension documentation.
         try {
             await getStatus();
         } catch (error) {
-            console.error('[MULTI-EXTRACTOR] Error in optimized status update:', error);
         } finally {
             isUpdating = false;
         }
@@ -465,11 +452,6 @@ For more help, check the extension documentation.
             updateStatusOptimized(false);
         }, POPUP_CONFIG.AUTO_REFRESH_INTERVAL);
 
-        console.log(
-            '[MULTI-EXTRACTOR] Adaptive refresh started with',
-            POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000,
-            'second interval'
-        );
     }
 
     /**
@@ -480,11 +462,9 @@ For more help, check the extension documentation.
             clearInterval(autoRefreshTimer);
             autoRefreshTimer = null;
         }
-        console.log('[MULTI-EXTRACTOR] Popup cleanup completed');
     }
 
     // Initialize popup with performance optimizations
-    console.log('[MULTI-EXTRACTOR] Initializing performance-optimized multi-platform popup...');
 
     // Initial status check
     await updateStatusOptimized(true);
@@ -496,11 +476,4 @@ For more help, check the extension documentation.
     window.addEventListener('beforeunload', cleanup);
     window.addEventListener('unload', cleanup);
 
-    console.log('[MULTI-EXTRACTOR] Performance-optimized multi-platform popup initialized successfully');
-    console.log('[MULTI-EXTRACTOR] Configuration:', {
-        autoRefreshInterval: POPUP_CONFIG.AUTO_REFRESH_INTERVAL / 1000 + 's',
-        appConnectionCacheTTL: POPUP_CONFIG.APP_CONNECTION_CACHE_TTL / 1000 + 's',
-        requestTimeout: POPUP_CONFIG.REQUEST_TIMEOUT / 1000 + 's',
-        supportedPlatforms: Object.values(PLATFORMS).filter((p) => p !== PLATFORMS.UNKNOWN),
-    });
 });

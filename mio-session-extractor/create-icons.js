@@ -18,7 +18,6 @@ function createSVGIcon(size, color = '#1a73e8') {
 const sizes = [16, 48, 128];
 const iconColor = '#1a73e8'; // Google Blue
 
-console.log('Creating extension icons...');
 
 sizes.forEach((size) => {
     const svgContent = createSVGIcon(size, iconColor);
@@ -31,14 +30,8 @@ sizes.forEach((size) => {
 
     // Write SVG file
     fs.writeFileSync(svgPath, svgContent);
-    console.log(`✅ Created ${svgPath}`);
 });
 
-console.log('\n📝 SVG icons created successfully!');
-console.log('\nTo convert to PNG (optional):');
-console.log('1. Install a tool like "svg2png" or use online converters');
-console.log('2. Or use the SVG files directly (Chrome supports SVG icons)');
-console.log('3. Update manifest.json to use .svg instead of .png if needed');
 
 // Update manifest.json to use SVG icons
 try {
@@ -54,7 +47,5 @@ try {
     };
 
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, '\t'));
-    console.log('✅ Updated manifest.json to use SVG icons');
 } catch (error) {
-    console.log('⚠️  Could not update manifest.json:', error.message);
 }

@@ -57,7 +57,6 @@ function processSessionAnalytics(sessions) {
 
         return analytics;
     } catch (error) {
-        console.error('[WORKER] Error processing session analytics:', error);
         return null;
     }
 }
@@ -111,7 +110,6 @@ function aggregatePerformanceData(performanceData) {
 
         return aggregated;
     } catch (error) {
-        console.error('[WORKER] Error aggregating performance data:', error);
         return null;
     }
 }
@@ -165,7 +163,6 @@ function processBatch() {
             });
         }
     } catch (error) {
-        console.error('[WORKER] Error processing batch:', error);
         self.postMessage({
             type: 'error',
             error: error.message,
@@ -221,7 +218,6 @@ self.onmessage = function (e) {
             break;
 
         default:
-            console.warn('[WORKER] Unknown message type:', type);
     }
 };
 
@@ -232,4 +228,3 @@ setInterval(() => {
     }
 }, WORKER_CONFIG.PROCESSING_INTERVAL);
 
-console.log('[WORKER] Performance worker initialized');

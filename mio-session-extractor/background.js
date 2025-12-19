@@ -75,7 +75,6 @@ function compressSessionData(sessionData) {
         };
         return JSON.stringify(compressed);
     } catch (error) {
-        console.error('[MIO-EXTRACTOR] Error compressing session data:', error);
         return JSON.stringify(sessionData);
     }
 }
@@ -94,7 +93,6 @@ function decompressSessionData(compressedData) {
         }
         return data; // Return as-is if not compressed format
     } catch (error) {
-        console.error('[MIO-EXTRACTOR] Error decompressing session data:', error);
         return null;
     }
 }
@@ -115,13 +113,11 @@ async function cleanupStorage() {
             const keysToRemove = sortedEntries.map(([key]) => key);
             if (keysToRemove.length > 0) {
                 await chrome.storage.local.remove(keysToRemove);
-                console.log(`[MIO-EXTRACTOR] Cleaned up ${keysToRemove.length} old storage entries`);
             }
         }
 
         performanceMetrics.storageOperations++;
     } catch (error) {
-        console.error('[MIO-EXTRACTOR] Error during storage cleanup:', error);
     }
 }
 
@@ -155,7 +151,6 @@ function cleanupTabState(tabId) {
 
 // Lazy initialization on first use
 chrome.runtime.onInstalled.addListener(() => {
-    console.log('[MIO-EXTRACTOR] Performance-optimized background service worker installed');
 
     // Initialize with minimal operations
     chrome.action.setBadgeText({ text: '' });
@@ -164,7 +159,6 @@ chrome.runtime.onInstalled.addListener(() => {
     // Start storage cleanup timer
     storageCleanupTimer = setInterval(cleanupStorage, BACKGROUND_CONFIG.STORAGE_CLEANUP_INTERVAL);
 
-    console.log('[MIO-EXTRACTOR] Background optimizations initialized');
 });
 
 // Optimized message handling with performance monitoring
@@ -186,17 +180,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             try {
                 // Check if chrome.cookies API is available
                 if (!chrome.cookies || typeof chrome.cookies.get !== 'function') {
-                    console.error('[MIO-EXTRACTOR] Chrome cookies API not available');
                     sendResponse({ success: false, error: 'Chrome cookies API not available', cookie: null });
                     return true;
                 }
 
                 // Validate request parameters
                 if (!request.url || !request.name) {
-                    console.error('[MIO-EXTRACTOR] Invalid cookie request parameters:', {
-                        url: request.url,
-                        name: request.name,
-                    });
                     sendResponse({
                         success: false,
                         error: 'Invalid parameters: url and name are required',
@@ -212,19 +201,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     },
                     (cookie) => {
                         if (chrome.runtime.lastError) {
-                            console.error('[MIO-EXTRACTOR] Error getting cookie:', chrome.runtime.lastError);
                             sendResponse({ success: false, error: chrome.runtime.lastError.message, cookie: null });
                         } else {
-                            console.log(
-                                `[MIO-EXTRACTOR] Cookie retrieved: ${request.name} from ${request.url}`,
-                                cookie ? 'found' : 'not found'
-                            );
                             sendResponse({ success: true, cookie: cookie });
                         }
                     }
                 );
             } catch (error) {
-                console.error('[MIO-EXTRACTOR] Exception in getCookie handler:', error);
                 sendResponse({ success: false, error: error.message, cookie: null });
             }
             return true; // Keep message channel open for async response
@@ -243,7 +226,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                     });
                     performanceMetrics.storageOperations++;
                 } catch (error) {
-                    console.error('[MIO-EXTRACTOR] Error storing compressed session:', error);
                 }
             });
         }
@@ -253,14 +235,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const processingTime = performance.now() - startTime;
         if (processingTime > 10) {
             // Log slow operations
-            console.warn(
-                `[MIO-EXTRACTOR] Slow message processing: ${processingTime.toFixed(2)}ms for ${request.action}`
-            );
         }
 
         sendResponse({ success: true, processingTime });
     } catch (error) {
-        console.error('[MIO-EXTRACTOR] Error handling message:', error);
         sendResponse({ success: false, error: error.message });
     }
 
@@ -294,7 +272,6 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Phase 3: Idle detection for performance optimization
 chrome.idle.onStateChanged.addListener((state) => {
-    console.log(`[MIO-EXTRACTOR] System idle state changed: ${state}`);
 
     if (state === 'idle') {
         // Perform maintenance tasks during idle time
@@ -331,8 +308,5 @@ self.addEventListener('beforeunload', () => {
     if (storageCleanupTimer) {
         clearInterval(storageCleanupTimer);
     }
-    console.log('[MIO-EXTRACTOR] Background service worker cleanup completed');
 });
 
-console.log('[MIO-EXTRACTOR] Performance-optimized background service worker loaded');
-console.log('[MIO-EXTRACTOR] Phase 2 & 3 optimizations active');

@@ -199,9 +199,7 @@
                 await this.loadSettings();
                 await this.migrateSettings();
                 this.isInitialized = true;
-                console.log('[SETTINGS] Settings system initialized successfully');
             } catch (error) {
-                console.error('[SETTINGS] Failed to initialize settings system:', error);
                 this.settings = this.deepClone(DEFAULT_SETTINGS);
                 this.isInitialized = true;
             }
@@ -223,17 +221,14 @@
 
                 if (result.extensionSettings) {
                     this.settings = this.mergeWithDefaults(result.extensionSettings);
-                    console.log('[SETTINGS] Loaded settings from storage' + (forceReload ? ' (forced reload)' : ''));
                 } else {
                     this.settings = this.deepClone(DEFAULT_SETTINGS);
                     await this.saveSettings(); // Save defaults
-                    console.log('[SETTINGS] Initialized with default settings');
                 }
 
                 this.cacheTimestamp = now;
                 return this.settings;
             } catch (error) {
-                console.error('[SETTINGS] Error loading settings:', error);
                 this.settings = this.deepClone(DEFAULT_SETTINGS);
                 return this.settings;
             }
@@ -244,7 +239,6 @@
          */
         clearCache() {
             this.cacheTimestamp = 0;
-            console.log('[SETTINGS] Cache cleared');
         }
 
         /**
@@ -262,9 +256,7 @@
 
                 this.cacheTimestamp = Date.now();
                 this.notifyListeners('settingsSaved', this.settings);
-                console.log('[SETTINGS] Settings saved successfully');
             } catch (error) {
-                console.error('[SETTINGS] Error saving settings:', error);
                 throw error;
             }
         }
@@ -274,7 +266,6 @@
          */
         get(path, defaultValue = null) {
             if (!this.settings) {
-                console.warn('[SETTINGS] Settings not loaded, using default');
                 return this.getFromObject(DEFAULT_SETTINGS, path, defaultValue);
             }
 
@@ -303,7 +294,6 @@
             // Notify listeners
             this.notifyListeners('settingChanged', { path, value });
 
-            console.log(`[SETTINGS] Updated setting: ${path} = ${JSON.stringify(value)}`);
         }
 
         /**
@@ -337,7 +327,6 @@
             await this.saveSettings();
             this.notifyListeners('settingsChanged', changes);
 
-            console.log(`[SETTINGS] Updated ${changes.length} settings`);
         }
 
         /**
@@ -350,7 +339,6 @@
             }
 
             await this.setMultiple(preset.settings);
-            console.log(`[SETTINGS] Applied preset: ${preset.name}`);
         }
 
         /**
@@ -360,7 +348,6 @@
             this.settings = this.deepClone(DEFAULT_SETTINGS);
             await this.saveSettings();
             this.notifyListeners('settingsReset', this.settings);
-            console.log('[SETTINGS] Settings reset to defaults');
         }
 
         /**
@@ -389,7 +376,6 @@
             await this.saveSettings();
             this.notifyListeners('settingsImported', this.settings);
 
-            console.log('[SETTINGS] Settings imported successfully');
         }
 
         /**
@@ -532,7 +518,6 @@
                 try {
                     callback(event, data);
                 } catch (error) {
-                    console.error('[SETTINGS] Error in listener callback:', error);
                 }
             }
         }
@@ -553,5 +538,4 @@
         module.exports = { SettingsManager, DEFAULT_SETTINGS, SETTINGS_PRESETS };
     }
 
-    console.log('[SETTINGS] Settings management system loaded');
 })();
