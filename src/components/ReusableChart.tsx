@@ -163,11 +163,28 @@ export function ReusableChart({
 					separatorHoverColor: isDark ? 'rgba(178, 181, 189, 0.3)' : 'rgba(178, 181, 189, 0.2)',
 				}
 			},
+			crosshair: {
+				mode: 1, // CrosshairMode.Normal - shows both horizontal and vertical lines
+				vertLine: {
+					width: 1,
+					color: isDark ? 'rgba(224, 227, 235, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+					style: 2, // LineStyle.Dashed
+					visible: true,
+					labelVisible: true,
+				},
+				horzLine: {
+					width: 1,
+					color: isDark ? 'rgba(224, 227, 235, 0.3)' : 'rgba(0, 0, 0, 0.2)',
+					style: 2, // LineStyle.Dashed
+					visible: true,
+					labelVisible: true,
+				},
+			},
 			grid: {
-				vertLines: { 
+				vertLines: {
 					color: showGrid ? chartColors.gridColor : 'transparent'
 				},
-				horzLines: { 
+				horzLines: {
 					color: showGrid ? chartColors.gridColor : 'transparent'
 				},
 			},

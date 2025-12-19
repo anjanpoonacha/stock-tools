@@ -114,6 +114,16 @@ const TOOLS: Tool[] = [
         category: 'Testing',
         keywords: ['session', 'test', 'debug'],
     },
+    {
+        id: 'systemanalyzer',
+        title: 'System Analyzer',
+        description: 'Calculate expectancy and performance metrics for trading systems',
+        href: '/system-analyzer',
+        icon: 'TrendingUp' as const,
+        category: 'Calculators',
+        featured: true,
+        keywords: ['calculator', 'expectancy', 'system', 'performance', 'r-multiple', 'champion'],
+    },
 ];
 
 interface DashboardLayoutProps {

@@ -163,6 +163,14 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			const cvdId = `cvd_${this.requestCount}`;
 			const cvd = this.getStudy(cvdId);
 			
+			console.log(`[PooledClient] CVD Study Retrieved:`, {
+				cvdId,
+				hasCvd: !!cvd,
+				cvdValuesCount: cvd?.values?.length || 0,
+				firstCvdBar: cvd?.values?.[0],
+				lastCvdBar: cvd?.values?.[cvd.values.length - 1]
+			});
+			
 			console.log(`[PooledClient] Results: ${bars.length} bars, metadata=${JSON.stringify(metadata).substring(0, 100)}`);
 			
 			// Validate bars received

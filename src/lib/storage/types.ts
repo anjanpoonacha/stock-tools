@@ -35,6 +35,10 @@ export interface ChartSettings {
   // Display settings
   showGrid: boolean;
   dualViewMode: boolean;
+
+  // Volume MA settings
+  showVolumeMA: boolean;
+  volumeMALength: number;
 }
 
 /**
@@ -43,6 +47,20 @@ export interface ChartSettings {
 export interface ViewSettings {
   viewMode: 'table' | 'chart';
   currentStockIndex: number;
+}
+
+/**
+ * Layout settings schema for multi-pane chart
+ */
+export interface LayoutSettings {
+  // Layout orientation
+  mode: 'horizontal' | 'vertical';
+
+  // Panel sizes as percentages (must sum to 100)
+  panelSizes: number[];
+
+  // Whether to sync time ranges across charts
+  rangeSync: boolean;
 }
 
 /**
@@ -68,6 +86,9 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
   cvdCustomPeriod: '30S',
   showGrid: true,
   dualViewMode: false,
+  // Volume MA defaults
+  showVolumeMA: true,
+  volumeMALength: 30,
 };
 
 /**
@@ -76,4 +97,13 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
 export const DEFAULT_VIEW_SETTINGS: ViewSettings = {
   viewMode: 'table',
   currentStockIndex: 0,
+};
+
+/**
+ * Default layout settings for multi-pane chart
+ */
+export const DEFAULT_LAYOUT_SETTINGS: LayoutSettings = {
+  mode: 'horizontal',
+  panelSizes: [33.33, 33.33, 33.34], // 3 equal panels
+  rangeSync: true,
 };

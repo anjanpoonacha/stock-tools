@@ -11,7 +11,7 @@
 
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { useTheme } from 'next-themes';
 import {
 	createChart,
@@ -29,12 +29,14 @@ import { parseChartHeight, applyZoom } from '@/lib/chart/utils';
 import { DEFAULT_CHART_HEIGHT } from '@/lib/chart/constants';
 import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
 import { ChartZoomLevel, type ChartHeight } from '@/lib/chart/types';
+import { calculateVolumeEMA } from '@/lib/chart/championTrader';
 
 interface TradingViewLiveChartProps {
 	symbol?: string;
 	resolution?: string;
 	barsCount?: number;
 	height?: ChartHeight; // Support both number and '100%'
+	showPrice?: boolean; // Show/hide candlestick price series
 	showSMA?: boolean;
 	showVolume?: boolean;
 	showGrid?: boolean;
@@ -42,6 +44,9 @@ interface TradingViewLiveChartProps {
 	cvdAnchorPeriod?: string;
 	cvdTimeframe?: string;
 	zoomLevel?: ChartZoomLevel; // Zoom level control
+	// Volume MA settings
+	showVolumeMA?: boolean; // Show Volume Moving Average line
+	volumeMALength?: number; // Volume MA period (default: 30)
 	chartData?: {
 		bars: OHLCVBar[];
 		metadata: Partial<SymbolMetadata>;
@@ -50,6 +55,9 @@ interface TradingViewLiveChartProps {
 		};
 	};
 	isStreaming?: boolean;
+	// Callback props
+	onChartReady?: (chart: IChartApi) => void;
+	onDataLoaded?: (bars: OHLCVBar[]) => void;
 }
 
 // Removed - now imported from useChartData hook
@@ -94,6 +102,7 @@ export function TradingViewLiveChart({
 	resolution = '1D',
 	barsCount = 300,
 	height = DEFAULT_CHART_HEIGHT,
+	showPrice = true,
 	showSMA = true,
 	showVolume = true,
 	showGrid = true,
@@ -101,8 +110,12 @@ export function TradingViewLiveChart({
 	cvdAnchorPeriod = '3M',
 	cvdTimeframe,
 	zoomLevel = ChartZoomLevel.MAX,
+	showVolumeMA = true,
+	volumeMALength = 30,
 	chartData: providedChartData,
-	isStreaming = false
+	isStreaming = false,
+	onChartReady,
+	onDataLoaded
 }: TradingViewLiveChartProps) {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
@@ -129,12 +142,6 @@ export function TradingViewLiveChart({
 	// Use provided data if available, otherwise use fetched data
 	const data = providedChartData || fetchedData;
 	
-	console.log('[TradingViewLiveChart] symbol:', symbol, 'resolution:', resolution);
-	console.log('[TradingViewLiveChart] isStreaming:', isStreaming);
-	console.log('[TradingViewLiveChart] providedChartData:', providedChartData ? `✓ bars=${providedChartData.bars?.length}, cvd=${providedChartData.indicators?.cvd?.values?.length}` : '✗ NONE');
-	console.log('[TradingViewLiveChart] Data source:', providedChartData ? '📡 STREAMED' : (isStreaming ? '⏳ WAITING' : '🌐 API'));
-	console.log('[TradingViewLiveChart] API fetch enabled:', !providedChartData && !isStreaming && authStatus?.isAuthenticated && !authLoading);
-	
 	// Determine if dark mode is active
 	const isDark = resolvedTheme === 'dark' || theme === 'dark';
 
@@ -149,6 +156,13 @@ export function TradingViewLiveChart({
 		return Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
 	}, [data?.bars]);
 
+	// Call onDataLoaded callback when bars data is loaded
+	useEffect(() => {
+		if (uniqueBars.length > 0 && onDataLoaded) {
+			onDataLoaded(uniqueBars);
+		}
+	}, [uniqueBars, onDataLoaded]);
+
 	// Memoize SMA calculation to avoid recalculating on every render
 	const smaData = useMemo(() => {
 		if (!data || uniqueBars.length === 0) return [];
@@ -159,46 +173,30 @@ export function TradingViewLiveChart({
 	const volumeData = useMemo(() => {
 		if (!data || uniqueBars.length === 0) return [];
 		
-		const volumes = uniqueBars.map(bar => ({
+		return uniqueBars.map(bar => ({
 			time: bar.time,
 			value: bar.volume,
 			color: bar.close >= bar.open 
 				? (isDark ? 'rgba(38, 166, 154, 0.8)' : 'rgba(38, 166, 154, 0.9)')  // Increased opacity from 0.4/0.5 to 0.8/0.9
 				: (isDark ? 'rgba(239, 83, 80, 0.8)' : 'rgba(239, 83, 80, 0.9)')
 		}));
-		
-		// Debug: Check volume values
-		const hasVolume = volumes.some(v => v.value > 0);
-		const avgVolume = volumes.reduce((sum, v) => sum + v.value, 0) / volumes.length;
-		console.log('[Volume Debug] Volume data generated:', {
-			count: volumes.length,
-			hasVolume,
-			avgVolume,
-			firstVolume: volumes[0]?.value,
-			lastVolume: volumes[volumes.length - 1]?.value
-		});
-		
-		return volumes;
 	}, [data, uniqueBars, isDark]);
+
+	// Memoize Volume MA (EMA) data
+	const volumeMAData = useMemo(() => {
+		if (!data || uniqueBars.length === 0 || !showVolumeMA) return [];
+		return calculateVolumeEMA(uniqueBars, volumeMALength);
+	}, [data, uniqueBars, showVolumeMA, volumeMALength]);
 
 	// Memoize CVD candlestick data (Cumulative Volume Delta)
 	const cvdData = useMemo(() => {
-		console.log('[CVD Debug] Full data object:', data);
-		console.log('[CVD Debug] Indicators:', data?.indicators);
-		console.log('[CVD Debug] CVD object:', data?.indicators?.cvd);
-		
 		if (!data?.indicators?.cvd?.values) {
-			console.log('[CVD Debug] No CVD data available - indicators:', Object.keys(data?.indicators || {}));
 			return [];
 		}
-		
-		console.log('[CVD Debug] CVD values count:', data.indicators.cvd.values.length);
 		
 		// CVD values: [open, high, low, close, ...] - convert to candlestick format
 		const filtered = data.indicators.cvd.values
 			.filter((d: { values: number[] }) => d.values[3] !== 1e+100); // Filter out placeholder values
-		
-		console.log('[CVD Debug] Filtered values count:', filtered.length);
 		
 		// Remove duplicates (keep last value for each timestamp) and sort
 		const uniqueMap = new Map<number, {
@@ -220,13 +218,7 @@ export function TradingViewLiveChart({
 		}
 		
 		// Convert to array and sort by time (ascending)
-		const result = Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
-		console.log('[CVD Debug] Final CVD data points:', result.length);
-		if (result.length > 0) {
-			console.log('[CVD Debug] First CVD bar:', result[0]);
-			console.log('[CVD Debug] Last CVD bar:', result[result.length - 1]);
-		}
-		return result;
+		return Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
 	}, [data?.indicators?.cvd]);
 
 	// Data fetching is now handled by useChartData hook with caching
@@ -243,13 +235,15 @@ export function TradingViewLiveChart({
 			chartRef.current = null;
 		}
 
-		// Calculate chart dimensions
-		const chartWidth = containerDimensions.width || 800;
-		const chartHeight = parseChartHeight(
+		// Calculate chart dimensions - use actual container size, not state
+		// This prevents re-creation loop when containerDimensions updates
+		// Round to prevent sub-pixel overflow (e.g., 280px chart in 279.5px container)
+		const chartWidth = Math.floor(chartContainerRef.current.clientWidth) || 800;
+		const chartHeight = Math.floor(parseChartHeight(
 			height,
-			containerDimensions.height,
+			chartContainerRef.current.clientHeight,
 			DEFAULT_CHART_HEIGHT
-		);
+		));
 
 		// Theme-aware colors
 		const chartColors = {
@@ -296,18 +290,21 @@ export function TradingViewLiveChart({
 			down: '#ef5350',   // Red
 		};
 
-		// Add candlestick series (price chart)
-		const candlestickSeries = chart.addSeries(CandlestickSeries, {
-			upColor: candleColors.up,
-			downColor: candleColors.down,
-			borderVisible: false,
-			wickUpColor: candleColors.up,
-			wickDownColor: candleColors.down,
-		});
-		
-		// Use pre-deduplicated bars from useMemo
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		candlestickSeries.setData(uniqueBars as any);
+		// Add candlestick series (price chart) - conditionally based on showPrice
+		let candlestickSeries;
+		if (showPrice) {
+			candlestickSeries = chart.addSeries(CandlestickSeries, {
+				upColor: candleColors.up,
+				downColor: candleColors.down,
+				borderVisible: false,
+				wickUpColor: candleColors.up,
+				wickDownColor: candleColors.down,
+			});
+			
+			// Use pre-deduplicated bars from useMemo
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
+			candlestickSeries.setData(uniqueBars as any);
+		}
 
 		// Add 20-period Simple Moving Average (SMA) - using memoized data
 		if (showSMA && smaData.length > 0) {
@@ -322,36 +319,42 @@ export function TradingViewLiveChart({
 		}
 
 		// Add volume histogram on separate pane (pane 1) - using memoized data
-		console.log('[Volume Debug] showVolume:', showVolume, 'volumeData.length:', volumeData.length);
-		
 		if (showVolume && volumeData.length > 0) {
-			console.log('[Volume Debug] Creating volume series...');
-			console.log('[Volume Debug] Sample volume data:', volumeData.slice(0, 3));
-			
 			const volumeSeries = chart.addSeries(HistogramSeries, {
 				priceFormat: {
 					type: 'volume',
 				},
 				base: 0,  // Ensure bars start from 0
-				priceScaleId: '',  // Use default price scale for volume pane
+				priceScaleId: 'right',  // Show scale on right side
 			});
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			volumeSeries.setData(volumeData as any);
 			// Move to pane 1 (creates pane if it doesn't exist)
 			volumeSeries.moveToPane(1);
-			
-			console.log('[Volume Debug] Volume series moved to pane 1');
-		} else {
-			console.log('[Volume Debug] Volume not rendered - showVolume:', showVolume, 'volumeData.length:', volumeData.length);
+
+			// Add Volume MA line if enabled
+			if (showVolumeMA && volumeMAData.length > 0) {
+				const volumeMASeries = chart.addSeries(LineSeries, {
+					color: isDark ? '#FB923C' : '#F97316',  // Orange/amber color
+					lineWidth: 1,
+					priceLineVisible: false,
+					lastValueVisible: false,  // Hide value in legend (no label requested)
+					// No title property - removes label from legend
+					priceFormat: {
+						type: 'volume',
+					},
+				});
+
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				volumeMASeries.setData(volumeMAData as any);
+				// Move to same pane as volume (pane 1)
+				volumeMASeries.moveToPane(1);
+			}
 		}
 
 		// Add CVD pane if checkbox is enabled (data is always fetched, showCVD controls visibility)
-		console.log('[CVD Debug] showCVD:', showCVD, 'cvdData.length:', cvdData.length);
-		
 		if (showCVD && cvdData.length > 0) {
 			const cvdPaneIndex = showVolume ? 2 : 1; // Pane 2 if volume shown, else pane 1
-			
-			console.log('[CVD Debug] Rendering CVD on pane index:', cvdPaneIndex);
 			
 			// Format large numbers with K/M/B notation
 			const formatCVDValue = (value: number): string => {
@@ -383,42 +386,64 @@ export function TradingViewLiveChart({
 			cvdSeries.setData(cvdData as any);
 			// Move to appropriate pane (creates pane if it doesn't exist)
 			cvdSeries.moveToPane(cvdPaneIndex);
-			
-			console.log('[CVD Debug] CVD series moved to pane', cvdPaneIndex);
-		} else {
-			console.log('[CVD Debug] CVD not rendered - showCVD:', showCVD, 'cvdData.length:', cvdData.length);
 		}
 
 		// ✅ FIX: Set pane heights using stretch factors (relative sizing)
 		// This avoids the synchronous setHeight() timing issue in lightweight-charts v5
 		const panes = chart.panes();
-		console.log('[Pane Debug] Total panes:', panes.length);
 
-		if (showVolume && showCVD) {
+		// Handle pane sizing based on what's visible
+		if (!showPrice) {
+			// Price hidden - hide pane 0
+			panes[0].setStretchFactor(0);
+			
+			if (showVolume && showCVD) {
+				// Volume and CVD visible - split 50/50
+				if (panes[1]) panes[1].setStretchFactor(1);  // Volume: 1 part (50%)
+				if (panes[2]) panes[2].setStretchFactor(1);  // CVD: 1 part (50%)
+			} else if (showVolume) {
+				// Only volume visible - takes full space
+				if (panes[1]) panes[1].setStretchFactor(1);  // Volume: full (100%)
+			} else if (showCVD) {
+				// Only CVD visible - takes full space
+				if (panes[1]) panes[1].setStretchFactor(1);  // CVD: full (100%)
+			}
+		} else if (showVolume && showCVD) {
 			// 3 panes: Price (0), Volume (1), CVD (2)
 			// Ratio: 50% : 25% : 25%
 			panes[0].setStretchFactor(2);  // Main chart: 2 parts (50%)
 			if (panes[1]) panes[1].setStretchFactor(1);  // Volume: 1 part (25%)
 			if (panes[2]) panes[2].setStretchFactor(1);  // CVD: 1 part (25%)
-			console.log('[Pane Debug] Set stretch factors: Price=2, Volume=1, CVD=1');
 		} else if (showVolume) {
 			// 2 panes: Price (0), Volume (1)
 			// Ratio: 66% : 33%
 			panes[0].setStretchFactor(2);  // Main chart: 2 parts (66%)
 			if (panes[1]) panes[1].setStretchFactor(1);  // Volume: 1 part (33%)
-			console.log('[Pane Debug] Set stretch factors: Price=2, Volume=1');
 		} else if (showCVD) {
 			// 2 panes: Price (0), CVD (1)
 			// Ratio: 66% : 33%
 			panes[0].setStretchFactor(2);  // Main chart: 2 parts (66%)
 			if (panes[1]) panes[1].setStretchFactor(1);  // CVD: 1 part (33%)
-			console.log('[Pane Debug] Set stretch factors: Price=2, CVD=1');
+		} else {
+			// Only price visible - takes full space
+			panes[0].setStretchFactor(1);  // Price: full (100%)
 		}
 
-		// Fit content to view
-		chart.timeScale().fitContent();
-
+		// Apply zoom level instead of fitContent to prevent flicker
+		// fitContent causes a zoom out flash before zoom effect runs
 		chartRef.current = chart;
+
+		if (uniqueBars.length > 0) {
+			applyZoom(chart.timeScale(), zoomLevel, uniqueBars, resolution);
+		} else {
+			// Fallback to fitContent if no bars
+			chart.timeScale().fitContent();
+		}
+
+		// Call onChartReady callback
+		if (onChartReady) {
+			onChartReady(chart);
+		}
 
 		// Cleanup
 		return () => {
@@ -427,29 +452,46 @@ export function TradingViewLiveChart({
 				chartRef.current = null;
 			}
 		};
-	}, [data, height, isDark, smaData, volumeData, cvdData, showSMA, showVolume, showGrid, showCVD, uniqueBars, containerDimensions]);
+	}, [data, height, isDark, smaData, volumeData, volumeMAData, cvdData, showPrice, showSMA, showVolume, showVolumeMA, showCVD, uniqueBars]);
+	// NOTE: onChartReady removed from dependencies - it's a callback, not data
+	// Adding it causes infinite loop when parent component passes inline arrow functions
 
-	// Apply zoom level when it changes
+	// Apply zoom level when it changes (without recreating chart)
+	// This effect handles zoom changes after initial chart creation
 	useEffect(() => {
-		if (!chartRef.current || !data || uniqueBars.length === 0) return;
+		// Skip if chart not ready or no data
+		if (!chartRef.current || uniqueBars.length === 0 || !data) return;
 
-		const timeScale = chartRef.current.timeScale();
-		applyZoom(timeScale, zoomLevel, uniqueBars, resolution);
-	}, [zoomLevel, uniqueBars, resolution, data]);
+		applyZoom(chartRef.current.timeScale(), zoomLevel, uniqueBars, resolution);
+	}, [zoomLevel, resolution]);
 
-	// Handle window resize
+	// Handle grid toggle without recreating chart
 	useEffect(() => {
-		const handleResize = () => {
-			if (chartRef.current && chartContainerRef.current) {
-				chartRef.current.applyOptions({
-					width: chartContainerRef.current.clientWidth,
-				});
-			}
-		};
+		if (!chartRef.current) return;
 
-		window.addEventListener('resize', handleResize);
-		return () => window.removeEventListener('resize', handleResize);
-	}, []);
+		const gridColor = isDark ? '#2B2B43' : '#e6e6e6';
+		chartRef.current.applyOptions({
+			grid: {
+				vertLines: {
+					color: showGrid ? gridColor : 'transparent'
+				},
+				horzLines: {
+					color: showGrid ? gridColor : 'transparent'
+				},
+			},
+		});
+	}, [showGrid, isDark]);
+
+	// Zoom is now applied synchronously during chart creation to prevent flicker
+	// No separate effect needed
+
+	// DISABLED: ResizeObserver was causing infinite expansion loop
+	// The chart is already set to height='100%' which makes it responsive
+	// Manual resize is handled during chart creation and layout changes
+	// ResizeObserver was triggering panel resize -> component re-render -> new chart -> new ResizeObserver -> expand...
+	useEffect(() => {
+		// No-op - ResizeObserver removed
+	}, [data]);
 
 	// Show loading if no data AND (fetching OR streaming)
 	const isLoading = !providedChartData && (loading || isStreaming);

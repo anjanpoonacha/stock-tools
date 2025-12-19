@@ -1,26 +1,48 @@
 /**
  * useChartSettings Hook
- * React hook for chart settings with automatic persistence
+ * React hook for chart settings with KV persistence
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { ChartSettingsStorage, ViewSettingsStorage, ChartIndexStorage } from '@/lib/storage/chartSettings';
+import { loadChartSettings, saveChartSettings, type ChartSettings as KVChartSettings } from '@/lib/storage/kvStorage';
 import type { ChartSettings, ViewSettings } from '@/lib/storage/types';
 
 /**
- * Hook for chart settings with localStorage persistence
+ * Hook for chart settings with KV persistence
  * @returns Chart settings and setter functions
  */
 export function useChartSettings() {
-  // Initialize from storage
+  // Initialize from localStorage (will be overwritten by KV)
   const [settings, setSettings] = useState<ChartSettings>(() =>
     ChartSettingsStorage.get()
   );
 
-  // Persist to storage whenever settings change
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Load from KV on mount
   useEffect(() => {
-    ChartSettingsStorage.set(settings);
-  }, [settings]);
+    async function loadFromKV() {
+      try {
+        const kvSettings = await loadChartSettings();
+        if (kvSettings) {
+          setSettings(kvSettings as ChartSettings);
+        }
+      } catch (error) {
+        console.error('Failed to load chart settings from KV:', error);
+      } finally {
+        setIsLoaded(true);
+      }
+    }
+    loadFromKV();
+  }, []);
+
+  // Persist to KV whenever settings change (after initial load)
+  useEffect(() => {
+    if (isLoaded) {
+      saveChartSettings(settings as unknown as KVChartSettings);
+    }
+  }, [settings, isLoaded]);
 
   /**
    * Update multiple settings at once

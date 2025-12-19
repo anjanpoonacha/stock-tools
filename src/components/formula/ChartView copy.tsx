@@ -39,7 +39,6 @@ import { TimeframeInputOverlay } from '@/components/chart/TimeframeInputOverlay'
 import { SymbolSearchOverlay } from '@/components/chart/SymbolSearchOverlay';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useKVSettings } from '@/hooks/useKVSettings';
-import { DUAL_CHART_SIZES } from '@/lib/chart/panelConstants';
 import { cn } from '@/lib/utils';
 import type { Stock } from '@/types/stock';
 import type { IChartApi } from 'lightweight-charts';
@@ -137,18 +136,10 @@ export default function ChartView({
 		resolution2,
 		zoomLevel1,
 		zoomLevel2,
-		showPrice1,
-		showVolume1,
-		showCVD1,
-		cvdAnchorPeriod1,
-		cvdUseCustomPeriod1,
-		cvdCustomPeriod1,
-		showPrice2,
-		showVolume2,
-		showCVD2,
-		cvdAnchorPeriod2,
-		cvdUseCustomPeriod2,
-		cvdCustomPeriod2,
+		showCVD,
+		cvdAnchorPeriod,
+		cvdUseCustomPeriod,
+		cvdCustomPeriod,
 		showGrid,
 		dualViewMode,
 	} = chartSettings;
@@ -329,17 +320,7 @@ export default function ChartView({
 	const handleLayoutModeToggle = useCallback(() => {
 		const newMode = layoutMode === 'horizontal' ? 'vertical' : 'horizontal';
 		updateLayoutMode(newMode);
-		
-		// HACK: Force restore panel sizes after orientation change to prevent stock list from disappearing
-		// The inner PanelGroup remount triggers parent resize events with incorrect values
-		setTimeout(() => {
-			updatePanelLayout({
-				'toolbar-panel': 5,
-				'chart-panel': 81,
-				'stock-list-panel': 14,
-			});
-		}, 100);
-	}, [layoutMode, updateLayoutMode, updatePanelLayout]);
+	}, [layoutMode, updateLayoutMode]);
 
 	// Handle range sync toggle (centralized hook handles persistence)
 	const handleRangeSyncToggle = useCallback(() => {
@@ -452,31 +433,12 @@ export default function ChartView({
 		const chart = layout['chart-panel'];
 		const stockList = layout['stock-list-panel'];
 
-		// Validate all panels exist and have valid values
-		if (!toolbar || !chart || !stockList || 
-		    toolbar < 0 || chart < 0 || stockList < 0) {
-			console.warn('⚠️ [Panel Resize] Invalid panel sizes, ignoring', layout);
-			return;
-		}
-
-		const total = toolbar + chart + stockList;
-		
-		// Validate total is approximately 100%
-		if (Math.abs(total - 100) > 5) {
-			console.warn('⚠️ [Panel Resize] Total not 100%, ignoring', {
-				toolbar: toolbar.toFixed(1),
-				chart: chart.toFixed(1),
-				stockList: stockList.toFixed(1),
-				total: total.toFixed(1)
-			});
-			return;
-		}
-
-		console.log('✅ [Panel Sizes]', {
-			toolbar: `${toolbar.toFixed(1)}%`,
-			chart: `${chart.toFixed(1)}%`,
-			stockList: `${stockList.toFixed(1)}%`,
-			total: `${total.toFixed(1)}%`
+		console.log('🎯 [Panel Sizes]', {
+			toolbar: `${toolbar?.toFixed(1)}%`,
+			chart: `${chart?.toFixed(1)}%`,
+			stockList: `${stockList?.toFixed(1)}%`,
+			total: `${(toolbar + chart + stockList).toFixed(1)}%`,
+			rawLayout: layout
 		});
 
 		// Update panel layout (centralized hook handles debouncing and saving)
@@ -661,193 +623,78 @@ export default function ChartView({
 					<PopoverTrigger asChild>
 						<Button variant='outline' size='icon' className='h-10 w-10 relative' title='CVD Indicator Settings'>
 							<TrendingUp className='h-5 w-5' />
-							{/* Left dot for Chart 1, Right dot for Chart 2 */}
-							{showCVD1 && (
-								<span className='absolute -top-1 -left-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background' />
-							)}
-							{showCVD2 && (
-								<span className='absolute -top-1 -right-1 h-3 w-3 bg-blue-500 rounded-full border-2 border-background' />
+							{showCVD && (
+								<span className='absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background' />
 							)}
 						</Button>
 					</PopoverTrigger>
-					<PopoverContent side='right' className='w-[380px]'>
+					<PopoverContent side='right' className='w-[320px]'>
 						<div className='space-y-4'>
-							<h3 className='text-sm font-semibold'>CVD Indicator Settings</h3>
+							<div className='flex items-center justify-between'>
+								<h3 className='text-sm font-semibold'>CVD Indicator</h3>
+								<Checkbox
+									id='cvd-toggle-popup'
+									checked={showCVD}
+									onCheckedChange={(checked) => updateChartSetting('showCVD', checked === true)}
+								/>
+							</div>
 
-							{/* Chart 1 Indicators */}
-							<div className='space-y-3 p-3 border rounded-lg bg-muted/30'>
-								<Label className='text-sm font-medium'>Chart 1 Indicators</Label>
-								
-								{/* Price Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>Price</Label>
-									<Checkbox
-										id='price-toggle-chart1'
-										checked={showPrice1}
-										onCheckedChange={(checked) => updateChartSetting('showPrice1', checked === true)}
-									/>
-								</div>
-								
-								{/* Volume Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>Volume</Label>
-									<Checkbox
-										id='volume-toggle-chart1'
-										checked={showVolume1}
-										onCheckedChange={(checked) => updateChartSetting('showVolume1', checked === true)}
-									/>
-								</div>
+							{showCVD && (
+								<div className='space-y-3 pt-2 border-t'>
+									{/* Anchor Period */}
+									<div className='space-y-2'>
+										<Label className='text-xs'>Anchor Period</Label>
+										<Select value={cvdAnchorPeriod} onValueChange={(val) => updateChartSetting('cvdAnchorPeriod', val)}>
+											<SelectTrigger className='h-9'>
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												{CVD_ANCHOR_PERIODS.map((period) => (
+													<SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
 
-								{/* CVD Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>CVD</Label>
-									<Checkbox
-										id='cvd-toggle-chart1'
-										checked={showCVD1}
-										onCheckedChange={(checked) => updateChartSetting('showCVD1', checked === true)}
-									/>
-								</div>
+									{/* Use Custom Period */}
+									<div className='flex items-center gap-2'>
+										<Checkbox
+											id='cvd-custom-popup'
+											checked={cvdUseCustomPeriod}
+											onCheckedChange={(checked) => updateChartSetting('cvdUseCustomPeriod', checked === true)}
+										/>
+										<Label htmlFor='cvd-custom-popup' className='text-xs cursor-pointer'>
+											Use Custom Period
+										</Label>
+									</div>
 
-								{showCVD1 && (
-									<div className='space-y-3 pt-2 border-t'>
-										{/* Anchor Period */}
+									{/* Custom Period */}
+									{cvdUseCustomPeriod && (
 										<div className='space-y-2'>
-											<Label className='text-xs'>Anchor Period</Label>
-											<Select value={cvdAnchorPeriod1} onValueChange={(val) => updateChartSetting('cvdAnchorPeriod1', val)}>
+											<Label className='text-xs'>Custom Period</Label>
+											<Select value={cvdCustomPeriod} onValueChange={(val) => updateChartSetting('cvdCustomPeriod', val)}>
 												<SelectTrigger className='h-9'>
 													<SelectValue />
 												</SelectTrigger>
 												<SelectContent>
-													{CVD_ANCHOR_PERIODS.map((period) => (
+													{CVD_CUSTOM_PERIODS.map((period) => (
 														<SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
 													))}
 												</SelectContent>
 											</Select>
 										</div>
-
-										{/* Use Custom Period */}
-										<div className='flex items-center gap-2'>
-											<Checkbox
-												id='cvd-custom-chart1'
-												checked={cvdUseCustomPeriod1}
-												onCheckedChange={(checked) => updateChartSetting('cvdUseCustomPeriod1', checked === true)}
-											/>
-											<Label htmlFor='cvd-custom-chart1' className='text-xs cursor-pointer'>
-												Use Custom Period
-											</Label>
-										</div>
-
-										{/* Custom Period */}
-										{cvdUseCustomPeriod1 && (
-											<div className='space-y-2'>
-												<Label className='text-xs'>Custom Period</Label>
-												<Select value={cvdCustomPeriod1} onValueChange={(val) => updateChartSetting('cvdCustomPeriod1', val)}>
-													<SelectTrigger className='h-9'>
-														<SelectValue />
-													</SelectTrigger>
-													<SelectContent>
-														{CVD_CUSTOM_PERIODS.map((period) => (
-															<SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-											</div>
-										)}
-									</div>
-								)}
-							</div>
-
-							{/* Chart 2 Indicators */}
-							<div className='space-y-3 p-3 border rounded-lg bg-muted/30'>
-								<Label className='text-sm font-medium'>Chart 2 Indicators</Label>
-								
-								{/* Price Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>Price</Label>
-									<Checkbox
-										id='price-toggle-chart2'
-										checked={showPrice2}
-										onCheckedChange={(checked) => updateChartSetting('showPrice2', checked === true)}
-									/>
+									)}
 								</div>
-								
-								{/* Volume Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>Volume</Label>
-									<Checkbox
-										id='volume-toggle-chart2'
-										checked={showVolume2}
-										onCheckedChange={(checked) => updateChartSetting('showVolume2', checked === true)}
-									/>
-								</div>
-
-								{/* CVD Toggle */}
-								<div className='flex items-center justify-between'>
-									<Label className='text-xs'>CVD</Label>
-									<Checkbox
-										id='cvd-toggle-chart2'
-										checked={showCVD2}
-										onCheckedChange={(checked) => updateChartSetting('showCVD2', checked === true)}
-									/>
-								</div>
-
-								{showCVD2 && (
-									<div className='space-y-3 pt-2 border-t'>
-										{/* Anchor Period */}
-										<div className='space-y-2'>
-											<Label className='text-xs'>Anchor Period</Label>
-											<Select value={cvdAnchorPeriod2} onValueChange={(val) => updateChartSetting('cvdAnchorPeriod2', val)}>
-												<SelectTrigger className='h-9'>
-													<SelectValue />
-												</SelectTrigger>
-												<SelectContent>
-													{CVD_ANCHOR_PERIODS.map((period) => (
-														<SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</div>
-
-										{/* Use Custom Period */}
-										<div className='flex items-center gap-2'>
-											<Checkbox
-												id='cvd-custom-chart2'
-												checked={cvdUseCustomPeriod2}
-												onCheckedChange={(checked) => updateChartSetting('cvdUseCustomPeriod2', checked === true)}
-											/>
-											<Label htmlFor='cvd-custom-chart2' className='text-xs cursor-pointer'>
-												Use Custom Period
-											</Label>
-										</div>
-
-										{/* Custom Period */}
-										{cvdUseCustomPeriod2 && (
-											<div className='space-y-2'>
-												<Label className='text-xs'>Custom Period</Label>
-												<Select value={cvdCustomPeriod2} onValueChange={(val) => updateChartSetting('cvdCustomPeriod2', val)}>
-													<SelectTrigger className='h-9'>
-														<SelectValue />
-													</SelectTrigger>
-													<SelectContent>
-														{CVD_CUSTOM_PERIODS.map((period) => (
-															<SelectItem key={period.value} value={period.value}>{period.label}</SelectItem>
-														))}
-													</SelectContent>
-												</Select>
-											</div>
-										)}
-									</div>
-								)}
-							</div>
+							)}
 						</div>
 					</PopoverContent>
 				</Popover>
 					</div>
 				</Panel>
 
-			<ResizeHandle className='w-1 bg-border hover:bg-primary transition-colors cursor-col-resize' />
+				<ResizeHandle className='w-1 bg-border hover:bg-primary transition-colors' />
 
-			{/* Panel 2: Chart Area (CENTER - Maximum Space) */}
+				{/* Panel 2: Chart Area (CENTER - Maximum Space) */}
 				<Panel
 					defaultSize={panelLayout['chart-panel']}
 					minSize="30%"
@@ -931,14 +778,10 @@ export default function ChartView({
 								<PanelGroup
 								orientation={layoutMode}
 								className='h-full w-full'
-								id='dual-chart-group'
+								id={`dual-chart-${layoutMode}`}
 							>
-									{/* Chart 1 */}
-									<Panel 
-										defaultSize={layoutMode === 'horizontal' ? DUAL_CHART_SIZES.HORIZONTAL.CHART_1 : DUAL_CHART_SIZES.VERTICAL.CHART_1}
-										minSize={DUAL_CHART_SIZES.MIN_SIZE}
-										order={1}
-									>
+										{/* Chart 1 */}
+										<Panel defaultSize={50} minSize={20} order={1}>
 										<div
 											className={cn(
 												'h-full bg-background rounded-lg border overflow-hidden transition-all cursor-pointer',
@@ -960,39 +803,32 @@ export default function ChartView({
 												</p>
 											</div>
 											<div className='p-2 h-[calc(100%-2.5rem)] relative'>
-											<TradingViewLiveChart
-												symbol={currentSymbol}
-												resolution={resolution1}
-												barsCount={getResolutionConfig(resolution1).barsCount}
-												height={RESPONSIVE_CHART_HEIGHT}
-												showPrice={showPrice1}
-												showGrid={showGrid}
-												showVolume={showVolume1}
-												showCVD={showCVD1}
-												cvdAnchorPeriod={cvdAnchorPeriod1}
-												cvdTimeframe={cvdUseCustomPeriod1 ? cvdCustomPeriod1 : undefined}
-												zoomLevel={zoomLevel1}
-												showVolumeMA={chartSettings.showVolumeMA}
-												volumeMALength={chartSettings.volumeMALength}
-												onChartReady={(chart) => { chart1Ref.current = chart; }}
-												onDataLoaded={(bars) => setBars1(bars)}
-											/>
+												<TradingViewLiveChart
+													symbol={currentSymbol}
+													resolution={resolution1}
+													barsCount={getResolutionConfig(resolution1).barsCount}
+													height={RESPONSIVE_CHART_HEIGHT}
+													showGrid={showGrid}
+													showCVD={showCVD}
+													cvdAnchorPeriod={cvdAnchorPeriod}
+													cvdTimeframe={cvdUseCustomPeriod ? cvdCustomPeriod : undefined}
+													zoomLevel={zoomLevel1}
+													showVolumeMA={chartSettings.showVolumeMA}
+													volumeMALength={chartSettings.volumeMALength}
+													onChartReady={(chart) => { chart1Ref.current = chart; }}
+													onDataLoaded={(bars) => setBars1(bars)}
+												/>
 											</div>
 										</div>
 									</Panel>
 
-								{/* TODO: Resizing disabled - using fixed splits (H: 70-30, V: 50-50) */}
-								{/* <ResizeHandle className={cn(
-									'transition-colors',
-									layoutMode === 'horizontal' ? 'w-1 bg-border hover:bg-primary cursor-col-resize' : 'h-2 w-full bg-border hover:bg-primary cursor-row-resize'
-								)} /> */}
+									<ResizeHandle className={cn(
+										'transition-colors',
+										layoutMode === 'horizontal' ? 'w-1 bg-border hover:bg-primary' : 'h-1 bg-border hover:bg-primary'
+									)} />
 
 									{/* Chart 2 */}
-									<Panel 
-										defaultSize={layoutMode === 'horizontal' ? DUAL_CHART_SIZES.HORIZONTAL.CHART_2 : DUAL_CHART_SIZES.VERTICAL.CHART_2}
-										minSize={DUAL_CHART_SIZES.MIN_SIZE}
-										order={2}
-									>
+									<Panel defaultSize={50} minSize={20} order={2}>
 										<div
 											className={cn(
 												'h-full bg-background rounded-lg border overflow-hidden transition-all cursor-pointer',
@@ -1014,23 +850,21 @@ export default function ChartView({
 												</p>
 											</div>
 											<div className='p-2 h-[calc(100%-2.5rem)] relative'>
-											<TradingViewLiveChart
-												symbol={currentSymbol}
-												resolution={resolution2}
-												barsCount={getResolutionConfig(resolution2).barsCount}
-												height={RESPONSIVE_CHART_HEIGHT}
-												showPrice={showPrice2}
-												showGrid={showGrid}
-												showVolume={showVolume2}
-												showCVD={showCVD2}
-												cvdAnchorPeriod={cvdAnchorPeriod2}
-												cvdTimeframe={cvdUseCustomPeriod2 ? cvdCustomPeriod2 : undefined}
-												zoomLevel={zoomLevel2}
-												showVolumeMA={chartSettings.showVolumeMA}
-												volumeMALength={chartSettings.volumeMALength}
-												onChartReady={(chart) => { chart2Ref.current = chart; }}
-												onDataLoaded={(bars) => setBars2(bars)}
-											/>
+												<TradingViewLiveChart
+													symbol={currentSymbol}
+													resolution={resolution2}
+													barsCount={getResolutionConfig(resolution2).barsCount}
+													height={RESPONSIVE_CHART_HEIGHT}
+													showGrid={showGrid}
+													showCVD={showCVD}
+													cvdAnchorPeriod={cvdAnchorPeriod}
+													cvdTimeframe={cvdUseCustomPeriod ? cvdCustomPeriod : undefined}
+													zoomLevel={zoomLevel2}
+													showVolumeMA={chartSettings.showVolumeMA}
+													volumeMALength={chartSettings.volumeMALength}
+													onChartReady={(chart) => { chart2Ref.current = chart; }}
+													onDataLoaded={(bars) => setBars2(bars)}
+												/>
 											</div>
 										</div>
 									</Panel>
@@ -1044,23 +878,21 @@ export default function ChartView({
 										</p>
 									</div>
 									<div className='p-2 h-[calc(100%-2.5rem)] relative'>
-									<TradingViewLiveChart
-										symbol={currentSymbol}
-										resolution={resolution1}
-										barsCount={getResolutionConfig(resolution1).barsCount}
-										height={RESPONSIVE_CHART_HEIGHT}
-										showPrice={showPrice1}
-										showGrid={showGrid}
-										showVolume={showVolume1}
-										showCVD={showCVD1}
-										cvdAnchorPeriod={cvdAnchorPeriod1}
-										cvdTimeframe={cvdUseCustomPeriod1 ? cvdCustomPeriod1 : undefined}
-										zoomLevel={zoomLevel1}
-										showVolumeMA={chartSettings.showVolumeMA}
-										volumeMALength={chartSettings.volumeMALength}
-										onChartReady={(chart) => { chart1Ref.current = chart; }}
-										onDataLoaded={(bars) => setBars1(bars)}
-									/>
+										<TradingViewLiveChart
+											symbol={currentSymbol}
+											resolution={resolution1}
+											barsCount={getResolutionConfig(resolution1).barsCount}
+											height={RESPONSIVE_CHART_HEIGHT}
+											showGrid={showGrid}
+											showCVD={showCVD}
+											cvdAnchorPeriod={cvdAnchorPeriod}
+											cvdTimeframe={cvdUseCustomPeriod ? cvdCustomPeriod : undefined}
+											zoomLevel={zoomLevel1}
+											showVolumeMA={chartSettings.showVolumeMA}
+											volumeMALength={chartSettings.volumeMALength}
+											onChartReady={(chart) => { chart1Ref.current = chart; }}
+											onDataLoaded={(bars) => setBars1(bars)}
+										/>
 									</div>
 								</div>
 							)}
@@ -1068,9 +900,9 @@ export default function ChartView({
 					</div>
 				</Panel>
 
-			<ResizeHandle className='w-1 bg-border hover:bg-primary transition-colors cursor-col-resize' />
+				<ResizeHandle className='w-1 bg-border hover:bg-primary transition-colors' />
 
-			{/* Panel 3: Stock List (RIGHT) */}
+				{/* Panel 3: Stock List (RIGHT) */}
 				<Panel
 					defaultSize={panelLayout['stock-list-panel']}
 					minSize="14%"

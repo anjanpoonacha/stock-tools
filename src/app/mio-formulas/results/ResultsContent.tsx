@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useFormulaResults } from '@/hooks/useFormulaResults';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import ChartView from '@/components/formula/ChartView';
 import { filterAndSortStocks, type SortField, type SortOrder } from '@/lib/utils/stockOrdering';
 import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
 import { useViewSettings, useChartIndex } from '@/hooks/useChartSettings';
+import type { Stock } from '@/types/stock';
 
 export default function ResultsContent() {
 	const searchParams = useSearchParams();
@@ -28,6 +29,9 @@ export default function ResultsContent() {
 
 	// Chart index with per-formula session storage
 	const { currentIndex: currentStockIndex, setCurrentIndex: setCurrentStockIndex } = useChartIndex(formulaId);
+
+	// Custom symbol state for jumping to symbols not in the list
+	const [customSymbol, setCustomSymbol] = useState<string | null>(null);
 
 	// Read sort and filter settings from URL
 	const sortField = (searchParams.get('sortBy') as SortField) || 'symbol';
@@ -47,9 +51,28 @@ export default function ResultsContent() {
 	}, [stocks, sortField, sortOrder, sectorFilter, industryFilter]);
 
 	// Get array of stock symbols for chart navigation
+	// Include custom symbol if set
 	const stockSymbols = useMemo(() => {
-		return filteredAndSortedStocks.map(s => s.symbol);
-	}, [filteredAndSortedStocks]);
+		const baseSymbols = filteredAndSortedStocks.map(s => s.symbol);
+		if (customSymbol && !baseSymbols.includes(customSymbol)) {
+			return [...baseSymbols, customSymbol];
+		}
+		return baseSymbols;
+	}, [filteredAndSortedStocks, customSymbol]);
+
+	// Include custom stock in stocks array if needed
+	const displayStocks = useMemo(() => {
+		if (customSymbol && !filteredAndSortedStocks.find(s => s.symbol === customSymbol)) {
+			const customStock: Stock = {
+				symbol: customSymbol,
+				name: customSymbol,
+				sector: 'Custom',
+				industry: 'Custom Symbol',
+			};
+			return [...filteredAndSortedStocks, customStock];
+		}
+		return filteredAndSortedStocks;
+	}, [filteredAndSortedStocks, customSymbol]);
 
 	// Reset chart index when filters change
 	useEffect(() => {
@@ -83,6 +106,16 @@ export default function ResultsContent() {
 	// Handle switching back to table view
 	const handleBackToTable = () => {
 		setViewMode('table');
+	};
+
+	// Handle jumping to arbitrary symbol (not in current list)
+	const handleSymbolJump = (symbol: string) => {
+		// Set custom symbol (will be appended to lists)
+		setCustomSymbol(symbol);
+
+		// Navigate to the last index (where custom symbol will be)
+		const newIndex = displayStocks.length; // Will be length after custom stock is added
+		setCurrentStockIndex(newIndex);
 	};
 
 	if (!formulaId) {
@@ -164,10 +197,12 @@ export default function ResultsContent() {
 							/>
 						) : (
 							<ChartView
+								stocks={displayStocks}
 								stockSymbols={stockSymbols}
 								currentIndex={currentStockIndex}
 								setCurrentIndex={setCurrentStockIndex}
 								onBackToTable={handleBackToTable}
+								onSymbolJump={handleSymbolJump}
 							/>
 						)}
 					</>
