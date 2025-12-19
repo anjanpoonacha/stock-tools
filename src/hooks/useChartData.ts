@@ -1,18 +1,11 @@
 /**
- * Reusable Chart Data Hook with Caching
+ * Reusable Chart Data Hook
  * 
- * Centralized hook for fetching chart data with automatic caching.
+ * Centralized hook for fetching chart data.
  * Used by both TradingViewLiveChart and ReusableChart components.
- * 
- * Features:
- * - Automatic cache check before API calls
- * - Saves successful responses to cache
- * - 5-minute TTL by default
- * - Prevents duplicate fetches
  */
 
 import { useState, useEffect } from 'react';
-import { LocalStorageCache } from '@/lib/utils/cache';
 import type { OHLCVBar } from '@/lib/tradingview/types';
 
 export interface ChartDataResponse {
@@ -58,21 +51,6 @@ interface UseChartDataReturn {
 	refetch: () => void;
 }
 
-const CACHE_KEY_PREFIX = 'chart-data:';
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Generate cache key from parameters
- */
-function getCacheKey(params: UseChartDataParams): string {
-	const { symbol, resolution, barsCount, cvdEnabled } = params;
-	// Normalize cvdEnabled to boolean for consistent cache keys
-	const cvdFlag = cvdEnabled === true;
-	const key = `${CACHE_KEY_PREFIX}${symbol}_${resolution}_${barsCount}_${cvdFlag}`;
-	console.log(`[getCacheKey] Generated key: ${key}`, { symbol, resolution, barsCount, cvdEnabled, cvdFlag });
-	return key;
-}
-
 /**
  * Fetch chart data from API
  */
@@ -87,13 +65,9 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
 		cvdTimeframe
 	} = params;
 
-	// Get credentials
-	const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
-	if (!storedCredentials) {
-		throw new Error('Authentication credentials not found. Please log in again.');
-	}
-
-	const credentials = JSON.parse(storedCredentials);
+	// Get credentials using centralized utility
+	const { requireCredentials } = await import('@/lib/auth/authUtils');
+	const credentials = requireCredentials();
 
 	// Build API URL
 	const url = new URL(apiEndpoint, window.location.origin);
@@ -110,9 +84,6 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
 		if (cvdTimeframe) {
 			url.searchParams.set('cvdTimeframe', cvdTimeframe);
 		}
-		console.log('[fetchChartData] CVD ENABLED - params:', { cvdAnchorPeriod, cvdTimeframe });
-	} else {
-		console.log('[fetchChartData] CVD DISABLED');
 	}
 
 	// Fetch data
@@ -132,13 +103,6 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
 	}
 
 	const result: ChartDataResponse = await response.json();
-	
-	console.log('[fetchChartData] API Response:', {
-		success: result.success,
-		barsCount: result.bars?.length,
-		hasIndicators: !!result.indicators,
-		indicatorKeys: result.indicators ? Object.keys(result.indicators) : []
-	});
 
 	if (!result.success) {
 		throw new Error(result.error || 'Failed to fetch chart data');
@@ -152,7 +116,7 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
 }
 
 /**
- * Reusable hook for fetching chart data with caching
+ * Reusable hook for fetching chart data
  * 
  * @param params - Chart data fetch parameters
  * @returns Chart data, loading state, error state, and refetch function
@@ -188,33 +152,10 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 				setLoading(true);
 				setError(null);
 
-				const cacheKey = getCacheKey(params);
-
-				// Check cache first
-				const cached = LocalStorageCache.get<ChartDataResponse>(cacheKey, CACHE_TTL);
-				if (cached) {
-					console.log(`[useChartData] ✅ Cache HIT: ${params.symbol} ${params.resolution} - Key: ${cacheKey}`);
-					if (mounted) {
-						setData(cached);
-						setLoading(false);
-					}
-					return;
-				}
-
-				console.log(`[useChartData] ❌ Cache MISS, fetching: ${params.symbol} ${params.resolution} - Key: ${cacheKey}`);
-
 				// Fetch from API
 				const result = await fetchChartData(params);
 
 				if (!mounted) return;
-
-				// Save to cache (only if not exceeding quota)
-				try {
-					LocalStorageCache.set(cacheKey, result);
-				} catch (err) {
-					console.warn('[useChartData] Failed to cache (quota exceeded):', err instanceof Error ? err.message : 'Unknown error');
-					// Continue without caching - not critical
-				}
 
 				setData(result);
 				setLoading(false);
@@ -255,32 +196,4 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 		error,
 		refetch
 	};
-}
-
-/**
- * Prefetch chart data in the background
- * Returns promise that resolves when complete
- * 
- * @param params - Chart data fetch parameters
- * @returns Promise<void>
- */
-export async function prefetchChartData(params: UseChartDataParams): Promise<void> {
-	const cacheKey = getCacheKey(params);
-
-	// Skip if already cached
-	const existing = LocalStorageCache.get<ChartDataResponse>(cacheKey, CACHE_TTL);
-	if (existing) {
-		console.log(`[prefetchChartData] ⏭️  Already cached: ${params.symbol} ${params.resolution} - Key: ${cacheKey}`);
-		return;
-	}
-
-	try {
-		console.log(`[prefetchChartData] 🔄 Fetching: ${params.symbol} ${params.resolution} - Key: ${cacheKey}`);
-		const result = await fetchChartData(params);
-		LocalStorageCache.set(cacheKey, result);
-		console.log(`[prefetchChartData] ✅ Cached: ${params.symbol} ${params.resolution} - Key: ${cacheKey}`);
-	} catch (err) {
-		console.error(`[prefetchChartData] ❌ Error fetching ${params.symbol} ${params.resolution}:`, err);
-		// Don't throw - prefetch failures should be silent
-	}
 }

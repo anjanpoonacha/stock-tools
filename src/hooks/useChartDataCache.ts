@@ -1,22 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useToast } from '@/components/ui/toast';
-import { LocalStorageCache } from '@/lib/utils/cache';
-
-const CACHE_KEY_PREFIX = 'chart-data:';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 export function useChartDataCache() {
 	const [loading, setLoading] = useState(false);
 	const [progress, setProgress] = useState({ current: 0, total: 0 });
 	const showToast = useToast();
-
-	const getCacheKey = (symbol: string, resolution: string) => {
-		return `${CACHE_KEY_PREFIX}${symbol}_${resolution}`;
-	};
-
-	const getCachedData = (symbol: string, resolution: string) => {
-		const key = getCacheKey(symbol, resolution);
-		return LocalStorageCache.get<unknown>(key);
-	};
 
 	const prefetchChartData = useCallback(async (
 		symbols: string[],
@@ -30,30 +19,18 @@ export function useChartDataCache() {
 
 		try {
 			// Get credentials
-			const credentials = JSON.parse(
-				localStorage.getItem('mio-tv-auth-credentials') || '{}'
-			);
+			const credentials = getStoredCredentials();
 
-			if (!credentials.userEmail || !credentials.userPassword) {
+			if (!credentials) {
 				throw new Error('Not authenticated');
 			}
 
-			// Fetch all charts in parallel (but with some throttling)
-			const fetchPromises: Promise<void>[] = [];
+		// Batch fetch all charts in parallel (but with some throttling)
+		const fetchPromises: Promise<void>[] = [];
 
-			for (const symbol of symbols) {
-				for (const resolution of resolutions) {
-					const key = getCacheKey(symbol, resolution);
-
-					// Skip if already cached and fresh
-					const existing = LocalStorageCache.get<unknown>(key);
-					if (existing) {
-						fetchedCount++;
-						setProgress({ current: fetchedCount, total: totalFetches });
-						continue;
-					}
-
-					// Fetch chart data
+		for (const symbol of symbols) {
+			for (const resolution of resolutions) {
+				// Fetch chart data
 					const fetchPromise = fetch(
 						`/api/chart-data?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}&barsCount=300`,
 						{
@@ -64,15 +41,12 @@ export function useChartDataCache() {
 								userPassword: credentials.userPassword,
 							}),
 						}
-					)
-						.then(res => res.json())
-						.then(data => {
-							if (data.success) {
-								LocalStorageCache.set(key, data);
-							}
-							fetchedCount++;
-							setProgress({ current: fetchedCount, total: totalFetches });
-						})
+				)
+					.then(res => res.json())
+					.then(data => {
+						fetchedCount++;
+						setProgress({ current: fetchedCount, total: totalFetches });
+					})
 						.catch(err => {
 							console.error(`Failed to fetch ${symbol} ${resolution}:`, err);
 							fetchedCount++;
@@ -90,23 +64,22 @@ export function useChartDataCache() {
 				}
 			}
 
-			// Wait for remaining fetches
-			await Promise.all(fetchPromises);
+		// Wait for remaining fetches
+		await Promise.all(fetchPromises);
 
-			showToast(`Prefetched ${totalFetches} charts`, 'success');
-		} catch (err) {
-			console.error('[useChartDataCache] Prefetch error:', err);
-			showToast('Failed to prefetch chart data', 'error');
-		} finally {
-			setLoading(false);
-			setProgress({ current: 0, total: 0 });
-		}
-	}, [showToast]);
+		showToast(`Fetched ${totalFetches} charts`, 'success');
+	} catch (err) {
+		console.error('[useChartDataCache] Batch fetch error:', err);
+		showToast('Failed to batch fetch chart data', 'error');
+	} finally {
+		setLoading(false);
+		setProgress({ current: 0, total: 0 });
+	}
+}, [showToast]);
 
-	return {
-		getCachedData,
-		prefetchChartData,
-		loading,
-		progress,
-	};
+return {
+	prefetchChartData,
+	loading,
+	progress,
+};
 }

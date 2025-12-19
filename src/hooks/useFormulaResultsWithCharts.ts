@@ -1,3 +1,5 @@
+// TODO: Migrate to IndexedDB for progressive caching
+
 /**
  * Hook for streaming formula results and chart data via SSE
  * 
@@ -5,7 +7,6 @@
  * - Connects to SSE endpoint for progressive loading
  * - Receives formula results immediately (~250ms)
  * - Receives chart data in progressive batches
- * - Caches each batch as it arrives
  * - Provides progress tracking
  * - Handles errors and reconnection
  */
@@ -14,7 +15,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import type { Stock } from '@/types/stock';
 import type { OHLCVBar, SymbolMetadata, StudyData } from '@/lib/tradingview/types';
 import { useToast } from '@/components/ui/toast';
-import { LocalStorageCache } from '@/lib/utils/cache';
 
 /**
  * Chart data for a single symbol × resolution
@@ -102,8 +102,7 @@ interface ErrorEvent {
 	message: string;
 }
 
-const CACHE_KEY_PREFIX = 'formula-results-with-charts:';
-const CHART_DATA_CACHE_PREFIX = 'chart-data-batch:';
+
 
 /**
  * Hook for streaming formula results with progressive chart data loading
@@ -111,8 +110,6 @@ const CHART_DATA_CACHE_PREFIX = 'chart-data-batch:';
 export function useFormulaResultsWithCharts(
 	formulaId: string | null
 ): UseFormulaResultsWithChartsReturn {
-	console.log('[useFormulaResultsWithCharts] Hook called with formulaId:', formulaId);
-	
 	const [stocks, setStocks] = useState<Stock[]>([]);
 	const [formulaName, setFormulaName] = useState<string>('');
 	const [chartData, setChartData] = useState<StreamedChartData>({});
@@ -136,13 +133,11 @@ export function useFormulaResultsWithCharts(
 	 * Cancel active stream
 	 */
 	const cancelStream = useCallback(() => {
-		console.log('[useFormulaResultsWithCharts] cancelStream called, isStreamingRef:', isStreamingRef.current);
 		if (eventSourceRef.current) {
 			eventSourceRef.current.close();
 			eventSourceRef.current = null;
 		}
 		if (abortControllerRef.current) {
-			console.log('[useFormulaResultsWithCharts] Aborting fetch request');
 			abortControllerRef.current.abort();
 			abortControllerRef.current = null;
 		}
@@ -159,72 +154,22 @@ export function useFormulaResultsWithCharts(
 			return;
 		}
 
-		console.log('[useFormulaResultsWithCharts] fetchResults called for:', formulaId);
-
-		// Get credentials early and validate
-		const credentialsStr = localStorage.getItem('mio-tv-auth-credentials');
-		if (!credentialsStr) {
-			console.error('[useFormulaResultsWithCharts] No credentials found in localStorage');
+		// Get credentials using centralized utility
+		const { getStoredCredentials } = await import('@/lib/auth/authUtils');
+		const credentials = getStoredCredentials();
+		
+		if (!credentials) {
+			console.error('[useFormulaResultsWithCharts] No credentials found');
 			setError('Not authenticated. Please log in first.');
 			setLoading(false);
 			return;
 		}
-
-		let credentials;
-		try {
-			credentials = JSON.parse(credentialsStr);
-		} catch (err) {
-			console.error('[useFormulaResultsWithCharts] Failed to parse credentials');
-			setError('Invalid authentication data. Please log in again.');
-			setLoading(false);
-			return;
-		}
-
-		if (!credentials.userEmail || !credentials.userPassword) {
-			console.error('[useFormulaResultsWithCharts] Missing email or password in credentials');
-			setError('Not authenticated. Please log in first.');
-			setLoading(false);
-			return;
-		}
-
-		console.log('[useFormulaResultsWithCharts] Credentials validated for user:', credentials.userEmail);
-
-		// Check cache first
-		const cacheKey = `${CACHE_KEY_PREFIX}${formulaId}`;
-		const cached = LocalStorageCache.get<{
-			stocks: Stock[];
-			formulaName: string;
-			chartData: StreamedChartData;
-		}>(cacheKey);
-
-		if (cached) {
-			console.log('[useFormulaResultsWithCharts] 📦 Using cached data:', {
-				stocks: cached.stocks.length,
-				charts: Object.keys(cached.chartData).length
-			});
-			setStocks(cached.stocks);
-			setFormulaName(cached.formulaName);
-			setChartData(cached.chartData);
-			setProgress({
-				loaded: Object.keys(cached.chartData).length,
-				total: Object.keys(cached.chartData).length,
-				percentage: 100,
-				batchesComplete: 1,
-				totalBatches: 1,
-			});
-			setLoading(false);
-			showToast(`Loaded ${cached.stocks.length} stocks from cache (click Refresh to stream fresh data)`, 'success');
-			return;
-		}
-
-		console.log('[useFormulaResultsWithCharts] No cache found, fetching from API');
 
 		// Cancel any existing stream
 		cancelStream();
 
 		// Prevent multiple simultaneous streams
 		if (isStreamingRef.current) {
-			console.log('[useFormulaResultsWithCharts] ⚠️ Stream already in progress, skipping');
 			return;
 		}
 
@@ -248,8 +193,6 @@ export function useFormulaResultsWithCharts(
 				resolutions: ['1W', '1D'],
 				barsCount: 300,
 			};
-
-			console.log('[useFormulaResultsWithCharts] Starting stream for formula:', formulaId);
 
 			// Make POST request to initiate SSE stream
 			const response = await fetch('/api/formula-results-with-charts', {
@@ -283,7 +226,6 @@ export function useFormulaResultsWithCharts(
 				const { done, value } = await reader.read();
 
 				if (done) {
-					console.log('[useFormulaResultsWithCharts] Stream ended');
 					break;
 				}
 
@@ -304,7 +246,6 @@ export function useFormulaResultsWithCharts(
 						switch (parsed.type) {
 							case 'formula-results': {
 								const data = parsed.data as FormulaResultsEvent;
-								console.log(`[useFormulaResultsWithCharts] Received formula results: ${data.stocks.length} stocks`);
 								currentStocks = data.stocks;
 								currentFormulaName = data.formulaName;
 								setStocks(data.stocks);
@@ -321,7 +262,6 @@ export function useFormulaResultsWithCharts(
 
 							case 'chart-batch': {
 								const data = parsed.data as ChartBatchEvent;
-								console.log(`[useFormulaResultsWithCharts] Received batch ${data.batchIndex}/${data.totalBatches} (${data.progress.percentage}%)`);
 
 								// Merge batch chart data into accumulated data
 								for (const [symbol, resolutions] of Object.entries(data.chartData)) {
@@ -330,8 +270,6 @@ export function useFormulaResultsWithCharts(
 									}
 									Object.assign(accumulatedChartData[symbol], resolutions);
 								}
-								
-								console.log(`[useFormulaResultsWithCharts] 📊 Accumulated chart data now has ${Object.keys(accumulatedChartData).length} symbols`);
 
 								setChartData({ ...accumulatedChartData });
 								setProgress({
@@ -342,24 +280,12 @@ export function useFormulaResultsWithCharts(
 									totalBatches: data.totalBatches,
 								});
 
-								// Cache batch incrementally
-								const batchCacheKey = `${CHART_DATA_CACHE_PREFIX}${formulaId}:batch${data.batchIndex}`;
-								LocalStorageCache.set(batchCacheKey, data.chartData);
-
 								break;
 							}
 
 							case 'complete': {
 								const data = parsed.data as CompleteEvent;
-								console.log(`[useFormulaResultsWithCharts] Stream complete: ${data.totalCharts} charts in ${data.totalTime}ms`);
 								
-								// Cache final complete data
-								LocalStorageCache.set(cacheKey, {
-									stocks: currentStocks,
-									formulaName: currentFormulaName,
-									chartData: accumulatedChartData,
-								});
-
 								setIsStreaming(false);
 								showToast(`Loaded ${data.totalCharts} charts in ${(data.totalTime / 1000).toFixed(1)}s`, 'success');
 								break;
@@ -379,7 +305,6 @@ export function useFormulaResultsWithCharts(
 
 		} catch (err) {
 			if (err instanceof Error && err.name === 'AbortError') {
-				console.log('[useFormulaResultsWithCharts] Stream cancelled');
 				return;
 			}
 
@@ -397,26 +322,20 @@ export function useFormulaResultsWithCharts(
 
 	// Auto-fetch on mount/formulaId change
 	useEffect(() => {
-		console.log('[useFormulaResultsWithCharts] useEffect triggered, formulaId:', formulaId, 'isStreamingRef:', isStreamingRef.current);
-		
 		// Only fetch if formulaId is valid (not null, not empty string)
 		if (formulaId && formulaId.trim() !== '') {
 			// Add small debounce to prevent rapid re-triggers during Fast Refresh
 			const timeoutId = setTimeout(() => {
-				console.log('[useFormulaResultsWithCharts] ✅ Valid formulaId, calling fetchResults()');
 				fetchResults();
 			}, 100);
 			
 			return () => {
-				console.log('[useFormulaResultsWithCharts] Cleanup: clearing timeout and canceling stream');
 				clearTimeout(timeoutId);
 				// Only cancel if we're actually leaving the page, not just re-rendering
 				if (!document.hidden) {
 					cancelStream();
 				}
 			};
-		} else {
-			console.log('[useFormulaResultsWithCharts] ❌ Skipping fetch - no valid formulaId:', formulaId);
 		}
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [formulaId]);

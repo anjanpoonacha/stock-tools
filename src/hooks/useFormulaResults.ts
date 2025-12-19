@@ -5,14 +5,14 @@
  * - Fetches only the stock list from the formula
  * - Does not fetch chart data (loaded on-demand)
  * - Provides simple loading/error states
- * - Caches results in localStorage
  * - Respects AuthGuard - doesn't fetch if not authenticated
+ * 
+ * TODO: Migrate to IndexedDB for caching
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Stock } from '@/types/stock';
-import { LocalStorageCache } from '@/lib/utils/cache';
 
 /**
  * Hook return interface
@@ -25,16 +25,12 @@ interface UseFormulaResultsReturn {
 	refetch: () => void;
 }
 
-const CACHE_KEY_PREFIX = 'formula-results:';
-
 /**
  * Hook for fetching formula results without chart data
  */
 export function useFormulaResults(
 	formulaId: string | null
 ): UseFormulaResultsReturn {
-	console.log('[useFormulaResults] Hook called with formulaId:', formulaId);
-	
 	// Get authentication state
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
 	
@@ -49,52 +45,23 @@ export function useFormulaResults(
 	const fetchResults = useCallback(async () => {
 		// Don't fetch if not authenticated - let AuthGuard handle this
 		if (!isAuthenticated()) {
-			console.log('[useFormulaResults] Not authenticated, skipping fetch');
 			return;
 		}
 
 		if (!formulaId) {
-			console.log('[useFormulaResults] No formulaId provided, skipping fetch');
 			return;
 		}
 
-		const cacheKey = `${CACHE_KEY_PREFIX}${formulaId}`;
-		console.log('[useFormulaResults] Fetching results for:', formulaId);
-
-		// Check cache first
-		const cached = LocalStorageCache.get<{ stocks: Stock[]; formulaName: string }>(cacheKey);
-		if (cached) {
-			console.log('[useFormulaResults] ✅ Cache HIT:', cacheKey);
-			setStocks(cached.stocks);
-			setFormulaName(cached.formulaName);
-			setError(null);
-			return;
-		}
-
-		console.log('[useFormulaResults] ❌ Cache MISS, fetching from API');
 		setLoading(true);
 		setError(null);
 
 		try {
-			// Get user credentials from localStorage (same as AuthContext)
-			const credentialsStr = localStorage.getItem('mio-tv-auth-credentials');
-			if (!credentialsStr) {
+			// Get user credentials using centralized utility
+			const { getStoredCredentials } = await import('@/lib/auth/authUtils');
+			const credentials = getStoredCredentials();
+			
+			if (!credentials) {
 				console.error('[useFormulaResults] No credentials found');
-				setError(null); // Don't show error, let AuthGuard handle it
-				return;
-			}
-
-			let credentials;
-			try {
-				credentials = JSON.parse(credentialsStr);
-			} catch (err) {
-				console.error('[useFormulaResults] Failed to parse credentials');
-				setError(null); // Don't show error, let AuthGuard handle it
-				return;
-			}
-
-			if (!credentials.userEmail || !credentials.userPassword) {
-				console.error('[useFormulaResults] Missing email or password');
 				setError(null); // Don't show error, let AuthGuard handle it
 				return;
 			}
@@ -116,29 +83,13 @@ export function useFormulaResults(
 				throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
 			}
 
-			const data = await response.json();
+		const data = await response.json();
 
-			console.log('[useFormulaResults] ✅ Success:', {
-				formulaName: data.formulaName,
-				stockCount: data.stocks.length
-			});
+		setStocks(data.stocks);
+		setFormulaName(data.formulaName);
+		setError(null);
 
-			setStocks(data.stocks);
-			setFormulaName(data.formulaName);
-			setError(null);
-
-			// Cache the results
-			try {
-				LocalStorageCache.set(cacheKey, {
-					stocks: data.stocks,
-					formulaName: data.formulaName
-				});
-				console.log('[useFormulaResults] ✅ Cached results');
-			} catch (err) {
-				console.warn('[useFormulaResults] Failed to cache (quota exceeded):', err instanceof Error ? err.message : 'Unknown error');
-			}
-
-		} catch (err) {
+	} catch (err) {
 			console.error('[useFormulaResults] Error:', err);
 			const errorMessage = err instanceof Error ? err.message : 'Failed to load formula results';
 			setError(errorMessage);
@@ -150,12 +101,10 @@ export function useFormulaResults(
 	}, [formulaId, isAuthenticated]);
 
 	/**
-	 * Refetch results (clears cache first)
+	 * Refetch results
 	 */
 	const refetch = useCallback(() => {
 		if (formulaId) {
-			const cacheKey = `${CACHE_KEY_PREFIX}${formulaId}`;
-			LocalStorageCache.remove(cacheKey);
 			fetchResults();
 		}
 	}, [formulaId, fetchResults]);
