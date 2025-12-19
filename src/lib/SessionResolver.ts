@@ -70,7 +70,6 @@ export class SessionResolver {
 	 */
 	static invalidateCache(): void {
 		this.sessionCache = { data: null, timestamp: 0 };
-		console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Cache invalidated`);
 	}
 
 	// Add loading state to prevent concurrent cache refreshes
@@ -84,13 +83,11 @@ export class SessionResolver {
 	private static async loadSessions(): Promise<StoredSessions> {
 		// Check cache first
 		if (this.isCacheValid()) {
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Using cached sessions (${Object.keys(this.sessionCache.data!).length} sessions)`);
 			return this.sessionCache.data!;
 		}
 
 		// If already loading, wait for the existing promise
 		if (this.isLoading && this.loadingPromise) {
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Waiting for concurrent session load...`);
 			return await this.loadingPromise;
 		}
 
@@ -122,7 +119,6 @@ export class SessionResolver {
 				timestamp: Date.now()
 			};
 
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Loaded and cached ${Object.keys(allSessions).length} sessions from KV storage`);
 			return allSessions;
 		} catch (error) {
 			console.error(`${LOG_PREFIXES.SESSION_RESOLVER} Failed to load sessions from KV:`, error);
@@ -305,16 +301,11 @@ export class SessionResolver {
 			const platformSessions = this.extractPlatformSessions(allSessions, platform, userCredentials);
 
 			if (platformSessions.length === 0) {
-				const userContext = userCredentials ? ` for user: ${userCredentials.userEmail}` : '';
-				console.log(`${LOG_PREFIXES.SESSION_RESOLVER} No ${platform} sessions found${userContext}`);
 				return null;
 			}
 
 			const sortedSessions = this.sortSessionsByTimestamp(platformSessions);
 			const latestSession = sortedSessions[0];
-
-			const userContext = userCredentials ? ` for user ${userCredentials.userEmail}` : '';
-			console.log(`${LOG_PREFIXES.SESSION_RESOLVER} Found ${platformSessions.length} ${platform} sessions${userContext}, using most recent: ${latestSession.internalId}`);
 
 			return {
 				sessionData: latestSession.sessionData,

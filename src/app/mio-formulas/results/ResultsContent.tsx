@@ -5,29 +5,29 @@ import { useSearchParams } from 'next/navigation';
 import { useFormulaResults } from '@/hooks/useFormulaResults';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Table as TableIcon, BarChart3, RefreshCw } from 'lucide-react';
+import { Table as TableIcon, BarChart3, RefreshCw } from 'lucide-react';
 import ResultsTable from '@/components/formula/ResultsTable';
 import ChartView from '@/components/formula/ChartView';
-import { LocalStorageCache } from '@/lib/utils/cache';
 import { filterAndSortStocks, type SortField, type SortOrder } from '@/lib/utils/stockOrdering';
-import { getViewMode, setViewMode as setViewModeStorage, getChartIndex, setChartIndex } from '@/lib/utils/sessionState';
+import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
+import { useViewSettings, useChartIndex } from '@/hooks/useChartSettings';
 
 export default function ResultsContent() {
 	const searchParams = useSearchParams();
 	const formulaId = searchParams.get('formulaId');
 
 	// Use non-streaming hook (formula results only, charts loaded on-demand)
-	const { stocks, formulaName, loading, error, refetch } = 
+	const { stocks, formulaName, loading, error, refetch } =
 		useFormulaResults(formulaId);
-	
+
 	console.log('[ResultsContent] Loaded stocks:', stocks.length);
 	console.log('[ResultsContent] Using on-demand chart loading (no pre-fetched data)');
 
-	// Initialize state from localStorage/sessionStorage (NOT URL)
-	const [viewMode, setViewMode] = useState<'table' | 'chart'>(() => getViewMode());
-	const [currentStockIndex, setCurrentStockIndex] = useState<number>(() => 
-		formulaId ? getChartIndex(formulaId) : 0
-	);
+	// View settings with automatic persistence
+	const { viewMode, setViewMode } = useViewSettings();
+
+	// Chart index with per-formula session storage
+	const { currentIndex: currentStockIndex, setCurrentIndex: setCurrentStockIndex } = useChartIndex(formulaId);
 
 	// Read sort and filter settings from URL
 	const sortField = (searchParams.get('sortBy') as SortField) || 'symbol';
@@ -51,36 +51,21 @@ export default function ResultsContent() {
 		return filteredAndSortedStocks.map(s => s.symbol);
 	}, [filteredAndSortedStocks]);
 
-	// Persist view mode to localStorage whenever it changes
-	useEffect(() => {
-		setViewModeStorage(viewMode);
-	}, [viewMode]);
-
-	// Persist chart index to sessionStorage whenever it changes
-	useEffect(() => {
-		if (formulaId && viewMode === 'chart') {
-			setChartIndex(formulaId, currentStockIndex);
-		}
-	}, [formulaId, currentStockIndex, viewMode]);
-
-	// Reset chart index when formula changes or filters change
+	// Reset chart index when filters change
 	useEffect(() => {
 		setCurrentStockIndex(0);
-	}, [formulaId, sectorFilter, industryFilter]);
+	}, [sectorFilter, industryFilter, setCurrentStockIndex]);
 
 	// Validate chart index bounds when stocks change
 	useEffect(() => {
 		if (currentStockIndex >= stockSymbols.length && stockSymbols.length > 0) {
 			setCurrentStockIndex(Math.max(0, stockSymbols.length - 1));
 		}
-	}, [stockSymbols, currentStockIndex]);
+	}, [stockSymbols, currentStockIndex, setCurrentStockIndex]);
 
-	// Handle clearing cache and refetching
+	// Refresh formula results - no cache to clear
 	const handleRefresh = () => {
 		if (formulaId) {
-			LocalStorageCache.remove(`formula-results:${formulaId}`);
-			// Also clear chart data caches
-			LocalStorageCache.clearByPrefix(`chart-data:`);
 			refetch();
 		}
 	};
@@ -110,20 +95,8 @@ export default function ResultsContent() {
 		);
 	}
 
-	if (loading) {
-		return (
-			<div className='p-4'>
-				<div className='flex items-center justify-center min-h-[400px]'>
-					<div className='text-center space-y-4'>
-						<Loader2 className='h-8 w-8 animate-spin mx-auto text-primary' />
-						<p className='text-muted-foreground'>Loading formula results...</p>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
-	if (error) {
+	// Show error if occurred
+	if (error && !loading) {
 		return (
 			<div className='p-4'>
 				<Alert variant='destructive'>
@@ -134,62 +107,72 @@ export default function ResultsContent() {
 	}
 
 	return (
-		<div className='p-4 space-y-4'>
-			{/* Header */}
-			<div className='flex items-center justify-between'>
-				<div className='flex-1'>
-					<h1 className='text-3xl font-bold tracking-tight'>Formula Results</h1>
-					<p className='text-muted-foreground mt-1'>
-						{formulaName} {filteredAndSortedStocks.length > 0 && `• ${filteredAndSortedStocks.length} stocks`}
-					</p>
-				</div>
+		<div className='h-full flex flex-col overflow-hidden'>
+			{/* Header - Always visible (preserves layout) */}
+			<div className='flex-shrink-0 p-4 border-b border-border'>
+				<div className='flex items-center justify-between'>
+					<div className='flex-1'>
+						<h1 className='text-3xl font-bold tracking-tight'>Formula Results</h1>
+						<p className='text-muted-foreground mt-1'>
+							{loading ? 'Loading...' : (formulaName && filteredAndSortedStocks.length > 0 && `${formulaName} • ${filteredAndSortedStocks.length} stocks`)}
+						</p>
+					</div>
 
-				{/* View Toggle */}
-				<div className='flex gap-2'>
-					<Button
-						variant='outline'
-						size='sm'
-						onClick={handleRefresh}
-						disabled={loading}
-						title='Clear cache and reload data'
-					>
-						<RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-						Refresh
-					</Button>
-					<Button
-						variant={viewMode === 'table' ? 'default' : 'outline'}
-						size='sm'
-						onClick={() => setViewMode('table')}
-					>
-						<TableIcon className='h-4 w-4 mr-2' />
-						Table View
-					</Button>
-					<Button
-						variant={viewMode === 'chart' ? 'default' : 'outline'}
-						size='sm'
-						onClick={handleViewCharts}
-						disabled={filteredAndSortedStocks.length === 0}
-					>
-						<BarChart3 className='h-4 w-4 mr-2' />
-						Chart View
-					</Button>
+					{/* View Toggle */}
+					<div className='flex gap-2'>
+						<Button
+							variant='outline'
+							size='sm'
+							onClick={handleRefresh}
+							disabled={loading}
+							title='Reload formula results'
+						>
+							<RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+							Refresh
+						</Button>
+						<Button
+							variant={viewMode === 'table' ? 'default' : 'outline'}
+							size='sm'
+							onClick={() => setViewMode('table')}
+							disabled={loading}
+						>
+							<TableIcon className='h-4 w-4 mr-2' />
+							Table View
+						</Button>
+						<Button
+							variant={viewMode === 'chart' ? 'default' : 'outline'}
+							size='sm'
+							onClick={handleViewCharts}
+							disabled={loading || filteredAndSortedStocks.length === 0}
+						>
+							<BarChart3 className='h-4 w-4 mr-2' />
+							Chart View
+						</Button>
+					</div>
 				</div>
 			</div>
 
-		{/* View Content */}
-		{viewMode === 'table' ? (
-			<ResultsTable
-				stocks={stocks}
-				onViewCharts={handleViewCharts}
-			/>
-		) : (
-			<ChartView
-				stockSymbols={stockSymbols}
-				currentIndex={currentStockIndex}
-				setCurrentIndex={setCurrentStockIndex}
-				onBackToTable={handleBackToTable}
-			/>
-		)}
+			{/* View Content - Takes remaining space with overlay when loading */}
+			<div className='flex-1 min-h-0 relative'>
+				{loading && <ChartLoadingOverlay message='Loading formula results...' />}
+				{!loading && (
+					<>
+						{viewMode === 'table' ? (
+							<ResultsTable
+								stocks={stocks}
+								onViewCharts={handleViewCharts}
+							/>
+						) : (
+							<ChartView
+								stockSymbols={stockSymbols}
+								currentIndex={currentStockIndex}
+								setCurrentIndex={setCurrentStockIndex}
+								onBackToTable={handleBackToTable}
+							/>
+						)}
+					</>
+				)}
+			</div>
 		</div>
 	);
 }

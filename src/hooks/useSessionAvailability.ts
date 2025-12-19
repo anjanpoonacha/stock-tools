@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 interface SessionAvailabilityResult {
   mioSessionAvailable: boolean;
@@ -24,20 +25,10 @@ export function useSessionAvailability(): SessionAvailabilityResult {
         setLoading(true);
         setError(null);
 
-        // Get stored credentials from localStorage
-        const storedCredentials = localStorage.getItem('mio-tv-auth-credentials');
+        // Get stored credentials
+        const credentials = getStoredCredentials();
 
-        if (!storedCredentials) {
-          setMioSessionAvailable(false);
-          setTvSessionAvailable(false);
-          setLoading(false);
-          return;
-        }
-
-        let credentials;
-        try {
-          credentials = JSON.parse(storedCredentials);
-        } catch {
+        if (!credentials) {
           setMioSessionAvailable(false);
           setTvSessionAvailable(false);
           setLoading(false);

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
 
 export default function TestSSEStream() {
 	const [output, setOutput] = useState<string>('');
@@ -23,9 +24,9 @@ export default function TestSSEStream() {
 		result += formulaCache ? `Found (${formulaCache.length} chars)\n${formulaCache.substring(0, 200)}...\n\n` : 'Not found\n\n';
 		
 		// Check credentials
-		const creds = localStorage.getItem('mio-tv-auth-credentials');
+		const creds = getStoredCredentials();
 		result += '🔐 Credentials:\n';
-		result += creds ? `${creds}\n\n` : 'Not found\n\n';
+		result += creds ? `${JSON.stringify(creds)}\n\n` : 'Not found\n\n';
 		
 		// List all formula-related keys
 		result += '📋 All Formula Keys:\n';
