@@ -24,7 +24,6 @@ export async function OPTIONS() {
 
 export async function POST(req: NextRequest) {
 	try {
-		console.log('[EXTENSION-API] Received session from multi-platform browser extension');
 
 		const body = await req.json();
 		const { sessionKey, sessionValue, extractedAt, url, platform, userEmail, userPassword, sessionid_sign } = body;
@@ -77,7 +76,7 @@ export async function POST(req: NextRequest) {
 		return response;
 
 	} catch (error) {
-		console.error('[EXTENSION-API] Error processing multi-platform extension session:', error);
+
 		return NextResponse.json({
 			error: 'Internal server error',
 			details: error instanceof Error ? error.message : 'Unknown error',

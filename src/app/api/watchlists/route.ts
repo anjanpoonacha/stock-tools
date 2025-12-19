@@ -158,7 +158,6 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json(response);
 
 	} catch (error) {
-		console.error('[UNIFIED-WATCHLISTS-API] Error:', error);
 
 		if (error instanceof z.ZodError) {
 			return NextResponse.json({
@@ -217,7 +216,7 @@ export async function GET(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[UNIFIED-WATCHLISTS-API] GET Error:', error);
+
 		return NextResponse.json({
 			error: 'Failed to check platform availability',
 			details: error instanceof Error ? error.message : 'Unknown error'

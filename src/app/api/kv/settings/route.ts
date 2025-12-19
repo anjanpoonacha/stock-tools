@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
 		return NextResponse.json(settings || null);
 	} catch (error) {
-		console.error('Failed to load settings:', error);
+
 		return NextResponse.json(null);
 	}
 }
@@ -88,11 +88,10 @@ export async function POST(request: Request) {
 		await kv.set(userSettingsKey, settings);
 
 		// Debug logging to verify user isolation
-		console.log('[Settings] Saved settings for userId:', userId);
 
 		return NextResponse.json({ success: true });
 	} catch (error) {
-		console.error('Failed to save settings:', error);
+
 		return NextResponse.json({ success: false, error: String(error) }, { status: 500 });
 	}
 }

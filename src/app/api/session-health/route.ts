@@ -6,13 +6,11 @@ import { getSession } from '@/lib/sessionStore';
 
 export async function GET(req: NextRequest) {
 	try {
-		console.log('[SessionHealth API] GET request received');
+
 		const { searchParams } = new URL(req.url);
 		const action = searchParams.get('action') || 'status';
 		const sessionId = searchParams.get('sessionId');
 		const platform = searchParams.get('platform');
-
-		console.log('[SessionHealth API] Action:', action, 'SessionId:', sessionId, 'Platform:', platform);
 
 		switch (action) {
 			case 'status':
@@ -62,7 +60,7 @@ export async function GET(req: NextRequest) {
 				);
 		}
 	} catch (error) {
-		console.error('[SessionHealth API] Error:', error);
+
 		return NextResponse.json(
 			{ error: 'Internal server error' },
 			{ status: 500 }
@@ -161,7 +159,7 @@ export async function POST(req: NextRequest) {
 						sessionHealthMonitor.startMonitoring(sessionId, platformName);
 						startedPlatforms.push(platformName);
 					} catch (error) {
-						console.warn(`Failed to start monitoring for ${platformName}:`, error);
+
 					}
 				}
 
@@ -178,7 +176,7 @@ export async function POST(req: NextRequest) {
 				);
 		}
 	} catch (error) {
-		console.error('[SessionHealth API] Error:', error);
+
 		return NextResponse.json(
 			{ error: 'Internal server error' },
 			{ status: 500 }
@@ -227,7 +225,7 @@ export async function DELETE(req: NextRequest) {
 			}
 		}
 	} catch (error) {
-		console.error('[SessionHealth API] Error:', error);
+
 		return NextResponse.json(
 			{ error: 'Internal server error' },
 			{ status: 500 }

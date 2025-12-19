@@ -38,26 +38,17 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Extract formula text and API URL from the page
-		console.log('[API][extract-text] Extracting from URL:', pageUrl);
-		console.log('[API][extract-text] Using session:', sessionInfo.internalId);
+
 
 		const extracted = await MIOService.extractApiUrlFromFormula(
 			sessionInfo.internalId,
 			pageUrl
 		);
 
-		console.log('[API][extract-text] Extraction result:', {
-			hasFormulaText: !!extracted.formulaText,
-			formulaTextLength: extracted.formulaText?.length,
-			formulaTextPreview: extracted.formulaText?.substring(0, 50),
-			hasApiUrl: !!extracted.apiUrl,
-			apiUrl: extracted.apiUrl,
-		});
-
 		if (!extracted.formulaText) {
-			console.warn('[API][extract-text] ✗ No formula text found at:', pageUrl);
+
 		} else {
-			console.log('[API][extract-text] ✓ Successfully extracted formula text');
+
 		}
 
 		return NextResponse.json({
@@ -67,7 +58,7 @@ export async function POST(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error extracting formula text:', error);
+
 		return NextResponse.json(
 			{
 				error: error instanceof Error ? error.message : 'Failed to extract formula text',

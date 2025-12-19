@@ -46,7 +46,7 @@ export async function PUT(request: NextRequest) {
 		}
 
 		// Edit formula using MIOService
-		console.log('[API] Editing formula:', { screenId, name, formulaLength: formula.length });
+
 		const result = await MIOService.editFormulaWithSession(sessionInfo.internalId, {
 			screenId,
 			name,
@@ -55,8 +55,6 @@ export async function PUT(request: NextRequest) {
 			groupId,
 			eventId,
 		});
-
-		console.log('[API] Formula edited successfully:', { screenId: result.screenId });
 
 		// Update stored formula
 		const key = generateFormulasKey(userEmail, userPassword);
@@ -98,7 +96,7 @@ export async function PUT(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error editing formula:', error);
+
 		return NextResponse.json(
 			{
 				error: error instanceof Error ? error.message : 'Failed to edit formula',

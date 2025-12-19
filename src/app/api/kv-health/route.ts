@@ -43,8 +43,6 @@ export async function GET(request: NextRequest) {
 
 		await kv.set(healthHistoryKey, history);
 
-		console.log(`[KV-HEALTH] Health check completed at ${timestamp}`);
-
 		return NextResponse.json({
 			success: true,
 			timestamp,
@@ -54,7 +52,6 @@ export async function GET(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[KV-HEALTH] Health check failed:', error);
 
 		return NextResponse.json(
 			{

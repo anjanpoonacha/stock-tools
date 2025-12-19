@@ -21,8 +21,6 @@ export async function POST(req: NextRequest) {
 		// Use shared authentication logic
 		const sessionInfo = await validateUserCredentials(userEmail, userPassword);
 
-		console.log(`${LOG_PREFIXES.API} [TV-SHORTLIST] Proceeding with TradingView API call for user: ${userEmail}`);
-
 		const cookie = `sessionid=${sessionid}`;
 		const watchlists = await fetchWatchlistsWithAuth(url, cookie);
 
@@ -30,8 +28,6 @@ export async function POST(req: NextRequest) {
 	} catch (error) {
 		const message = getErrorMessage(error);
 		const statusCode = getErrorStatusCode(error);
-
-		console.error(`${LOG_PREFIXES.API} [TV-SHORTLIST] Error:`, message);
 
 		return createErrorResponse(message, statusCode, statusCode === 401);
 	}

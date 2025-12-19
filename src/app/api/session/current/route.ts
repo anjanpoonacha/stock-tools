@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
 		}
 
 	} catch (error) {
-		console.error('[SESSION-API] Error retrieving session info:', error);
+
 		return NextResponse.json({
 			hasSession: false,
 			sessionAvailable: false,
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 		try {
 			body = await request.json();
 		} catch (jsonError) {
-			console.error('[SESSION-API] Failed to parse JSON body:', jsonError);
+
 			return NextResponse.json({
 				error: 'Invalid JSON body',
 				details: 'Request body must be valid JSON',
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
 		}
 
 	} catch (error) {
-		console.error('[SESSION-API] Error retrieving user session info:', error);
+
 		return NextResponse.json({
 			hasSession: false,
 			sessionAvailable: false,

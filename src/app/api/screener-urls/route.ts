@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 			count: urls?.length || 0
 		});
 	} catch (error) {
-		console.error('[API] Error fetching screener URLs:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to fetch screener URLs' },
 			{ status: 500 }
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
 		}, { status: 201 });
 
 	} catch (error) {
-		console.error('[API] Error adding screener URL:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to add screener URL' },
 			{ status: 500 }
@@ -221,7 +221,7 @@ export async function PUT(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error updating screener URL:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to update screener URL' },
 			{ status: 500 }
@@ -272,7 +272,7 @@ export async function DELETE(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error deleting screener URL:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to delete screener URL' },
 			{ status: 500 }

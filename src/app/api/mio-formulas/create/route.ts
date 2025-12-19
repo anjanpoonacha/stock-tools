@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		// Create formula using MIOService
-		console.log('[API] Creating formula:', { name, formulaLength: formula.length });
+
 		const result = await MIOService.createFormulaWithSession(sessionInfo.internalId, {
 			name,
 			formula,
@@ -55,10 +55,8 @@ export async function POST(request: NextRequest) {
 			eventId,
 		});
 
-		console.log('[API] Formula created successfully:', { screenId: result.screenId });
-
 		// Extract API URL immediately after creation
-		console.log('[API] Extracting API URL from formula page:', result.redirectUrl);
+
 		const extracted = await MIOService.extractApiUrlFromFormula(
 			sessionInfo.internalId,
 			result.redirectUrl
@@ -77,12 +75,6 @@ export async function POST(request: NextRequest) {
 			extractionStatus: extracted.apiUrl ? 'success' : 'failed',
 			formulaText: extracted.formulaText || undefined,
 		};
-
-		console.log('[API] Formula stored with API URL:', {
-			hasApiUrl: !!extracted.apiUrl,
-			hasFormulaText: !!extracted.formulaText,
-			extractionStatus: newFormula.extractionStatus
-		});
 
 		// Add to stored formulas
 		const key = generateFormulasKey(userEmail, userPassword);
@@ -110,7 +102,7 @@ export async function POST(request: NextRequest) {
 		}, { status: 201 });
 
 	} catch (error) {
-		console.error('[API] Error creating formula:', error);
+
 		return NextResponse.json(
 			{
 				error: error instanceof Error ? error.message : 'Failed to create formula',

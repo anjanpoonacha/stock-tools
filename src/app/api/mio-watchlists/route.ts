@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[MIO-WATCHLISTS-API] Error retrieving watchlists:', error);
+
 		return NextResponse.json({
 			error: 'Internal server error',
 			message: 'Failed to retrieve watchlists',
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[MIO-WATCHLISTS-API] Error creating watchlist:', error);
+
 		return NextResponse.json({
 			error: 'Internal server error',
 			message: 'Failed to create watchlist',

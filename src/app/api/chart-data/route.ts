@@ -83,12 +83,12 @@ export async function POST(request: NextRequest) {
 					// Acquire persistent connection with JWT token
 					await persistentManager.acquire(jwtResult.token!);
 					persistentConnectionAcquired = true;
-					console.log(`[Chart Data API] Using persistent connection pool (refCount: ${persistentManager.getRefCount()})`);
+
 				}
 			}
 		} catch (connectionError) {
 			// Non-fatal: Continue with regular pooling if persistent connection fails
-			console.warn('[Chart Data API] Failed to acquire persistent connection, using regular pool:', connectionError);
+
 		}
 		
 		try {
@@ -124,12 +124,12 @@ export async function POST(request: NextRequest) {
 			// Release persistent connection after request completes
 			if (persistentConnectionAcquired) {
 				persistentManager.release();
-				console.log(`[Chart Data API] Released persistent connection (refCount: ${persistentManager.getRefCount()})`);
+
 			}
 		}
 		
 	} catch (error) {
-		console.error('[Chart Data API] Unexpected error:', error);
+
 		return NextResponse.json({
 			success: false,
 			error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}`

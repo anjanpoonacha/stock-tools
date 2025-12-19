@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
 			}
 			body = JSON.parse(text);
 		} catch (parseError) {
-			console.error('[SSE] Failed to parse request body:', parseError);
+
 			return new Response(
 				JSON.stringify({ 
 					error: 'Invalid request body',
@@ -105,15 +105,9 @@ export async function POST(request: NextRequest) {
 
 		const { userEmail, userPassword, formulaId, resolutions = ['1W', '1D'], barsCount = 300 } = body;
 
-		console.log('[SSE] Received request:', { userEmail, formulaId, resolutions, barsCount });
-
 		// Validate required fields
 		if (!userEmail || !userPassword || !formulaId) {
-			console.error('[SSE] Missing required fields:', { 
-				hasEmail: !!userEmail, 
-				hasPassword: !!userPassword, 
-				hasFormulaId: !!formulaId 
-			});
+
 			return new Response(
 				JSON.stringify({ error: 'User email, password, and formulaId are required' }),
 				{ 
@@ -158,7 +152,7 @@ export async function POST(request: NextRequest) {
 					}
 
 					// 2. Fetch stock results from MIO API
-					console.log(`[SSE] Fetching stock results from: ${formula.apiUrl}`);
+
 					const mioResponse = await fetch(formula.apiUrl);
 
 					if (!mioResponse.ok) {
@@ -169,8 +163,6 @@ export async function POST(request: NextRequest) {
 
 					const mioData = await mioResponse.text();
 					const stocks: Stock[] = parseMIOResponse(mioData);
-
-					console.log(`[SSE] Parsed ${stocks.length} stocks from MIO response`);
 
 					// 3. Send formula results event immediately
 					const symbols = stocks.map(s => s.symbol);
@@ -183,8 +175,6 @@ export async function POST(request: NextRequest) {
 						resolutions,
 						barsCount,
 					});
-
-					console.log(`[SSE] Sent formula results (${stocks.length} stocks)`);
 
 					// 4. Resolve user session and get JWT token
 					const serviceConfig = createChartDataServiceConfig();
@@ -209,14 +199,11 @@ export async function POST(request: NextRequest) {
 						return;
 					}
 
-					console.log(`[SSE] Authenticated successfully`);
-
 					// 5. Acquire persistent connection for this request
 					const persistentManager = getPersistentConnectionManager();
 					await persistentManager.acquire(jwtResult.token!);
 					
 					try {
-						console.log(`[SSE] Using persistent connection pool (refCount: ${persistentManager.getRefCount()})`);
 
 					// 6. Fetch charts in batches with streaming
 					const batchStartTime = Date.now();
@@ -264,7 +251,6 @@ export async function POST(request: NextRequest) {
 								timing: batch.timing,
 							});
 
-							console.log(`[SSE] Sent batch ${batch.batchIndex}/${batch.totalBatches} (${progress.percentage}%)`);
 						},
 							// Pass the persistent connection pool
 							connectionPool: persistentManager.getConnectionPool(),
@@ -278,18 +264,16 @@ export async function POST(request: NextRequest) {
 							avgTimePerChart: Math.round(totalDuration / totalCharts),
 						});
 
-						console.log(`[SSE] Stream complete: ${totalCharts} charts in ${totalDuration}ms`);
-						
 					} finally {
 						// Release persistent connection after request completes
 						persistentManager.release();
-						console.log(`[SSE] Released persistent connection (refCount: ${persistentManager.getRefCount()})`);
+
 					}
 					
 					controller.close();
 
 				} catch (error) {
-					console.error('[SSE] Stream error:', error);
+
 					const message = `data: ${JSON.stringify({
 						type: 'error',
 						data: { message: error instanceof Error ? error.message : 'Unknown error' }
@@ -311,7 +295,7 @@ export async function POST(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[SSE] Error setting up stream:', error);
+
 		return new Response(
 			JSON.stringify({
 				error: error instanceof Error ? error.message : 'Failed to start stream'

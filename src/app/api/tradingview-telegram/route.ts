@@ -29,8 +29,6 @@ export async function POST(req: NextRequest) {
 		let symbol: string | null = null;
 		const contentType = req.headers.get('content-type') || '';
 
-		console.log(`[Webhook] Incoming request: ${contentType}`);
-
 		// Get sessionId from query params
 		const { searchParams } = new URL(req.url);
 		const sessionId = searchParams.get('sessionId');
@@ -41,22 +39,21 @@ export async function POST(req: NextRequest) {
 		let alert: TradingViewAlertPayload | string;
 		if (contentType.includes('application/json')) {
 			alert = (await req.json()) as TradingViewAlertPayload;
-			console.log('[Webhook] Parsed JSON payload:', alert);
+
 			message = alert.message || alert.text || JSON.stringify(alert);
 			symbol = extractSymbolFromAlert(alert);
 		} else {
 			message = await req.text();
 			alert = message;
-			console.log('[Webhook] Raw text payload:', message);
+
 			symbol = extractSymbolFromAlert(message);
 		}
 
-		console.log(`[Webhook] Sending to Telegram: ${message}`);
 		if (process.env.NODE_ENV === 'production') {
 			await sendTelegramMessage(TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, message, TELEGRAM_TOPIC_ID);
-			console.log('[Webhook] Message sent successfully');
+
 		} else {
-			console.log('[Webhook] Skipped sending Telegram message (not in production mode)');
+
 		}
 
 		// TradingView watchlist logic
@@ -67,21 +64,21 @@ export async function POST(req: NextRequest) {
 				const watchlists = await fetchWatchlistsWithAuth(TV_WATCHLISTS_URL, cookie);
 				const wl = watchlists.find((w) => w.name === TV_WATCHLIST_NAME);
 				if (!wl) {
-					console.error(`[TradingView] Watchlist "${TV_WATCHLIST_NAME}" not found`);
+
 				} else {
 					await appendSymbolToWatchlist(wl.id, tvSymbol, cookie);
-					console.log(`[TradingView] Symbol ${tvSymbol} added to watchlist "${TV_WATCHLIST_NAME}"`);
+
 				}
 			} catch (tvErr) {
-				console.error('[TradingView] Error updating watchlist:', tvErr);
+
 			}
 		} else {
-			console.warn('[TradingView] No symbol found in alert payload, skipping watchlist update');
+
 		}
 
 		return NextResponse.json({ ok: true });
 	} catch (e) {
-		console.error('[Webhook] Error:', (e as Error).message);
+
 		return NextResponse.json({ error: (e as Error).message }, { status: 500 });
 	}
 }

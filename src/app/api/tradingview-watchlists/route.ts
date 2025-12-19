@@ -18,15 +18,9 @@ export async function POST(req: NextRequest) {
 
 		// If internalSessionId is provided, use health-integrated validation
 		if (internalSessionId) {
-			console.log('[API] Using health-integrated validation for internalSessionId:', internalSessionId);
 
 			// Check health status first
 			const healthData = await getHealthAwareSessionData(internalSessionId);
-			console.log('[API] Health-aware session check:', {
-				sessionExists: healthData.sessionExists,
-				overallStatus: healthData.overallStatus,
-				platforms: healthData.platforms
-			});
 
 			if (!healthData.sessionExists || !healthData.platforms.includes('tradingview')) {
 				return NextResponse.json({
@@ -40,7 +34,7 @@ export async function POST(req: NextRequest) {
 			const validationResult = await validateAndStartMonitoring(internalSessionId, 'tradingview');
 
 			if (!validationResult.isValid) {
-				console.log('[API] TradingView session validation failed:', validationResult.error?.message);
+
 				return NextResponse.json({
 					error: validationResult.error?.message || 'TradingView session expired. Please re-authenticate.',
 					canAutoRecover: validationResult.error?.canAutoRecover() || false,
@@ -55,10 +49,6 @@ export async function POST(req: NextRequest) {
 				healthStatus = validationResult.healthStatus;
 				monitoringStarted = validationResult.monitoringStarted;
 
-				console.log('[API] Session validated and monitoring started:', {
-					healthStatus,
-					monitoringStarted
-				});
 			} else {
 				return NextResponse.json({ error: 'TradingView sessionid not found in session data' }, { status: 401 });
 			}

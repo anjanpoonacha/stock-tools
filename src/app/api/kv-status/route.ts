@@ -65,7 +65,6 @@ export async function GET() {
 		});
 
 	} catch (error) {
-		console.error('[KV-STATUS] Failed to get KV status:', error);
 
 		return NextResponse.json(
 			{

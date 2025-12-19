@@ -73,8 +73,6 @@ export async function POST(request: NextRequest) {
 			}, { status: 400 });
 		}
 
-		console.log('[Formula-Results] Fetching formula results:', { userEmail, formulaId });
-
 		// 1. Get user's formulas from KV
 		const formulasKey = generateFormulasKey(userEmail, userPassword);
 		const storedFormulas = await kv.get<StoredFormulas>(formulasKey);
@@ -96,8 +94,6 @@ export async function POST(request: NextRequest) {
 			}, { status: 404 });
 		}
 
-		console.log('[Formula-Results] Found formula:', formula.name);
-
 		// 3. Check if formula has apiUrl
 		if (!formula.apiUrl) {
 			return NextResponse.json({
@@ -112,7 +108,7 @@ export async function POST(request: NextRequest) {
 		});
 
 		if (!mioResponse.ok) {
-			console.error('[Formula-Results] MIO API error:', mioResponse.status);
+
 			return NextResponse.json({
 				error: 'Failed to fetch formula results',
 				details: `MIO API returned status ${mioResponse.status}`
@@ -122,11 +118,6 @@ export async function POST(request: NextRequest) {
 		const mioData = await mioResponse.text();
 		const stocks = parseMIOResponse(mioData);
 
-		console.log('[Formula-Results] ✅ Success:', {
-			formulaName: formula.name,
-			stockCount: stocks.length
-		});
-
 		return NextResponse.json({
 			success: true,
 			formulaName: formula.name,
@@ -135,7 +126,7 @@ export async function POST(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[Formula-Results] Error:', error);
+
 		return NextResponse.json({
 			error: 'Internal server error',
 			details: error instanceof Error ? error.message : 'Unknown error'

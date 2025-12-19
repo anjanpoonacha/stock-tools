@@ -61,12 +61,11 @@ function getErrorMessage(error: unknown): string {
 async function handleGetWatchlists(sessionInfo: MIOSessionInfo): Promise<NextResponse<APIResponse>> {
 	try {
 		const watchlists = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
-		console.log(`${LOG_PREFIXES.API} Retrieved ${watchlists.length} watchlists`);
 
 		return createSuccessResponse({ watchlists }, sessionInfo.internalId);
 	} catch (error) {
 		const message = getErrorMessage(error);
-		console.error(`${LOG_PREFIXES.API} Failed to get watchlists:`, message);
+
 		return createErrorResponse(
 			message || ERROR_MESSAGES.WATCHLIST_LOAD_FAILED,
 			HTTP_STATUS.UNAUTHORIZED,
@@ -97,7 +96,7 @@ async function handleAddToWatchlist(
 		return createSuccessResponse({ result }, sessionInfo.internalId);
 	} catch (error) {
 		const message = getErrorMessage(error);
-		console.error(`${LOG_PREFIXES.API} Failed to add to watchlist:`, message);
+
 		return createErrorResponse(
 			message || ERROR_MESSAGES.WATCHLIST_ADD_FAILED,
 			HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -110,8 +109,6 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 	try {
 		const body: MIOActionRequest & { userEmail?: string; userPassword?: string } = await req.json();
 		const { mioWlid, symbols, userEmail, userPassword } = body;
-
-		console.log(`${LOG_PREFIXES.API} POST ${req.url} body:`, { mioWlid, symbols, userEmail: userEmail ? '[PROVIDED]' : '[MISSING]' });
 
 		// Require user credentials for authentication
 		if (!userEmail || !userPassword) {
@@ -126,15 +123,13 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 
 		if (!sessionInfo) {
-			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+
 			return createErrorResponse(
 				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
 				HTTP_STATUS.UNAUTHORIZED,
 				true
 			);
 		}
-
-		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
 
 		// If no specific action requested, treat as "get watchlists"
 		if (!mioWlid && !symbols) {
@@ -145,7 +140,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 		return handleAddToWatchlist(sessionInfo, mioWlid!, symbols!);
 	} catch (error) {
 		const message = getErrorMessage(error);
-		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+
 		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }
@@ -172,7 +167,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 
 		if (!sessionInfo) {
-			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+
 			return createErrorResponse(
 				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
 				HTTP_STATUS.UNAUTHORIZED,
@@ -180,15 +175,13 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 			);
 		}
 
-		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
-		console.log(`${LOG_PREFIXES.API} Creating watchlist with session: ${sessionInfo.internalId}`);
 
 		try {
 			const result = await MIOService.createWatchlist(sessionInfo.key, sessionInfo.value, name);
 			return createSuccessResponse({ result }, sessionInfo.internalId);
 		} catch (error) {
 			const message = getErrorMessage(error);
-			console.error(`${LOG_PREFIXES.API} Failed to create watchlist:`, message);
+
 			return createErrorResponse(
 				message || ERROR_MESSAGES.WATCHLIST_CREATE_FAILED,
 				HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -197,7 +190,7 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 		}
 	} catch (error) {
 		const message = getErrorMessage(error);
-		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+
 		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }
@@ -224,7 +217,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 		const sessionInfo = await SessionResolver.getLatestMIOSessionForUser({ userEmail, userPassword });
 
 		if (!sessionInfo) {
-			console.log(`${LOG_PREFIXES.API} No MIO session found for user: ${userEmail}`);
+
 			return createErrorResponse(
 				`No MarketInOut session found for user ${userEmail}. Please use the browser extension to capture sessions from marketinout.com`,
 				HTTP_STATUS.UNAUTHORIZED,
@@ -232,15 +225,13 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 			);
 		}
 
-		console.log(`${LOG_PREFIXES.API} Using credential-based authentication for user: ${userEmail}`);
-		console.log(`${LOG_PREFIXES.API} Deleting watchlists with session: ${sessionInfo.internalId}`);
 
 		try {
 			const result = await MIOService.deleteWatchlists(sessionInfo.key, sessionInfo.value, deleteIds);
 			return createSuccessResponse({ result }, sessionInfo.internalId);
 		} catch (error) {
 			const message = getErrorMessage(error);
-			console.error(`${LOG_PREFIXES.API} Failed to delete watchlists:`, message);
+
 			return createErrorResponse(
 				message || ERROR_MESSAGES.WATCHLIST_DELETE_FAILED,
 				HTTP_STATUS.INTERNAL_SERVER_ERROR,
@@ -249,7 +240,7 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 		}
 	} catch (error) {
 		const message = getErrorMessage(error);
-		console.error(`${LOG_PREFIXES.API} Unexpected error:`, message);
+
 		return createErrorResponse(message || ERROR_MESSAGES.UNKNOWN_ERROR, HTTP_STATUS.INTERNAL_SERVER_ERROR);
 	}
 }

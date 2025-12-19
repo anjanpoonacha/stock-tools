@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
 			lastUpdated: storedData.lastUpdated,
 		});
 	} catch (error) {
-		console.error('[API] Error fetching formulas:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to fetch formulas' },
 			{ status: 500 }
@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
 		}, { status: 201 });
 
 	} catch (error) {
-		console.error('[API] Error extracting formulas:', error);
+
 		return NextResponse.json(
 			{
 				error: error instanceof Error ? error.message : 'Failed to extract formulas',
@@ -187,7 +187,7 @@ export async function PUT(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error updating formula:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to update formula' },
 			{ status: 500 }
@@ -240,13 +240,13 @@ export async function DELETE(request: NextRequest) {
 			const sessionInfo = await SessionResolver.getLatestMIOSessionForUser(userCredentials);
 
 			if (sessionInfo && sessionInfo.internalId && deletedFormula.screenId) {
-				console.log('[API] Deleting formula from MIO:', deletedFormula.screenId);
+
 				await MIOService.deleteFormulaWithSession(sessionInfo.internalId, [deletedFormula.screenId]);
 			} else {
-				console.warn('[API] No valid session or screenId, skipping MIO deletion');
+
 			}
 		} catch (mioError) {
-			console.error('[API] Error deleting from MIO:', mioError);
+
 			// Continue with local deletion even if MIO delete fails
 			// This allows cleanup of orphaned local entries
 		}
@@ -266,7 +266,7 @@ export async function DELETE(request: NextRequest) {
 		});
 
 	} catch (error) {
-		console.error('[API] Error deleting formula:', error);
+
 		return NextResponse.json(
 			{ error: 'Failed to delete formula' },
 			{ status: 500 }
