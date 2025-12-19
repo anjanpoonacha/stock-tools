@@ -398,8 +398,8 @@ export default function ChartView({
 				{/* Panel 1: Compact Toolbar (LEFT) */}
 				<Panel
 					defaultSize={panelLayout['toolbar-panel']}
-					minSize="5%"
-					maxSize="15%"
+					minSize={5}
+					maxSize={15}
 					collapsible={false}
 					id='toolbar-panel'
 				>
@@ -533,7 +533,12 @@ export default function ChartView({
 							<PopoverTrigger asChild>
 								<Button variant='outline' size='icon' className='h-10 w-10 relative' title='Indicator Settings'>
 									<TrendingUp className='h-5 w-5' />
-
+									{/* Show indicator status dots */}
+									{currentLayout.slots.some(slot => 
+										slot.indicators.some(ind => ind.enabled)
+									) && (
+										<span className='absolute -top-1 -right-1 h-3 w-3 bg-green-500 rounded-full border-2 border-background' />
+									)}
 								</Button>
 							</PopoverTrigger>
 							<PopoverContent side='right' className='w-[380px] max-h-[600px] overflow-y-auto'>
@@ -599,7 +604,7 @@ export default function ChartView({
 				{/* Panel 2: Chart Area (CENTER - Maximum Space) */}
 				<Panel
 					defaultSize={panelLayout['chart-panel']}
-					minSize="30%"
+					minSize={30}
 					collapsible={false}
 					id='chart-panel'
 				>
@@ -708,7 +713,7 @@ export default function ChartView({
 										<Panel 
 											key={slotIndex}
 											defaultSize={currentLayout.slotSizes?.[slotIndex] || 50}
-											minSize="20%"
+											minSize={20}
 										>
 											<div
 												className={cn(
@@ -757,8 +762,8 @@ export default function ChartView({
 				{/* Panel 3: Stock List (RIGHT) */}
 				<Panel
 					defaultSize={panelLayout['stock-list-panel']}
-					minSize="14%"
-					maxSize="40%"
+					minSize={14}
+					maxSize={40}
 					collapsible={false}
 					id='stock-list-panel'
 				>

@@ -1,169 +1,55 @@
 /**
- * Centralized KV Settings Hook
+ * Centralized KV Settings Hook (Refactored)
  *
- * Single source of truth for ALL user settings:
+ * Single source of truth for ALL user settings using unified structure:
  * - Panel layout (sizes)
- * - Chart settings (resolutions, zoom, indicators)
- * - Layout settings (mode, sync)
+ * - Chart settings (layouts, indicators, global settings)
  *
  * This is the ONLY hook that should be used for persisting user preferences.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { DEFAULT_PANEL_SIZES } from '@/lib/chart/panelConstants';
+import {
+	AllSettings,
+	ChartSettings,
+	PanelLayout,
+	LayoutConfig,
+	ChartSlotConfig,
+	IndicatorConfig,
+	IndicatorType,
+	GlobalSettings,
+} from '@/types/chartSettings';
+import { DEFAULT_ALL_SETTINGS } from '@/lib/chart/defaults';
 
-// API endpoints
-const API = {
-	PANEL_LAYOUT: '/api/kv/panel-layout',
-	CHART_SETTINGS: '/api/kv/chart-settings',
-	LAYOUT_SETTINGS: '/api/kv/layout-settings',
-	DUAL_CHART_LAYOUT: '/api/kv/dual-chart-layout',
-} as const;
-
-// Type definitions
-export interface PanelLayout {
-	'toolbar-panel': number;
-	'chart-panel': number;
-	'stock-list-panel': number;
-}
-
-export interface ChartSettings {
-	resolution1: string;
-	resolution2: string;
-	zoomLevel1: string;
-	zoomLevel2: string;
-	// Chart 1 Indicator Visibility
-	showPrice1: boolean;
-	showVolume1: boolean;
-	showCVD1: boolean;
-	cvdAnchorPeriod1: string;
-	cvdUseCustomPeriod1: boolean;
-	cvdCustomPeriod1: string;
-	// Chart 2 Indicator Visibility
-	showPrice2: boolean;
-	showVolume2: boolean;
-	showCVD2: boolean;
-	cvdAnchorPeriod2: string;
-	cvdUseCustomPeriod2: boolean;
-	cvdCustomPeriod2: string;
-	showGrid: boolean;
-	dualViewMode: boolean;
-	showVolumeMA: boolean;
-	volumeMALength: number;
-}
-
-export interface LayoutSettings {
-	mode: 'horizontal' | 'vertical';
-	rangeSync: boolean;
-}
-
-export interface DualChartLayout {
-	horizontal: {
-		chart1: number;
-		chart2: number;
-	};
-	vertical: {
-		chart1: number;
-		chart2: number;
-	};
-}
-
-interface AllSettings {
-	panelLayout: PanelLayout;
-	chartSettings: ChartSettings;
-	layoutSettings: LayoutSettings;
-	dualChartLayout: DualChartLayout;
-}
-
-// Default values
-const DEFAULTS: AllSettings = {
-	panelLayout: {
-		'toolbar-panel': DEFAULT_PANEL_SIZES.TOOLBAR,
-		'chart-panel': DEFAULT_PANEL_SIZES.CHART,
-		'stock-list-panel': DEFAULT_PANEL_SIZES.STOCK_LIST,
-	},
-	chartSettings: {
-		resolution1: '1D',
-		resolution2: '1W',
-		zoomLevel1: 'MD',
-		zoomLevel2: 'MD',
-		// Chart 1 defaults
-		showPrice1: true,
-		showVolume1: true,
-		showCVD1: false,
-		cvdAnchorPeriod1: '3M',
-		cvdUseCustomPeriod1: false,
-		cvdCustomPeriod1: '1',
-		// Chart 2 defaults
-		showPrice2: true,
-		showVolume2: true,
-		showCVD2: false,
-		cvdAnchorPeriod2: '3M',
-		cvdUseCustomPeriod2: false,
-		cvdCustomPeriod2: '1',
-		showGrid: false,
-		dualViewMode: false,
-		showVolumeMA: false,
-		volumeMALength: 30,
-	},
-	layoutSettings: {
-		mode: 'horizontal',
-		rangeSync: true,
-	},
-	dualChartLayout: {
-		horizontal: {
-			chart1: 50,
-			chart2: 50,
-		},
-		vertical: {
-			chart1: 50,
-			chart2: 50,
-		},
-	},
-};
+// API endpoint - single unified endpoint
+const API_SETTINGS = '/api/kv/settings';
 
 /**
  * Centralized settings hook - USE THIS INSTEAD OF OTHER HOOKS
  */
 export function useKVSettings() {
-	const [settings, setSettings] = useState<AllSettings>(DEFAULTS);
+	const [settings, setSettings] = useState<AllSettings>(DEFAULT_ALL_SETTINGS);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isLoaded, setIsLoaded] = useState(false);
 
-	// Debounce timers for each setting type
-	const panelSaveTimer = useRef<NodeJS.Timeout | null>(null);
-	const chartSaveTimer = useRef<NodeJS.Timeout | null>(null);
-	const layoutSaveTimer = useRef<NodeJS.Timeout | null>(null);
-	const dualChartSaveTimer = useRef<NodeJS.Timeout | null>(null);
+	// Single debounce timer for all settings saves
+	const saveTimer = useRef<NodeJS.Timeout | null>(null);
 
-	// Load all settings on mount - ONCE only to prevent infinite loop
+	// Load all settings on mount - ONCE only
 	useEffect(() => {
 		async function loadAll() {
-			// CRITICAL FIX: Skip if already loaded to prevent re-fetching on every render
+			// Skip if already loaded to prevent re-fetching
 			if (isLoaded) {
 				return;
 			}
-			
-			try {
-				const [panelRes, chartRes, layoutRes, dualChartRes] = await Promise.all([
-					fetch(API.PANEL_LAYOUT),
-					fetch(API.CHART_SETTINGS),
-					fetch(API.LAYOUT_SETTINGS),
-				fetch(API.DUAL_CHART_LAYOUT),
-				]);
 
-				const [panelLayout, chartSettings, layoutSettings, dualChartLayout] = await Promise.all([
-					panelRes.json(),
-					chartRes.json(),
-					layoutRes.json(),
-				dualChartRes.json(),
-				]);
+			try {
+				const response = await fetch(API_SETTINGS);
+				const loadedSettings = await response.json();
 
 				setSettings({
-					panelLayout: panelLayout || DEFAULTS.panelLayout,
-					chartSettings: chartSettings || DEFAULTS.chartSettings,
-					layoutSettings: layoutSettings || DEFAULTS.layoutSettings,
-				dualChartLayout: dualChartLayout || DEFAULTS.dualChartLayout,
+					panelLayout: loadedSettings?.panelLayout || DEFAULT_ALL_SETTINGS.panelLayout,
+					chartSettings: loadedSettings?.chartSettings || DEFAULT_ALL_SETTINGS.chartSettings,
 				});
 
 				console.log('✅ Loaded settings from KV');
@@ -176,153 +62,216 @@ export function useKVSettings() {
 			}
 		}
 		loadAll();
-	}, [isLoaded]); // Include isLoaded to check guard condition
-
-	// Save panel layout (debounced)
-	const savePanelLayout = useCallback((layout: PanelLayout) => {
-		if (!isLoaded) return;
-
-		if (panelSaveTimer.current) {
-			clearTimeout(panelSaveTimer.current);
-		}
-
-		panelSaveTimer.current = setTimeout(async () => {
-			try {
-				await fetch(API.PANEL_LAYOUT, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(layout),
-				});
-				console.log('✅ Saved panel layout to KV');
-			} catch (error) {
-				console.error('❌ Failed to save panel layout:', error);
-			}
-		}, 1000); // 1 second debounce
 	}, [isLoaded]);
 
-	// Save chart settings (debounced)
-	const saveChartSettings = useCallback((chartSettings: ChartSettings) => {
-		if (!isLoaded) return;
+	// Save settings with 1 second debounce
+	const saveSettings = useCallback(
+		(updatedSettings: AllSettings) => {
+			if (!isLoaded) return;
 
-		if (chartSaveTimer.current) {
-			clearTimeout(chartSaveTimer.current);
-		}
-
-		chartSaveTimer.current = setTimeout(async () => {
-			try {
-				await fetch(API.CHART_SETTINGS, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(chartSettings),
-				});
-				console.log('✅ Saved chart settings to KV');
-			} catch (error) {
-				console.error('❌ Failed to save chart settings:', error);
+			if (saveTimer.current) {
+				clearTimeout(saveTimer.current);
 			}
-		}, 500); // 500ms debounce for chart settings
-	}, [isLoaded]);
 
-	// Save layout settings (immediate)
-	const saveLayoutSettings = useCallback(async (layoutSettings: LayoutSettings) => {
-		if (!isLoaded) return;
+			saveTimer.current = setTimeout(async () => {
+				try {
+					await fetch(API_SETTINGS, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify(updatedSettings),
+					});
+					console.log('✅ Saved settings to KV');
+				} catch (error) {
+					console.error('❌ Failed to save settings:', error);
+				}
+			}, 1000); // 1 second debounce
+		},
+		[isLoaded]
+	);
 
-		try {
-			await fetch(API.LAYOUT_SETTINGS, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify(layoutSettings),
+	// ============================================
+	// Helper Methods
+	// ============================================
+
+	/**
+	 * Get the current active layout configuration
+	 */
+	const getCurrentLayout = useCallback((): LayoutConfig => {
+		const activeLayout = settings.chartSettings.activeLayout;
+		return settings.chartSettings.layouts[activeLayout];
+	}, [settings.chartSettings]);
+
+	/**
+	 * Get a specific slot by index
+	 */
+	const getSlot = useCallback(
+		(slotIndex: number): ChartSlotConfig | undefined => {
+			const layout = getCurrentLayout();
+			return layout.slots[slotIndex];
+		},
+		[getCurrentLayout]
+	);
+
+	/**
+	 * Update a specific slot configuration
+	 */
+	const updateSlot = useCallback(
+		(slotIndex: number, updates: Partial<ChartSlotConfig>) => {
+			setSettings((prev) => {
+				const activeLayout = prev.chartSettings.activeLayout;
+				const layout = prev.chartSettings.layouts[activeLayout];
+				const updatedSlots = [...layout.slots];
+
+				if (slotIndex >= 0 && slotIndex < updatedSlots.length) {
+					updatedSlots[slotIndex] = {
+						...updatedSlots[slotIndex],
+						...updates,
+					};
+				}
+
+				const newSettings = {
+					...prev,
+					chartSettings: {
+						...prev.chartSettings,
+						layouts: {
+							...prev.chartSettings.layouts,
+							[activeLayout]: {
+								...layout,
+								slots: updatedSlots,
+							},
+						},
+					},
+				};
+
+				saveSettings(newSettings);
+				return newSettings;
 			});
-			console.log('✅ Saved layout settings to KV');
-		} catch (error) {
-			console.error('❌ Failed to save layout settings:', error);
-		}
-	}, [isLoaded]);
+		},
+		[saveSettings]
+	);
 
-	// Update panel layout
-	const updatePanelLayout = useCallback((layout: PanelLayout) => {
-		setSettings(prev => ({ ...prev, panelLayout: layout }));
-		savePanelLayout(layout);
-	}, [savePanelLayout]);
+	/**
+	 * Update a specific indicator within a slot
+	 */
+	const updateIndicatorInSlot = useCallback(
+		(
+			slotIndex: number,
+			indicatorType: IndicatorType,
+			updates: Partial<IndicatorConfig>
+		) => {
+			setSettings((prev) => {
+				const activeLayout = prev.chartSettings.activeLayout;
+				const layout = prev.chartSettings.layouts[activeLayout];
+				const updatedSlots = [...layout.slots];
 
-	// Update single chart setting
-	const updateChartSetting = useCallback(<K extends keyof ChartSettings>(
-		key: K,
-		value: ChartSettings[K]
-	) => {
-		let newChartSettings: ChartSettings;
-		setSettings(prev => {
-			newChartSettings = { ...prev.chartSettings, [key]: value };
-			return { ...prev, chartSettings: newChartSettings };
-		});
-		// Save with the newly created settings object
-		saveChartSettings(newChartSettings!);
-	}, [saveChartSettings]);
+				if (slotIndex >= 0 && slotIndex < updatedSlots.length) {
+					const slot = updatedSlots[slotIndex];
+					const indicatorIndex = slot.indicators.findIndex(
+						(ind) => ind.type === indicatorType
+					);
 
-	// Update multiple chart settings
-	const updateChartSettings = useCallback((partial: Partial<ChartSettings>) => {
-		let newChartSettings: ChartSettings;
-		setSettings(prev => {
-			newChartSettings = { ...prev.chartSettings, ...partial };
-			return { ...prev, chartSettings: newChartSettings };
-		});
-		// Save with the newly created settings object
-		saveChartSettings(newChartSettings!);
-	}, [saveChartSettings]);
+					if (indicatorIndex !== -1) {
+						const updatedIndicators = [...slot.indicators];
+						updatedIndicators[indicatorIndex] = {
+							...updatedIndicators[indicatorIndex],
+							...updates,
+						};
 
-	// Update layout mode
-	const updateLayoutMode = useCallback((mode: 'horizontal' | 'vertical') => {
-		setSettings(prev => {
-			const newLayoutSettings = { ...prev.layoutSettings, mode };
-			saveLayoutSettings(newLayoutSettings);
-			return { ...prev, layoutSettings: newLayoutSettings };
-		});
-	}, [saveLayoutSettings]);
+						updatedSlots[slotIndex] = {
+							...slot,
+							indicators: updatedIndicators,
+						};
+					}
+				}
 
-	// Update range sync
-	const updateRangeSync = useCallback((rangeSync: boolean) => {
-		setSettings(prev => {
-			const newLayoutSettings = { ...prev.layoutSettings, rangeSync };
-			saveLayoutSettings(newLayoutSettings);
-			return { ...prev, layoutSettings: newLayoutSettings };
-		});
-	}, [saveLayoutSettings]);
+				const newSettings = {
+					...prev,
+					chartSettings: {
+						...prev.chartSettings,
+						layouts: {
+							...prev.chartSettings.layouts,
+							[activeLayout]: {
+								...layout,
+								slots: updatedSlots,
+							},
+						},
+					},
+				};
 
-	// Save dual chart layout (debounced)
-	const saveDualChartLayout = useCallback((layout: DualChartLayout) => {
-		if (!isLoaded) return;
+				saveSettings(newSettings);
+				return newSettings;
+			});
+		},
+		[saveSettings]
+	);
 
-		if (dualChartSaveTimer.current) {
-			clearTimeout(dualChartSaveTimer.current);
-		}
+	/**
+	 * Switch to a different layout
+	 */
+	const setActiveLayout = useCallback(
+		(layout: 'single' | 'horizontal' | 'vertical') => {
+			setSettings((prev) => {
+				const newSettings = {
+					...prev,
+					chartSettings: {
+						...prev.chartSettings,
+						activeLayout: layout,
+					},
+				};
 
-		dualChartSaveTimer.current = setTimeout(async () => {
-			try {
-				await fetch(API.DUAL_CHART_LAYOUT, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify(layout),
-				});
-				console.log('✅ Saved dual chart layout to KV');
-			} catch (error) {
-				console.error('❌ Failed to save dual chart layout:', error);
-			}
-		}, 1000); // 1 second debounce
-	}, [isLoaded]);
+				saveSettings(newSettings);
+				return newSettings;
+			});
+		},
+		[saveSettings]
+	);
 
-	// Update dual chart layout
-	const updateDualChartLayout = useCallback((
-		orientation: 'horizontal' | 'vertical',
-		sizes: { chart1: number; chart2: number }
-	) => {
-		setSettings(prev => {
-			const newDualChartLayout = {
-				...prev.dualChartLayout,
-				[orientation]: sizes,
-			};
-			saveDualChartLayout(newDualChartLayout);
-			return { ...prev, dualChartLayout: newDualChartLayout };
-		});
-	}, [saveDualChartLayout]);
+	/**
+	 * Update a global setting
+	 */
+	const updateGlobalSetting = useCallback(
+		<K extends keyof GlobalSettings>(key: K, value: GlobalSettings[K]) => {
+			setSettings((prev) => {
+				const newSettings = {
+					...prev,
+					chartSettings: {
+						...prev.chartSettings,
+						global: {
+							...prev.chartSettings.global,
+							[key]: value,
+						},
+					},
+				};
+
+				saveSettings(newSettings);
+				return newSettings;
+			});
+		},
+		[saveSettings]
+	);
+
+	// ============================================
+	// Panel Layout Update (Backward Compatibility)
+	// ============================================
+
+	/**
+	 * Update panel layout separately (backward compat)
+	 * This is separate because panel resizing happens frequently
+	 */
+	const updatePanelLayout = useCallback(
+		(layout: PanelLayout) => {
+			setSettings((prev) => {
+				const newSettings = {
+					...prev,
+					panelLayout: layout,
+				};
+
+				saveSettings(newSettings);
+				return newSettings;
+			});
+		},
+		[saveSettings]
+	);
 
 	return {
 		// Loading state
@@ -332,23 +281,23 @@ export function useKVSettings() {
 		// All settings
 		settings,
 
-		// Panel layout
+		// Panel layout (backward compat)
 		panelLayout: settings.panelLayout,
 		updatePanelLayout,
 
-		// Chart settings
+		// Chart settings (direct access)
 		chartSettings: settings.chartSettings,
-		updateChartSetting,
-		updateChartSettings,
 
-		// Layout settings
-		layoutMode: settings.layoutSettings.mode,
-		rangeSync: settings.layoutSettings.rangeSync,
-		updateLayoutMode,
-		updateRangeSync,
+		// Helper methods
+		getCurrentLayout,
+		getSlot,
+		updateSlot,
+		updateIndicatorInSlot,
+		setActiveLayout,
+		updateGlobalSetting,
 
-		// Dual chart layout
-		dualChartLayout: settings.dualChartLayout,
-		updateDualChartLayout,
+		// Convenience accessors
+		activeLayout: settings.chartSettings.activeLayout,
+		globalSettings: settings.chartSettings.global,
 	};
 }

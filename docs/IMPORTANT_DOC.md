@@ -1,4 +1,36 @@
-# Known Issues & Critical Fixes
+# Important Documentation - Critical Issues & Quirks
+
+## 📐 CVD Timeframe Format (CRITICAL)
+
+**Issue**: CVD custom periods use TradingView-specific format, NOT standard notation  
+**Root Cause**: TradingView API requires specific uppercase/lowercase and suffix rules  
+**Fix Location**: `src/lib/chart/constants.ts`, `src/components/chart/indicators/CVDSettings.tsx`
+
+```typescript
+// ✅ CORRECT FORMAT
+'15S'   // Seconds: Uppercase S
+'30S'   // Seconds: Uppercase S
+'1'     // Minutes: Number only (NO suffix)
+'5'     // Minutes: Number only
+'60'    // 1 hour = 60 minutes (NO 'h' suffix)
+'1D'    // Days: Uppercase D
+'1W'    // Weeks: Uppercase W
+'3M'    // Months: Uppercase M
+'1Y'    // Years: Uppercase Y
+
+// ❌ WRONG FORMAT
+'15s'   // Should be '15S' (uppercase)
+'5m'    // Should be '5' (no suffix for minutes)
+'1h'    // Should be '60' (hours not supported)
+'1d'    // Should be '1D' (uppercase)
+```
+
+**Reference**: 
+- API: `src/app/api/chart-data/route.ts:26`
+- Types: `src/lib/tradingview/types.ts:136`
+- Full spec: `docs/CVD_TIMEFRAME_FORMAT.md`
+
+---
 
 ## 🔥 TradingView WebSocket Heartbeat (CRITICAL)
 
@@ -91,7 +123,7 @@ chart.moveToPane(volumeSeries, 1); // Move to pane 1 (below price)
 
 ---
 
-## 📝 Documentation Cleanup
+## 📝 Note
 
-All implementation summaries, testing guides, and status docs removed.  
-Only this file remains with critical production issues/quirks.
+**This is a LEAN document** - only critical production issues/quirks that cause bugs.  
+Implementation details → separate docs. Keep this under 150 lines.

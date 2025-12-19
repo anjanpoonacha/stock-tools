@@ -54,6 +54,12 @@ export function applyZoom(
   bars: OHLCVBar[],
   resolution: string
 ): void {
+  // Guard: If no bars or empty array, use fitContent
+  if (!bars || bars.length === 0) {
+    timeScale.fitContent();
+    return;
+  }
+
   // MAX zoom = fit all content
   if (zoomLevel === ChartZoomLevel.MAX) {
     timeScale.fitContent();
@@ -65,12 +71,26 @@ export function applyZoom(
   const firstBarIndex = Math.max(0, bars.length - visibleBars);
   const lastBarIndex = bars.length - 1;
 
-  // Apply visible range (show last N bars)
-  if (firstBarIndex < bars.length && lastBarIndex < bars.length) {
-    timeScale.setVisibleRange({
-      from: bars[firstBarIndex].time as Time,
-      to: bars[lastBarIndex].time as Time,
-    });
+  // Guard: Validate indices and bars have valid time values
+  if (
+    firstBarIndex < bars.length && 
+    lastBarIndex < bars.length &&
+    bars[firstBarIndex]?.time != null &&
+    bars[lastBarIndex]?.time != null
+  ) {
+    try {
+      timeScale.setVisibleRange({
+        from: bars[firstBarIndex].time as Time,
+        to: bars[lastBarIndex].time as Time,
+      });
+    } catch (error) {
+      // If setVisibleRange fails (e.g., timeScale not ready), fallback to fitContent
+      console.warn('[applyZoom] setVisibleRange failed, using fitContent:', error);
+      timeScale.fitContent();
+    }
+  } else {
+    // Fallback to fitContent if data is invalid
+    timeScale.fitContent();
   }
 }
 

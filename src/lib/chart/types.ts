@@ -7,10 +7,10 @@
  * Zoom level enum - predefined zoom presets
  */
 export enum ChartZoomLevel {
-  MAX = 'max',
-  FIVE_X = '5x',
-  TWO_X = '2x',
-  ONE_X = '1x',
+  SM = 'SM',
+  MD = 'MD',
+  LG = 'LG',
+  MAX = 'MAX',
 }
 
 /**
