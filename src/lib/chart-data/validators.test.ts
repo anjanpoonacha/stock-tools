@@ -9,28 +9,28 @@ import { validateChartDataRequest, validateUserCredentials } from './validators'
 
 describe('validateChartDataRequest', () => {
 	describe('barsCount validation', () => {
-		it('should reject barsCount > 300', () => {
-			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '500');
+		it('should reject barsCount > 2000', () => {
+			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '2500');
 			expect(result.valid).toBe(false);
-			expect(result.error).toContain('between 1 and 300');
+			expect(result.error).toContain('between 1 and 2000');
 		});
 		
 		it('should reject barsCount = 0', () => {
 			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '0');
 			expect(result.valid).toBe(false);
-			expect(result.error).toContain('between 1 and 300');
+			expect(result.error).toContain('between 1 and 2000');
 		});
 		
 		it('should reject negative barsCount', () => {
 			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '-50');
 			expect(result.valid).toBe(false);
-			expect(result.error).toContain('between 1 and 300');
+			expect(result.error).toContain('between 1 and 2000');
 		});
 		
 		it('should reject non-numeric barsCount', () => {
 			const result = validateChartDataRequest('NSE:JUNIPER', '1D', 'abc');
 			expect(result.valid).toBe(false);
-			expect(result.error).toContain('between 1 and 300');
+			expect(result.error).toContain('between 1 and 2000');
 		});
 		
 		it('should accept barsCount = 1', () => {
@@ -43,6 +43,18 @@ describe('validateChartDataRequest', () => {
 			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '300');
 			expect(result.valid).toBe(true);
 			expect(result.params?.barsCount).toBe(300);
+		});
+		
+		it('should accept barsCount = 1000 (verified via API testing)', () => {
+			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '1000');
+			expect(result.valid).toBe(true);
+			expect(result.params?.barsCount).toBe(1000);
+		});
+		
+		it('should accept barsCount = 2000 (max verified via API testing)', () => {
+			const result = validateChartDataRequest('NSE:JUNIPER', '1D', '2000');
+			expect(result.valid).toBe(true);
+			expect(result.params?.barsCount).toBe(2000);
 		});
 		
 		it('should parse barsCount as integer', () => {

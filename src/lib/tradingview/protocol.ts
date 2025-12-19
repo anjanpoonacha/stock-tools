@@ -15,6 +15,7 @@ export interface TVMessage {
 export interface ParsedFrame {
 	messages: TVMessage[];
 	rawMessages: string[];
+	heartbeats: string[];  // Heartbeat messages that need to be echoed back
 }
 
 /**
@@ -25,6 +26,7 @@ export interface ParsedFrame {
 export function parseFrame(frame: string): ParsedFrame {
 	const messages: TVMessage[] = [];
 	const rawMessages: string[] = [];
+	const heartbeats: string[] = [];
 	let position = 0;
 
 	while (position < frame.length) {
@@ -53,21 +55,29 @@ export function parseFrame(frame: string): ParsedFrame {
 
 		// Extract the message payload
 		const messagePayload = frame.substring(position, position + messageLength);
-		rawMessages.push(messagePayload);
-
-		// Try to parse as JSON
-		try {
-			const parsed = JSON.parse(messagePayload);
-			messages.push(parsed as TVMessage);
-		} catch (error) {
-			console.warn('[TV Protocol] Failed to parse message JSON:', messagePayload.substring(0, 100));
+		
+		// Check if this is a heartbeat message (~h~N format)
+		if (messagePayload.startsWith('~h~')) {
+			// Extract the full heartbeat message including frame markers
+			const heartbeatMessage = `~m~${messageLength}~m~${messagePayload}`;
+			heartbeats.push(heartbeatMessage);
+			console.log('[TV Protocol] 💓 Heartbeat received:', messagePayload);
+		} else {
+			// Regular message - try to parse as JSON
+			rawMessages.push(messagePayload);
+			try {
+				const parsed = JSON.parse(messagePayload);
+				messages.push(parsed as TVMessage);
+			} catch (error) {
+				console.warn('[TV Protocol] Failed to parse message JSON:', messagePayload.substring(0, 100));
+			}
 		}
 
 		// Move position forward by message length
 		position += messageLength;
 	}
 
-	return { messages, rawMessages };
+	return { messages, rawMessages, heartbeats };
 }
 
 /**

@@ -153,7 +153,9 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			
 			// Wait for data
 			// Both create_series and modify_series take ~3-5 seconds for data
-			await this.waitForData(5000);
+			// For high bar counts (1000-2000) with CVD, allow more time
+			const waitTime = request.cvdEnabled && request.barsCount > 500 ? 8000 : 5000;
+			await this.waitForData(waitTime);
 			
 			// Get results
 			const bars = this.getBars();
@@ -167,7 +169,8 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			if (bars.length === 0) {
 				console.error(`[PooledClient] ❌ No bars received! Request #${this.requestCount}, symbol=${request.symbol}`);
 				console.error(`[PooledClient] Debug: chartSessionId=${this.chartSessionId}, seriesId=${this.seriesId}`);
-				throw new Error(`No bars received for symbol ${request.symbol}`);
+				console.error(`[PooledClient] Possible causes: invalid symbol, delisted stock, or data unavailable for resolution`);
+				throw new Error(`No bars received for symbol ${request.symbol}. Symbol may be invalid or delisted.`);
 			}
 			
 			console.log(`[PooledClient] ✅ Collected ${bars.length} bars for ${request.symbol}`);

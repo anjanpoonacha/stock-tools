@@ -17,7 +17,10 @@ import type { ChartDataResponse } from '@/lib/tradingview/types';
  * Query Parameters:
  * - symbol: Stock symbol (e.g., 'NSE:JUNIPER')
  * - resolution: Time resolution ('1D', '1W', '1M', '1', '5', '15', '30', '60') - default '1D'
- * - barsCount: Number of bars to fetch (max 300) - default 300
+ * - barsCount: Number of bars to fetch (1-2000) - default 300
+ *   Verified through real API testing (Dec 18, 2025):
+ *   Daily=2000 (8 years), 15min=2000 (4 months), Weekly=1500 (29 years), 5min=1000 (17 days)
+ *   See: docs/BAR_COUNT_TEST_RESULTS.md
  * - cvdEnabled: Enable CVD indicator ('true' or 'false') - default 'false'
  * - cvdAnchorPeriod: CVD anchor period ('1W', '1M', '3M', '6M', '1Y') - default '3M'
  * - cvdTimeframe: CVD custom timeframe ('15S', '30S', '1', '5', etc.) - optional

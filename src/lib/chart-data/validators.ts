@@ -59,10 +59,13 @@ export function validateChartDataRequest(
 	const finalBarsCount = barsCountParam ? parseInt(barsCountParam, 10) : 300;
 	
 	// Validate barsCount
-	if (isNaN(finalBarsCount) || finalBarsCount <= 0 || finalBarsCount > 300) {
+	// Limit set to 2000 based on real API testing (Dec 18, 2025)
+	// See: docs/BAR_COUNT_TEST_RESULTS.md for test results
+	// TradingView supports up to 5000 bars, but we use 2000 as a conservative verified limit
+	if (isNaN(finalBarsCount) || finalBarsCount <= 0 || finalBarsCount > 2000) {
 		return {
 			valid: false,
-			error: 'Invalid barsCount parameter. Must be between 1 and 300.'
+			error: 'Invalid barsCount parameter. Must be between 1 and 2000.'
 		};
 	}
 	

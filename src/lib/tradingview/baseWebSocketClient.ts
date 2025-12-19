@@ -132,6 +132,9 @@ export abstract class BaseWebSocketClient {
 	// Study data waiting
 	private expectedStudyCount: number = 0;
 	
+	// Track requested bar count for timeout scaling
+	protected requestedBarsCount: number = 300;
+	
 	// Logging (optional)
 	private messageStats: MessageStats | null = null;
 	
@@ -282,7 +285,17 @@ export abstract class BaseWebSocketClient {
 	 * @param frame Raw WebSocket frame
 	 */
 	private handleMessage(frame: string): void {
-		const { messages } = parseFrame(frame);
+		const { messages, heartbeats } = parseFrame(frame);
+		
+		// Handle heartbeats immediately - echo them back to keep connection alive
+		if (heartbeats.length > 0) {
+			for (const heartbeat of heartbeats) {
+				if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+					this.ws.send(heartbeat);
+					console.log('[TV Protocol] 💓 Heartbeat echoed back');
+				}
+			}
+		}
 		
 		// Update stats
 		if (this.messageStats) {
@@ -305,6 +318,10 @@ export abstract class BaseWebSocketClient {
 			switch (msg.m) {
 				case 'symbol_resolved':
 					this.handleSymbolResolved(msg);
+					break;
+					
+				case 'symbol_error':
+					this.handleSymbolError(msg);
 					break;
 					
 				case 'study_loading':
@@ -476,6 +493,9 @@ export abstract class BaseWebSocketClient {
 	 * @param barsCount Number of bars to request
 	 */
 	protected async createSeries(resolution: string, barsCount: number): Promise<void> {
+		// Store requested bar count for timeout scaling
+		this.requestedBarsCount = barsCount;
+		
 		this.send(createMessage('create_series', [
 			this.chartSessionId,
 			'sds_1',
@@ -577,11 +597,15 @@ export abstract class BaseWebSocketClient {
 	 * @param timeout Timeout in milliseconds (default: from config or 10000)
 	 */
 	protected async waitForData(timeout: number = this.config.dataTimeout): Promise<void> {
-		// If we're waiting for studies, use 2-second timeout (increased from 800ms)
-		// CVD data typically arrives within 1-3 seconds
+		// If we're waiting for studies, use appropriate timeout based on REQUESTED data volume
+		// CVD data typically arrives within 1-3 seconds for 300 bars
+		// For larger bar counts (1000-2000), allow proportionally more time
 		if (this.expectedStudyCount > 0) {
-			timeout = Math.min(timeout, 2000);
-			console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: waiting for ${this.expectedStudyCount} studies (timeout: ${timeout}ms)`);
+			// Scale timeout: 2s base + 1s per 500 bars over 300 (max 5s)
+			// Use REQUESTED bars, not received bars (which is 0 at this point)
+			const barBasedTimeout = Math.min(5000, 2000 + Math.max(0, (this.requestedBarsCount - 300) / 500 * 1000));
+			timeout = Math.min(timeout, barBasedTimeout);
+			console.log(`[BaseWebSocket] 🔍 CVD Diagnostic: waiting for ${this.expectedStudyCount} studies (timeout: ${timeout}ms, requested bars: ${this.requestedBarsCount})`);
 			console.log(`[BaseWebSocket] Waiting max ${timeout}ms for ${this.expectedStudyCount} studies`);
 		}
 		if (!this.config.eventDrivenWaits) {
@@ -641,6 +665,26 @@ export abstract class BaseWebSocketClient {
 	protected handleSymbolResolved(msg: TVMessage): void {
 		const [, , metadata] = msg.p as [string, string, SymbolMetadata];
 		this.symbolMetadata = metadata;
+	}
+	
+	/**
+	 * Handle symbol_error message
+	 * 
+	 * Called when symbol resolution fails (invalid/delisted symbol).
+	 * Default implementation logs error and triggers data wait resolver.
+	 * 
+	 * @param msg Symbol error message
+	 */
+	protected handleSymbolError(msg: TVMessage): void {
+		const [, symbolName, errorReason] = msg.p as [string, string, string];
+		console.error(`[BaseWebSocket] ❌ Symbol error: ${symbolName} - ${errorReason}`);
+		console.error(`[BaseWebSocket] Symbol may be invalid, delisted, or not available on this exchange`);
+		
+		// Trigger data wait resolver to prevent hanging
+		if (this.dataWaitResolver) {
+			this.dataWaitResolver(false);
+			this.dataWaitResolver = null;
+		}
 	}
 	
 	/**
