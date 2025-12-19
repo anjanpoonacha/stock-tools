@@ -81,11 +81,22 @@ export default function ResultsTable({
 		}
 		
 		const newUrl = `${pathname}?${params.toString()}`;
-		router.replace(newUrl, { scroll: false });
+		
+		// Guard: Only update URL if it actually changed to prevent unnecessary re-renders
+		const currentUrl = `${pathname}?${searchParams.toString()}`;
+		if (newUrl !== currentUrl) {
+			router.replace(newUrl, { scroll: false });
+		}
 		
 		// Save to user preferences
 		updateFormulaResultsPreferences({ sortBy: sortField, sortOrder, groupBy });
-	}, [sortField, sortOrder, groupBy, sectorFilter, industryFilter, pathname, router, searchParams]);
+		
+		// NOTE: searchParams is intentionally excluded from dependencies to prevent infinite loops.
+		// searchParams is read once during mount (state initialization lines 47-61).
+		// This effect should only run when state values change, not when URL changes externally.
+		// In production, router.replace() creates new searchParams instances, causing infinite loops.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [sortField, sortOrder, groupBy, sectorFilter, industryFilter, pathname, router]);
 
 	// Extract unique sectors and industries
 	const sectors = useMemo(() => {
