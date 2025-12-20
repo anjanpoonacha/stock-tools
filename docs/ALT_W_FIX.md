@@ -19,13 +19,22 @@ User reported: "Option+W does nothing"
 - Pressing `Alt+W` / `Option+W` did nothing
 - No error, no action, no response
 
+**Additional Issue Found:**
+- On Mac, `Option+W` produces special character `∑` 
+- Using `event.key === 'w'` fails because `event.key === '∑'`
+- Need to use `event.code === 'KeyW'` instead
+
 ---
 
 ## 🔍 Root Cause
 
 **File:** `src/hooks/useChartKeybindings.ts`
 
-**Bug Location:** Lines 112-116 (BEFORE fix)
+**Two Issues Found:**
+
+### **Issue #1: Modifier Key Check Order**
+
+**Bug Location:** Lines 112-116 (BEFORE first fix)
 
 ```typescript
 // Check for modifier keys and exit early
@@ -51,15 +60,34 @@ if (isQuickAddShortcut && ...) {
 3. `Alt+W` check on line 176 is **never reached**
 4. Shortcut doesn't work
 
+### **Issue #2: Mac Option Key Produces Special Characters**
+
+**Bug Location:** Line 114 (AFTER first fix, still broken on Mac)
+
+```typescript
+const isQuickAddShortcut = 
+    event.key === 'w' &&  // ← On Mac: Option+W produces '∑' not 'w'!
+    event.altKey && ...
+```
+
+**The Problem on Mac:**
+1. Mac Option key modifies the character output
+2. `Option+W` produces `∑` (special character)
+3. Check for `event.key === 'w'` fails because `event.key === '∑'`
+4. Should use `event.code === 'KeyW'` (physical key) instead
+
 **Why It Wasn't Caught:**
-- The keybinding check was **after** the modifier block
-- Code logic error: Check should happen **before** blocking modifiers
+- The keybinding check was **after** the modifier block (Issue #1)
+- Used `event.key` instead of `event.code` (Issue #2)
+- Not tested on Mac keyboard layout
 
 ---
 
 ## ✅ Solution
 
-**Move the `Alt+W` check BEFORE the modifier block:**
+**Two fixes applied:**
+
+### **Fix #1: Move Alt+W check BEFORE modifier block**
 
 ```typescript
 // FIXED: Check Alt+W FIRST, before blocking modifiers
@@ -82,10 +110,27 @@ if (hasModifierKey(event) || event.shiftKey) {
 }
 ```
 
+### **Fix #2: Use event.code instead of event.key (Mac compatibility)**
+
+```typescript
+// FIXED: Use event.code for physical key detection
+const isQuickAddShortcut = 
+    event.code === 'KeyW' &&  // ← Physical key, works on Mac with Option
+    event.altKey && 
+    !event.ctrlKey && 
+    !event.metaKey &&
+    !event.shiftKey;
+```
+
+**Why `event.code` works:**
+- `event.key` - Character produced (Mac Option+W → `'∑'`)
+- `event.code` - Physical key pressed (`'KeyW'` always)
+
 **Key Changes:**
 1. ✅ Moved `Alt+W` check to **lines 112-124** (before modifier block)
-2. ✅ Removed duplicate `Alt+W` check that was at line 176
-3. ✅ Now `Alt+W` is handled before early return
+2. ✅ Changed `event.key === 'w'` to `event.code === 'KeyW'`
+3. ✅ Removed duplicate `Alt+W` check that was at line 176
+4. ✅ Now works on both Windows (Alt+W) and Mac (Option+W)
 
 ---
 
@@ -235,12 +280,21 @@ if (hasModifierKey(event) || event.shiftKey) {
 
 ```typescript
 const isQuickAddShortcut = 
-    event.key === 'w' &&       // W key pressed
-    event.altKey &&            // Alt modifier is pressed
+    event.code === 'KeyW' &&   // Physical W key (works on Mac with Option)
+    event.altKey &&            // Alt/Option modifier is pressed
     !event.ctrlKey &&          // No Ctrl
     !event.metaKey &&          // No Cmd/Win
     !event.shiftKey;           // No Shift
 ```
+
+**Why `event.code` instead of `event.key`:**
+
+| Platform | Modifier | `event.key` | `event.code` | Works? |
+|----------|----------|-------------|--------------|--------|
+| Windows | Alt+W | `'w'` | `'KeyW'` | ✅ Both work |
+| Mac | Option+W | `'∑'` ❌ | `'KeyW'` ✅ | Only `event.code` |
+
+Using `event.code` ensures cross-platform compatibility!
 
 ### **Safety Checks:**
 

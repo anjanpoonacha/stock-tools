@@ -110,8 +110,9 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 			}
 
 			// Check for Quick add (Option+W / Alt+W) first - before blocking modifiers
+			// On Mac: Option+W produces special character, so we check event.code instead of event.key
 			const isQuickAddShortcut = 
-				event.key === 'w' && 
+				event.code === 'KeyW' && 
 				event.altKey && 
 				!event.ctrlKey && 
 				!event.metaKey &&
