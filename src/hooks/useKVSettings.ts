@@ -276,10 +276,26 @@ export function useKVSettings() {
 	/**
 	 * Update panel layout separately (backward compat)
 	 * This is separate because panel resizing happens frequently
+	 * 
+	 * IMPORTANT: Only update state if values actually changed to prevent infinite loops
 	 */
 	const updatePanelLayout = useCallback(
 		(layout: PanelLayout) => {
 			setSettings((prev) => {
+				// Check if layout actually changed (deep comparison)
+				const hasChanged = Object.keys(layout).some((key) => {
+					const typedKey = key as keyof PanelLayout;
+					const oldValue = prev.panelLayout[typedKey] ?? 0;
+					const newValue = layout[typedKey] ?? 0;
+					// Use threshold of 0.1% to account for floating point precision
+					return Math.abs(oldValue - newValue) > 0.1;
+				});
+
+				// If no actual change, return previous state to prevent re-render
+				if (!hasChanged) {
+					return prev;
+				}
+
 				const newSettings = {
 					...prev,
 					panelLayout: layout,

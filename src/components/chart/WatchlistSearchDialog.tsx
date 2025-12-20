@@ -6,11 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
-import { Check, Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2 } from 'lucide-react';
 import type { UnifiedWatchlist } from '@/lib/watchlist-sync/types';
 import type { Stock } from '@/types/stock';
 import { getStoredCredentials } from '@/lib/auth/authUtils';
 import { useToast } from '@/components/ui/toast';
+import { WatchlistListItem, getPlatformBadge } from './WatchlistListItem';
+import { ConfirmationDialog } from '@/components/ConfirmationDialog';
 
 interface WatchlistSearchDialogProps {
   open: boolean;
@@ -38,6 +40,9 @@ export function WatchlistSearchDialog({
   const [newWatchlistName, setNewWatchlistName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [watchlistToDelete, setWatchlistToDelete] = useState<UnifiedWatchlist | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
   const listItemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -112,20 +117,7 @@ export function WatchlistSearchDialog({
     }
   };
 
-  // Get platform badge text and variant
-  const getPlatformBadge = (platforms: string[]) => {
-    const hasMio = platforms.includes('mio');
-    const hasTv = platforms.includes('tv');
 
-    if (hasMio && hasTv) {
-      return { text: 'TV + MIO', variant: 'default' as const };
-    } else if (hasMio) {
-      return { text: 'MIO only', variant: 'secondary' as const };
-    } else if (hasTv) {
-      return { text: 'TV only', variant: 'outline' as const };
-    }
-    return { text: 'Unknown', variant: 'secondary' as const };
-  };
 
   // Validate watchlist name
   const validateWatchlistName = (name: string): string | null => {
@@ -229,6 +221,76 @@ export function WatchlistSearchDialog({
     }
   };
 
+  // Handle delete watchlist
+  const handleDeleteWatchlist = async () => {
+    if (!watchlistToDelete) return;
+    
+    setIsDeleting(true);
+    
+    try {
+      // Get credentials
+      const credentials = getStoredCredentials();
+      if (!credentials) {
+        toast('Authentication required. Please log in first.', 'error');
+        setIsDeleting(false);
+        return;
+      }
+
+      // Parallel deletion from both platforms
+      const results = await Promise.allSettled([
+        // MIO deletion
+        fetch('/api/mio-action', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            deleteIds: [watchlistToDelete.mioId],
+            userEmail: credentials.userEmail,
+            userPassword: credentials.userPassword,
+          }),
+        }).then(r => r.json()),
+        
+        // TV deletion
+        fetch('/api/watchlist/delete', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            watchlistId: watchlistToDelete.tvId,
+            userEmail: credentials.userEmail,
+            userPassword: credentials.userPassword,
+          }),
+        }).then(r => r.json()),
+      ]);
+
+      // Check results
+      const mioSuccess = results[0].status === 'fulfilled' && results[0].value?.success;
+      const tvSuccess = results[1].status === 'fulfilled';
+      
+      if (mioSuccess && tvSuccess) {
+        // Full success
+        toast(`Watchlist "${watchlistToDelete.name}" deleted from both platforms!`, 'success');
+        await refreshWatchlists();
+        setDeleteDialogOpen(false);
+        setWatchlistToDelete(null);
+      } else if (mioSuccess || tvSuccess) {
+        // Partial success
+        const platform = mioSuccess ? 'TradingView' : 'MarketInOut';
+        toast(`Deleted from ${mioSuccess ? 'MarketInOut' : 'TradingView'} only. Failed on ${platform}.`, 'info');
+        await refreshWatchlists();
+        setDeleteDialogOpen(false);
+        setWatchlistToDelete(null);
+      } else {
+        // Complete failure
+        const mioError = results[0].status === 'rejected' ? results[0].reason : 'Unknown error';
+        const tvError = results[1].status === 'rejected' ? results[1].reason : 'Unknown error';
+        toast(`Failed to delete from both platforms. MIO: ${mioError}, TV: ${tvError}`, 'error');
+      }
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Failed to delete watchlist', 'error');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -274,7 +336,6 @@ export function WatchlistSearchDialog({
                 {filteredWatchlists.map((watchlist, index) => {
                   const isSelected = index === selectedIndex;
                   const isCurrent = currentWatchlist?.id === watchlist.id;
-                  const badge = getPlatformBadge(watchlist.platforms);
 
                   return (
                     <div
@@ -282,43 +343,20 @@ export function WatchlistSearchDialog({
                       ref={(el) => {
                         listItemRefs.current[index] = el;
                       }}
-                      onClick={() => {
-                        onSelect(watchlist);
-                        onClose();
-                      }}
-                      className={`
-                        flex items-center gap-3 px-3 py-2 rounded-md cursor-pointer
-                        transition-colors
-                        ${
-                          isSelected
-                            ? 'bg-accent text-accent-foreground'
-                            : 'hover:bg-muted'
-                        }
-                      `}
                     >
-                      {/* Selection Indicator */}
-                      <div className="w-4 flex-shrink-0">
-                        {isSelected && (
-                          <span className="text-foreground">→</span>
-                        )}
-                      </div>
-
-                      {/* Current Indicator */}
-                      <div className="w-4 flex-shrink-0">
-                        {isCurrent && (
-                          <Check className="w-4 h-4 text-foreground" />
-                        )}
-                      </div>
-
-                      {/* Watchlist Name */}
-                      <span className="flex-1 font-medium">
-                        {watchlist.name}
-                      </span>
-
-                      {/* Platform Badge */}
-                      <Badge variant={badge.variant} className="text-xs">
-                        {badge.text}
-                      </Badge>
+                      <WatchlistListItem
+                        watchlist={watchlist}
+                        isSelected={isSelected}
+                        isCurrent={isCurrent}
+                        onSelect={(w) => {
+                          onSelect(w);
+                          onClose();
+                        }}
+                        onDelete={(wl) => {
+                          setWatchlistToDelete(wl);
+                          setDeleteDialogOpen(true);
+                        }}
+                      />
                     </div>
                   );
                 })}
@@ -405,6 +443,19 @@ export function WatchlistSearchDialog({
             </div>
           </div>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <ConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleDeleteWatchlist}
+          title="Delete Watchlist"
+          description={`Are you sure you want to delete "${watchlistToDelete?.name}"? This will remove it from both TradingView and MarketInOut.`}
+          confirmText="Delete"
+          cancelText="Cancel"
+          variant="destructive"
+          loading={isDeleting}
+        />
       </DialogContent>
     </Dialog>
   );

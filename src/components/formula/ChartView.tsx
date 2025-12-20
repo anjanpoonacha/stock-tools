@@ -295,6 +295,7 @@ export default function ChartView({
 		const chart = layout['chart-panel'];
 		const stockList = layout['stock-list-panel'];
 
+		// Validate layout values
 		if (!toolbar || !chart || !stockList || 
 		    toolbar < 0 || chart < 0 || stockList < 0) {
 			return;
@@ -302,10 +303,12 @@ export default function ChartView({
 
 		const total = toolbar + chart + stockList;
 		
+		// Ensure total is approximately 100%
 		if (Math.abs(total - 100) > 5) {
 			return;
 		}
 
+		// Update panel layout (threshold check is now in useKVSettings)
 		updatePanelLayout({
 			'toolbar-panel': toolbar,
 			'chart-panel': chart,

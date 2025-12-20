@@ -91,6 +91,16 @@ export async function fetchWatchlistsWithAuth(url: string, cookie: string): Prom
 }
 
 /**
+ * Get all TradingView watchlists
+ * @param cookie - The TradingView session cookie (e.g. "sessionid=...")
+ * @returns Promise with array of watchlists
+ */
+export async function getWatchlists(cookie: string): Promise<TradingViewWatchlist[]> {
+	const url = 'https://www.tradingview.com/api/v1/symbols_list/custom/';
+	return fetchWatchlistsWithAuth(url, cookie);
+}
+
+/**
  * Append a symbol to a TradingView watchlist.
  * @param watchlistId - The ID of the watchlist.
  * @param symbol - The symbol to append (e.g. "NSE:TCS").
@@ -152,6 +162,46 @@ export async function createWatchlist(name: string, cookie: string): Promise<{ i
 		id: String(data.id), // Convert to string for consistency
 		name: data.name || name,
 	};
+}
+
+/**
+ * Delete a TradingView watchlist
+ * 
+ * @param watchlistId - The TradingView watchlist ID
+ * @param cookie - TradingView session cookie (format: "sessionid=...")
+ * @throws Error if deletion fails
+ * 
+ * @example
+ * await deleteWatchlist('abc-def-ghi', 'sessionid=xyz...');
+ */
+export async function deleteWatchlist(watchlistId: string, cookie: string): Promise<void> {
+	const url = `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/`;
+	
+	const response = await fetch(url, {
+		method: 'DELETE',
+		headers: {
+			Cookie: cookie,
+			Origin: 'https://www.tradingview.com',
+			Referer: 'https://www.tradingview.com/',
+			'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+		},
+	});
+
+	// Consider 404 as success (watchlist already deleted)
+	if (response.status === 404) {
+		return;
+	}
+
+	if (!response.ok) {
+		const text = await response.text();
+		
+		// Handle specific error cases
+		if (response.status === 401) {
+			throw new Error('[TradingView API] Session expired or invalid - please re-authenticate');
+		}
+		
+		throw new Error(`[TradingView API] Failed to delete watchlist: ${response.status} ${response.statusText} - ${text}`);
+	}
 }
 
 /**
