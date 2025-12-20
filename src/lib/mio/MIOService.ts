@@ -73,7 +73,9 @@ export class MIOService {
 				throw error;
 			}
 
+			console.log('[MIOService] getWatchlistsWithSession called with internalSessionId:', internalSessionId);
 			const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+			console.log('[MIOService] sessionKeyValue lookup result:', sessionKeyValue ? '✓ Found' : '✗ Not found');
 			if (!sessionKeyValue) {
 				const error = ErrorHandler.createSessionExpiredError(
 					Platform.MARKETINOUT,
@@ -452,5 +454,74 @@ export class MIOService {
 		}
 
 		return FormulaClient.deleteFormula(sessionKeyValue, screenIds);
+	}
+
+	/**
+	 * Add single stock to watchlist (NEW endpoint)
+	 * Uses wl_add_all.php endpoint which is faster for single stock operations
+	 */
+	static async addSingleStockWithSession(
+		internalSessionId: string,
+		wlid: string,
+		symbol: string
+	) {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'addSingleStockWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return APIClient.addSingleStock(sessionKeyValue, wlid, symbol);
+	}
+
+	/**
+	 * Remove single stock from watchlist (NEW endpoint)
+	 * Uses wl_add_all.php endpoint which is faster for single stock operations
+	 */
+	static async removeSingleStockWithSession(
+		internalSessionId: string,
+		wlid: string,
+		symbol: string
+	) {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'removeSingleStockWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return APIClient.removeSingleStock(sessionKeyValue, wlid, symbol);
+	}
+
+	/**
+	 * Delete stock by ticker ID (NEW endpoint)
+	 * Uses wl_del.php endpoint
+	 */
+	static async deleteStockByTidWithSession(
+		internalSessionId: string,
+		wlid: string,
+		tid: string
+	) {
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		if (!sessionKeyValue) {
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'deleteStockByTidWithSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		return APIClient.deleteStockByTid(sessionKeyValue, wlid, tid);
 	}
 }

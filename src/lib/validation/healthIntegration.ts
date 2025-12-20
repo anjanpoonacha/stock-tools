@@ -181,7 +181,9 @@ export async function getHealthAwareSessionData(internalSessionId: string): Prom
 	try {
 		validateSessionId(internalSessionId, 'getHealthAwareSessionData');
 
+		console.log('[getHealthAwareSessionData] Looking up session for internalSessionId:', internalSessionId);
 		const session = await getSession(internalSessionId);
+		console.log('[getHealthAwareSessionData] Session lookup result:', session ? `Found with platforms: ${Object.keys(session).join(', ')}` : 'Not found');
 		const healthReport = sessionHealthMonitor.getSessionHealthReport(internalSessionId);
 
 		const result = {

@@ -56,6 +56,26 @@ function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Maps MIO error codes to HTTP status codes
+ */
+function getHttpStatusFromMIOError(errorCode?: string): number {
+	switch (errorCode) {
+		case 'SESSION_EXPIRED':
+			return HTTP_STATUS.UNAUTHORIZED;
+		case 'INVALID_INPUT':
+			return HTTP_STATUS.BAD_REQUEST;
+		case 'NOT_FOUND':
+			return HTTP_STATUS.BAD_REQUEST;
+		case 'NETWORK_ERROR':
+			return HTTP_STATUS.INTERNAL_SERVER_ERROR;
+		case 'PARSE_ERROR':
+			return HTTP_STATUS.INTERNAL_SERVER_ERROR;
+		default:
+			return HTTP_STATUS.INTERNAL_SERVER_ERROR;
+	}
+}
+
+/**
  * Handles MIO watchlist retrieval
  */
 async function handleGetWatchlists(sessionInfo: MIOSessionInfo): Promise<NextResponse<APIResponse>> {
@@ -105,10 +125,89 @@ async function handleAddToWatchlist(
 	}
 }
 
+/**
+ * Handles adding single stock to MIO watchlist (NEW endpoint)
+ */
+async function handleAddSingleStock(
+	sessionInfo: MIOSessionInfo,
+	mioWlid: string,
+	symbol: string
+): Promise<NextResponse<APIResponse>> {
+	try {
+		const result = await MIOService.addSingleStockWithSession(
+			sessionInfo.internalId,
+			mioWlid,
+			symbol
+		);
+
+		// Check if MIO operation succeeded
+		if (!result.success) {
+			const httpStatus = getHttpStatusFromMIOError(result.error?.code);
+			return createErrorResponse(
+				result.error?.message || 'Failed to add stock',
+				httpStatus,
+				result.error?.needsRefresh ?? false
+			);
+		}
+
+		return createSuccessResponse({ result }, sessionInfo.internalId);
+	} catch (error) {
+		const message = getErrorMessage(error);
+
+		return createErrorResponse(
+			message || 'Failed to add stock',
+			HTTP_STATUS.INTERNAL_SERVER_ERROR,
+			true
+		);
+	}
+}
+
+/**
+ * Handles removing single stock from MIO watchlist (NEW endpoint)
+ */
+async function handleRemoveSingleStock(
+	sessionInfo: MIOSessionInfo,
+	mioWlid: string,
+	symbol: string
+): Promise<NextResponse<APIResponse>> {
+	try {
+		const result = await MIOService.removeSingleStockWithSession(
+			sessionInfo.internalId,
+			mioWlid,
+			symbol
+		);
+
+		// Check if MIO operation succeeded
+		if (!result.success) {
+			const httpStatus = getHttpStatusFromMIOError(result.error?.code);
+			return createErrorResponse(
+				result.error?.message || 'Failed to remove stock',
+				httpStatus,
+				result.error?.needsRefresh ?? false
+			);
+		}
+
+		return createSuccessResponse({ result }, sessionInfo.internalId);
+	} catch (error) {
+		const message = getErrorMessage(error);
+
+		return createErrorResponse(
+			message || 'Failed to remove stock',
+			HTTP_STATUS.INTERNAL_SERVER_ERROR,
+			true
+		);
+	}
+}
+
 export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>> {
 	try {
-		const body: MIOActionRequest & { userEmail?: string; userPassword?: string } = await req.json();
-		const { mioWlid, symbols, userEmail, userPassword } = body;
+		const body: MIOActionRequest & { 
+			userEmail?: string; 
+			userPassword?: string;
+			action?: 'add' | 'remove' | 'addSingle' | 'removeSingle';
+			symbol?: string;
+		} = await req.json();
+		const { mioWlid, symbols, userEmail, userPassword, action, symbol } = body;
 
 		// Require user credentials for authentication
 		if (!userEmail || !userPassword) {
@@ -131,12 +230,21 @@ export async function POST(req: NextRequest): Promise<NextResponse<APIResponse>>
 			);
 		}
 
+		// Handle different actions
+		if (action === 'addSingle' && symbol && mioWlid) {
+			return handleAddSingleStock(sessionInfo, mioWlid, symbol);
+		}
+
+		if (action === 'removeSingle' && symbol && mioWlid) {
+			return handleRemoveSingleStock(sessionInfo, mioWlid, symbol);
+		}
+
 		// If no specific action requested, treat as "get watchlists"
 		if (!mioWlid && !symbols) {
 			return handleGetWatchlists(sessionInfo);
 		}
 
-		// Otherwise, treat as "add to watchlist"
+		// Otherwise, treat as "add to watchlist" (bulk)
 		return handleAddToWatchlist(sessionInfo, mioWlid!, symbols!);
 	} catch (error) {
 		const message = getErrorMessage(error);

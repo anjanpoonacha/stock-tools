@@ -1,0 +1,14 @@
+{
+  "chart": {
+    "watchlist": {
+      "openSearch": ";",
+      "quickAdd": "Alt+W",
+      "description": "Watchlist management shortcuts"
+    },
+    "navigation": {
+      "nextStock": "ArrowDown",
+      "prevStock": "ArrowUp",
+      "description": "Stock navigation shortcuts"
+    }
+  }
+}

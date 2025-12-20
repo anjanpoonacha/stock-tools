@@ -55,8 +55,16 @@ export function useSessionBridge(platform: Platform): [string | null, boolean, s
 				const data: SessionResponse = await response.json();
 
 				if (isMounted) {
-					if (data.hasSession && data.sessionId) {
-						setSessionId(data.sessionId);
+					// Handle both sessionId (TradingView) and currentSessionId (MarketInOut)
+					const resolvedSessionId = data.sessionId || data.currentSessionId;
+					console.log(`[useSessionBridge] ${platform} session resolved:`, {
+						hasSession: data.hasSession,
+						sessionId: data.sessionId,
+						currentSessionId: data.currentSessionId,
+						resolved: resolvedSessionId
+					});
+					if (data.hasSession && resolvedSessionId) {
+						setSessionId(resolvedSessionId);
 					} else {
 						setSessionId(null);
 					}

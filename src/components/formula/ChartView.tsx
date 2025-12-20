@@ -47,6 +47,8 @@ import { cn } from '@/lib/utils';
 import type { Stock } from '@/types/stock';
 import type { IChartApi } from 'lightweight-charts';
 import type { OHLCVBar } from '@/lib/tradingview/types';
+import { useWatchlistIntegration } from '@/hooks/useWatchlistIntegration';
+import { WatchlistSearchDialog } from '@/components/chart/WatchlistSearchDialog';
 
 interface ChartViewProps {
 	stocks: Stock[];
@@ -119,6 +121,22 @@ export default function ChartView({
 	// Symbol search state
 	const [showSymbolSearch, setShowSymbolSearch] = useState(false);
 	const [symbolSearchBuffer, setSymbolSearchBuffer] = useState('');
+
+	// Watchlist dialog state
+	const [showWatchlistDialog, setShowWatchlistDialog] = useState(false);
+
+	// Watchlist integration
+	const {
+		watchlists,
+		currentWatchlist,
+		addToCurrentWatchlist,
+		selectWatchlist,
+		isLoading: watchlistLoading,
+		sessionStatus,
+	} = useWatchlistIntegration({
+		currentSymbol,
+		currentStock,
+	});
 
 	// Determine if we're in dual view mode (2+ charts)
 	const isDualView = currentLayout.slots.length > 1;
@@ -311,7 +329,9 @@ export default function ChartView({
 		onSymbolBackspace: handleSymbolBackspace,
 		onSymbolSubmit: jumpToSymbol,
 		onTabKeyPress: handleTabKey,
-		inputMode,
+		onWatchlistSearchOpen: () => setShowWatchlistDialog(true),
+		onWatchlistQuickAdd: addToCurrentWatchlist,
+		inputMode: showWatchlistDialog ? 'watchlist' : inputMode,
 		activeChartIndex: focusedChartIndex,
 		enabled: true,
 	});
@@ -721,6 +741,20 @@ export default function ChartView({
 					id='stock-list-panel'
 				>
 					<div className='h-full w-full bg-muted/30 border-l border-border flex flex-col'>
+						{/* Current Watchlist Indicator */}
+						{currentWatchlist && (
+							<div className='p-2 border-b border-border bg-primary/10'>
+								<div className='flex items-center gap-2'>
+									<span className='text-xs font-medium'>
+										🎯 {currentWatchlist.name}
+									</span>
+									<Badge variant='outline' className='text-[10px]'>
+										{currentWatchlist.platforms.join(' + ').toUpperCase()}
+									</Badge>
+								</div>
+							</div>
+						)}
+
 						<div className='p-2 pb-2 flex-shrink-0'>
 							<h3 className='text-xs font-semibold mb-2'>Stocks ({totalStocks})</h3>
 							{/* Search Box */}
@@ -799,6 +833,21 @@ export default function ChartView({
 						setShowSymbolSearch(false);
 						setSymbolSearchBuffer('');
 					}}
+				/>
+			)}
+
+			{/* Watchlist Search Dialog */}
+			{showWatchlistDialog && (
+				<WatchlistSearchDialog
+					open={showWatchlistDialog}
+					onClose={() => setShowWatchlistDialog(false)}
+					onSelect={async (watchlist) => {
+						await selectWatchlist(watchlist.id);
+						setShowWatchlistDialog(false);
+					}}
+					watchlists={watchlists}
+					currentWatchlist={currentWatchlist}
+					currentStock={currentStock || { symbol: currentSymbol, name: currentSymbol }}
 				/>
 			)}
 		</div>

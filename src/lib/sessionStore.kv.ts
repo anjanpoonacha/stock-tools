@@ -125,9 +125,12 @@ export async function getPlatformSession(internalId: string, platform: string): 
  */
 export async function getSession(internalId: string): Promise<SessionData | undefined> {
 	const pattern = `session:${internalId}:*`;
+	console.log('[KV getSession] Searching for pattern:', pattern);
 	const keys = await kv.keys(pattern);
+	console.log('[KV getSession] Found keys:', keys);
 
 	if (keys.length === 0) {
+		console.log('[KV getSession] No keys found, returning undefined');
 		return undefined;
 	}
 

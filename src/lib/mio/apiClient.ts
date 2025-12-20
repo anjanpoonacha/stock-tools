@@ -9,6 +9,7 @@ import {
 import type { SessionKeyValue, Watchlist, AddWatchlistParams } from './types';
 import { MIO_URLS as URLS, PATTERNS, LOGIN_INDICATORS } from './types';
 import type { FormulaListItem } from '@/types/formula';
+import { MIOHttpClient, RequestValidator, ErrorCode, type MIOResponse, type SingleStockResponse } from './core';
 
 /**
  * API Client - Handles HTTP requests, watchlist and formula operations
@@ -474,6 +475,230 @@ export class APIClient {
 			}
 
 			return { apiUrl: null, formulaText: null };
+		}
+	}
+
+	/**
+	 * Add single stock to watchlist (NEW endpoint from curls.http)
+	 * Endpoint: GET /wl/wl_add_all.php?action=add&wlid={id}&wl_name=&symbol={symbol}
+	 * Response: 302 redirect to wl_add_all_done.php
+	 * 
+	 * @param sessionKeyValue - Session credentials
+	 * @param wlid - Watchlist ID
+	 * @param symbol - Stock symbol (e.g., TCS.NS)
+	 * @returns MIOResponse with operation result
+	 */
+	static async addSingleStock(
+		sessionKeyValue: SessionKeyValue,
+		wlid: string,
+		symbol: string
+	): Promise<MIOResponse<SingleStockResponse>> {
+		try {
+			// Validate inputs using shared validator
+			const wlidValidation = RequestValidator.validateWatchlistId(wlid);
+			if (!wlidValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: wlidValidation.error || 'Invalid watchlist ID',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			const symbolValidation = RequestValidator.validateSymbol(symbol);
+			if (!symbolValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: symbolValidation.error || 'Invalid symbol',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			// Make request using shared HTTP client
+			const url = `https://www.marketinout.com/wl/wl_add_all.php?action=add&wlid=${wlid}&wl_name=&symbol=${symbol}`;
+			
+			return await MIOHttpClient.request<SingleStockResponse>(
+				url,
+				{ method: 'GET', sessionKeyValue },
+				(html) => ({
+					success: true,
+					action: 'add',
+					wlid,
+					symbol,
+				})
+			);
+		} catch (error) {
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'addSingleStock',
+				undefined,
+				undefined
+			);
+			ErrorLogger.logError(sessionError);
+			throw sessionError;
+		}
+	}
+
+	/**
+	 * Remove single stock from watchlist (NEW endpoint from curls.http)
+	 * Endpoint: GET /wl/wl_add_all.php?action=remove&wlid={id}&wl_name=&symbol={symbol}
+	 * Response: 302 redirect to wl_add_all_done.php
+	 * 
+	 * @param sessionKeyValue - Session credentials
+	 * @param wlid - Watchlist ID
+	 * @param symbol - Stock symbol (e.g., INFY.NS)
+	 * @returns MIOResponse with operation result
+	 */
+	static async removeSingleStock(
+		sessionKeyValue: SessionKeyValue,
+		wlid: string,
+		symbol: string
+	): Promise<MIOResponse<SingleStockResponse>> {
+		try {
+			// Validate inputs
+			const wlidValidation = RequestValidator.validateWatchlistId(wlid);
+			if (!wlidValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: wlidValidation.error || 'Invalid watchlist ID',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			const symbolValidation = RequestValidator.validateSymbol(symbol);
+			if (!symbolValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: symbolValidation.error || 'Invalid symbol',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			// Make request using shared HTTP client
+			const url = `https://www.marketinout.com/wl/wl_add_all.php?action=remove&wlid=${wlid}&wl_name=&symbol=${symbol}`;
+			
+			return await MIOHttpClient.request<SingleStockResponse>(
+				url,
+				{ method: 'GET', sessionKeyValue },
+				(html) => ({
+					success: true,
+					action: 'remove',
+					wlid,
+					symbol,
+				})
+			);
+		} catch (error) {
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'removeSingleStock',
+				undefined,
+				undefined
+			);
+			ErrorLogger.logError(sessionError);
+			throw sessionError;
+		}
+	}
+
+	/**
+	 * Delete stock by ticker ID (NEW endpoint from curls.http)
+	 * Endpoint: GET /wl/wl_del.php?action=delete&wlid={id}&tid={tid}
+	 * Response: Redirect or success message
+	 * 
+	 * @param sessionKeyValue - Session credentials
+	 * @param wlid - Watchlist ID
+	 * @param tid - Ticker ID
+	 * @returns MIOResponse with operation result
+	 */
+	static async deleteStockByTid(
+		sessionKeyValue: SessionKeyValue,
+		wlid: string,
+		tid: string
+	): Promise<MIOResponse<{ deleted: boolean; wlid: string; tid: string }>> {
+		try {
+			// Validate inputs
+			const wlidValidation = RequestValidator.validateWatchlistId(wlid);
+			if (!wlidValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: wlidValidation.error || 'Invalid watchlist ID',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			const tidValidation = RequestValidator.validateTid(tid);
+			if (!tidValidation.valid) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: tidValidation.error || 'Invalid ticker ID',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			// Make request using shared HTTP client
+			const url = `https://www.marketinout.com/wl/wl_del.php?action=delete&wlid=${wlid}&tid=${tid}`;
+			
+			return await MIOHttpClient.request<{ deleted: boolean; wlid: string; tid: string }>(
+				url,
+				{ method: 'GET', sessionKeyValue },
+				(html) => ({
+					deleted: true,
+					wlid,
+					tid,
+				})
+			);
+		} catch (error) {
+			const sessionError = ErrorHandler.parseError(
+				error,
+				Platform.MARKETINOUT,
+				'deleteStockByTid',
+				undefined,
+				undefined
+			);
+			ErrorLogger.logError(sessionError);
+			throw sessionError;
 		}
 	}
 }

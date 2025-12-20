@@ -1,0 +1,138 @@
+### MIO get watchlist
+
+
+curl 'https://www.marketinout.com/wl/wl_add.php?wlid=74577&overwrite=1&name=' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://www.marketinout.com/wl/watch_list.php' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'sec-gpc: 1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+
+### Edit watchlist
+
+
+curl 'https://www.marketinout.com/wl/watch_list.php' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'origin: https://www.marketinout.com' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://www.marketinout.com/wl/watch_list.php' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'sec-gpc: 1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' \
+  --data-raw 'mode=add&wlid=74577&overwrite=1&name=&stock_list=AARTIDRUGS.NS'
+
+# Response:
+# HTTP/1.1 302 Object moved
+# <head><title>Object moved</title></head>
+# <body><h1>Object Moved</h1>This object may be found <a HREF="watch_list.php?wlid=74577">here</a>.</body>
+
+
+
+### ADD stocks to watchlist
+
+curl 'https://www.marketinout.com/wl/watch_list.php' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -H 'content-type: application/x-www-form-urlencoded' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'origin: https://www.marketinout.com' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://www.marketinout.com/wl/watch_list.php?wlid=74577' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: document' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'sec-gpc: 1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36' \
+  --data-raw 'mode=add&wlid=74577&overwrite=0&name=&stock_list=TCS.NS'
+
+
+### Delete the stock from watchlist
+curl 'https://www.marketinout.com/wl/wl_del.php?action=delete&wlid=74577&tid=61478' \
+  -H 'accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=0, i' \
+  -H 'referer: https://www.marketinout.com/wl/wl_del.php?wlid=74577&tid=61478' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: iframe' \
+  -H 'sec-fetch-mode: navigate' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-fetch-user: ?1' \
+  -H 'sec-gpc: 1' \
+  -H 'upgrade-insecure-requests: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+
+### Add 1 stock to watchlist
+  # html response: 
+  # somewhere -> AEROFLEX.NS has been added to the watch list!
+curl 'https://www.marketinout.com/wl/wl_add_all.php?action=add&wlid=74577&wl_name=&symbol=AEROFLEX.NS' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://www.marketinout.com/wl/wl_add_all.php?opt=2&symbol=AEROFLEX.NS' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-gpc: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+
+### Remove 1 stock from watchlist
+curl 'https://www.marketinout.com/wl/wl_add_all.php?action=remove&wlid=74577&wl_name=&symbol=AEROFLEX.NS' \
+  -H 'accept: */*' \
+  -H 'accept-language: en-GB,en;q=0.5' \
+  -H 'cache-control: no-cache' \
+  -b 'mio={09C6062D-3128-4316-BEB8-670B82D140A7}; perf_dv6Tr4n=1; ASPSESSIONIDQUABQBRC=IGHHFLOCKLFPABFCCLNODILN' \
+  -H 'pragma: no-cache' \
+  -H 'priority: u=1, i' \
+  -H 'referer: https://www.marketinout.com/wl/wl_add_all.php?opt=2&symbol=AEROFLEX.NS' \
+  -H 'sec-ch-ua: "Brave";v="143", "Chromium";v="143", "Not A(Brand";v="24"' \
+  -H 'sec-ch-ua-mobile: ?0' \
+  -H 'sec-ch-ua-platform: "macOS"' \
+  -H 'sec-fetch-dest: empty' \
+  -H 'sec-fetch-mode: cors' \
+  -H 'sec-fetch-site: same-origin' \
+  -H 'sec-gpc: 1' \
+  -H 'user-agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+# html response:
+  # AEROFLEX.NS has been removed from the watch list!

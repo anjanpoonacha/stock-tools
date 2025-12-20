@@ -46,6 +46,7 @@ export type SessionData = {
  * Constants for MIO API URLs
  */
 export const MIO_URLS = {
+	BASE: 'https://www.marketinout.com',
 	WATCHLIST_PAGE: 'https://www.marketinout.com/wl/watch_list.php?mode=list',
 	WATCHLIST_API: 'https://www.marketinout.com/wl/watch_list.php',
 	MY_WATCHLISTS: 'https://www.marketinout.com/wl/my_watch_lists.php',

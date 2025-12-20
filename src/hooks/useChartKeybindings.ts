@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import keybindingsConfig from '@/config/keybindings.json';
 
 export interface UseChartKeybindingsOptions {
 	onNavigatePrev: () => void;
@@ -20,8 +21,10 @@ export interface UseChartKeybindingsOptions {
 	onSymbolSubmit?: () => void; // Submit symbol search (Enter key)
 	onTimeframeSubmit?: () => void; // Submit timeframe (Enter key)
 	onTabKeyPress?: () => void; // Cycle through charts in dual view
+	onWatchlistSearchOpen?: () => void; // Triggered by ;
+	onWatchlistQuickAdd?: () => void; // Triggered by Option+W
 	// Pass the current mode from parent to determine which overlay is active
-	inputMode: 'none' | 'timeframe' | 'symbol';
+	inputMode: 'none' | 'timeframe' | 'symbol' | 'watchlist';
 	activeChartIndex?: number;
 	enabled?: boolean;
 }
@@ -80,6 +83,8 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onSymbolSubmit,
 		onTimeframeSubmit,
 		onTabKeyPress,
+		onWatchlistSearchOpen,
+		onWatchlistQuickAdd,
 		inputMode,
 		enabled = true,
 	} = options;
@@ -158,6 +163,34 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 				return;
 			}
 
+			// Watchlist search (;) - only in 'none' mode
+			if (event.key === keybindingsConfig.chart.watchlist.openSearch 
+				&& inputMode === 'none' 
+				&& onWatchlistSearchOpen) {
+				event.preventDefault();
+				onWatchlistSearchOpen();
+				return;
+			}
+
+			// Quick add (Option+W / Alt+W) - only in 'none' mode
+			const isQuickAddShortcut = 
+				event.key === 'w' && 
+				event.altKey && 
+				!event.ctrlKey && 
+				!event.metaKey &&
+				!event.shiftKey;
+
+			if (isQuickAddShortcut && inputMode === 'none' && onWatchlistQuickAdd) {
+				event.preventDefault();
+				onWatchlistQuickAdd();
+				return;
+			}
+
+			// When in watchlist mode, don't intercept keys (let dialog handle)
+			if (inputMode === 'watchlist') {
+				return;
+			}
+
 			// Mode-based input detection
 			if (inputMode === 'none') {
 				// First character determines mode
@@ -216,6 +249,8 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onSymbolSubmit,
 		onTimeframeSubmit,
 		onTabKeyPress,
+		onWatchlistSearchOpen,
+		onWatchlistQuickAdd,
 		inputMode,
 	]);
 

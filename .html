@@ -1,0 +1,66 @@
+
+<html>
+<head>
+	<meta http-equiv="content-type" content="text/html; charset=utf-8">
+	<script type="text/javascript" src="/include/jscript/jquery.js"></script>
+	<script type="text/javascript" src="/stock-screener/main.js"></script>
+	
+	<link rel="stylesheet" type="text/css" href="/style/market_v8.css?v=19">
+	
+	<script>
+		function view_wl() {
+			var url = "/wl/watch_list.php";
+			parent.parent.document.location.href = url;
+		}
+	</script>
+</head>
+
+<body style="background:#EBEFF9; margin:0px; padding:0px; border: 1px #004364 solid;">
+	<table border="0" cellPadding="0" cellSpacing="1" width="100%" id="dragHandle">
+	<tr>
+	<td width="100%" colspan="2">
+		<table cellSpacing="0" cellPadding="0" border="0" width="100%">
+		<tr class="title">
+		<td class="title">&nbsp;Done!</td>
+		<td class="title" align="right"><a href="#" onClick="web3Popup.close(); return false;"><img src="/img/svg/close.svg" border="0" width="16" height="16"></a></td>
+		<td class="title" width="1">&nbsp;</td>
+		</tr>
+		</table>
+	</td>
+	</tr>
+	</table>
+
+	<table border="0" width="100%">
+	
+	<tr><td colspan="3">&nbsp;</td></tr>
+	<tr><td colspan="3">&nbsp;</td></tr>
+	
+	<tr>
+		<td>&nbsp;&nbsp;&nbsp;</td>
+		<td valign="top" align="center" nowrap="1"><b>AEROFLEX.NS</b> has been removed from the watch list!</td>
+		<td>&nbsp;&nbsp;&nbsp;</td>
+	</tr>
+	<tr><td colspan="3">&nbsp;</td></tr>
+	
+	<tr>
+		<td/>
+		<td valign="top" align="center" nowrap="1">
+			View <span class="link" onclick="view_wl();">Watch List</span>
+		</td>
+		<td/>
+	</tr>
+	<tr><td colspan="3">&nbsp;</td></tr>
+	
+	<tr>
+		<td/>
+		<td valign="top" align="center" nowrap="1">
+			<input type="button" class="button" value="OK" onClick="web3Popup.close(); return false;" style="width:80px"/>
+		</td>
+		<td/>
+	</tr>
+	<tr><td colspan="3">&nbsp;</td></tr>
+	
+	</table>
+
+</body>
+</html>
