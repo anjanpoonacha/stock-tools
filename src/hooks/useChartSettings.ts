@@ -38,9 +38,14 @@ export function useChartSettings() {
   }, []);
 
   // Persist to KV whenever settings change (after initial load)
+  // Debounced to prevent API flooding during rapid UI interactions
   useEffect(() => {
     if (isLoaded) {
-      saveChartSettings(settings as unknown as KVChartSettings);
+      const timeout = setTimeout(() => {
+        saveChartSettings(settings as unknown as KVChartSettings);
+      }, 500); // Only save after 500ms of no changes
+      
+      return () => clearTimeout(timeout);
     }
   }, [settings, isLoaded]);
 

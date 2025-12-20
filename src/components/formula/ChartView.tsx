@@ -71,6 +71,38 @@ const RESOLUTIONS = [
 	{ value: '1M', label: '1M', barsCount: 1000 },
 ] as const;
 
+// Memoized Stock List Item component
+const StockListItem = React.memo(({ 
+	symbol, 
+	actualIndex,
+	isSelected, 
+	onClick
+}: {
+	symbol: string;
+	actualIndex: number;
+	isSelected: boolean;
+	onClick: () => void;
+}) => {
+	return (
+		<button
+			onClick={onClick}
+			className={`w-full text-left px-2 py-1.5 rounded-md transition-colors ${
+				isSelected
+					? 'bg-primary text-primary-foreground'
+					: 'hover:bg-muted'
+			}`}
+		>
+			<div className='flex items-center gap-1.5'>
+				<span className='text-[9px] text-muted-foreground'>
+					#{actualIndex + 1}
+				</span>
+				<span className='text-xs font-medium font-mono'>{symbol}</span>
+			</div>
+		</button>
+	);
+});
+StockListItem.displayName = 'StockListItem';
+
 export default function ChartView({
 	stocks,
 	stockSymbols,
@@ -315,6 +347,16 @@ export default function ChartView({
 			'stock-list-panel': stockList,
 		});
 	}, [updatePanelLayout]);
+
+	// Memoize search query handler
+	const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+		setSearchQuery(e.target.value);
+	}, []);
+
+	// Memoize stock selection handler
+	const handleStockSelect = useCallback((index: number) => {
+		setCurrentIndex(index);
+	}, [setCurrentIndex]);
 
 	// Keyboard shortcuts - MUST be before early returns (React Hooks Rule)
 	const inputMode: 'none' | 'timeframe' | 'symbol' = showTimeframeOverlay 
@@ -768,7 +810,7 @@ export default function ChartView({
 									type='text'
 									placeholder='Search...'
 									value={searchQuery}
-									onChange={(e) => setSearchQuery(e.target.value)}
+									onChange={handleSearchChange}
 									className='pl-7 h-7 text-xs'
 								/>
 							</div>
@@ -780,22 +822,13 @@ export default function ChartView({
 								{filteredStockSymbols.map((symbol) => {
 									const actualIndex = stockSymbols.indexOf(symbol);
 									return (
-										<button
+										<StockListItem
 											key={symbol}
-											onClick={() => setCurrentIndex(actualIndex)}
-											className={`w-full text-left px-2 py-1.5 rounded-md transition-colors ${
-												actualIndex === currentIndex
-													? 'bg-primary text-primary-foreground'
-													: 'hover:bg-muted'
-											}`}
-										>
-											<div className='flex items-center gap-1.5'>
-												<span className='text-[9px] text-muted-foreground'>
-													#{actualIndex + 1}
-												</span>
-												<span className='text-xs font-medium font-mono'>{symbol}</span>
-											</div>
-										</button>
+											symbol={symbol}
+											actualIndex={actualIndex}
+											isSelected={actualIndex === currentIndex}
+											onClick={() => handleStockSelect(actualIndex)}
+										/>
 									);
 								})}
 							</div>

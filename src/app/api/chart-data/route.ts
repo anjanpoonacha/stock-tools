@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getChartData, resolveUserSession, fetchJWTToken, createChartDataServiceConfig } from '@/lib/chart-data/chartDataService';
 import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
+import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
 
 /**
  * POST /api/chart-data
@@ -92,7 +93,21 @@ export async function POST(request: NextRequest) {
 		}
 		
 		try {
-			// Call service layer (will automatically use persistent pool if active)
+			// Check cache first
+			const cacheKey = `${symbol}:${resolution}:${barsCount || '300'}:${cvdEnabled || 'false'}`;
+			const cached = getCachedChartData(cacheKey);
+			
+			if (cached) {
+				console.log(`[Chart API] Cache HIT for ${cacheKey}`);
+				return NextResponse.json(cached, { status: 200 });
+			}
+			
+			console.log(`[Chart API] Cache MISS for ${cacheKey}`);
+			
+			// Get the persistent pool connection
+			const pool = persistentManager.getConnectionPool();
+			
+			// Call service layer and pass the pool
 			const result = await getChartData({
 				symbol,
 				resolution,
@@ -102,18 +117,23 @@ export async function POST(request: NextRequest) {
 				cvdTimeframe,
 				userEmail,
 				userPassword
-			});
+			}, undefined, pool);
 			
 			// Format response based on service result
 			if (result.success && result.data) {
-				return NextResponse.json({
+				const response = {
 					success: true,
 					symbol: result.data.symbol,
 					resolution: result.data.resolution,
 					bars: result.data.bars,
 					metadata: result.data.metadata,
 					indicators: result.data.indicators
-				} as ChartDataResponse, { status: result.statusCode });
+				} as ChartDataResponse;
+				
+				// Cache successful responses
+				setCachedChartData(cacheKey, response);
+				
+				return NextResponse.json(response, { status: result.statusCode });
 			} else {
 				return NextResponse.json({
 					success: false,

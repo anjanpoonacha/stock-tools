@@ -8,7 +8,7 @@
 import { SessionResolver } from '@/lib/SessionResolver';
 import { getDataAccessToken } from '@/lib/tradingview/jwtService';
 import { fetchHistoricalBars, type Resolution } from '@/lib/tradingview/historicalDataClient';
-import { getConnectionPool } from '@/lib/tradingview/connectionPool';
+import { getConnectionPool, WebSocketConnectionPool } from '@/lib/tradingview/connectionPool';
 import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
 import type { 
 	SessionResolutionResult, 
@@ -226,6 +226,7 @@ export async function fetchHistoricalData(
  * @param barsCount - Number of bars to fetch
  * @param jwtToken - JWT authentication token
  * @param cvdOptions - CVD indicator configuration
+ * @param connectionPool - Optional connection pool (uses default pool if not provided)
  * @returns Historical data result
  */
 export async function fetchHistoricalDataPooled(
@@ -239,17 +240,24 @@ export async function fetchHistoricalDataPooled(
 		cvdTimeframe?: string;
 		sessionId?: string;
 		sessionIdSign?: string;
-	}
+	},
+	connectionPool?: WebSocketConnectionPool
 ): Promise<HistoricalDataResult> {
 	try {
-		// Try to use persistent connection manager if active, otherwise fall back to regular pool
-		const persistentManager = getPersistentConnectionManager();
-		const pool = persistentManager.isManagerActive()
-			? persistentManager.getConnectionPool()
-			: getConnectionPool();
+		// Use provided pool, or fall back to persistent manager or regular pool
+		let pool: WebSocketConnectionPool;
 		
-		if (persistentManager.isManagerActive()) {
+		if (connectionPool) {
+			pool = connectionPool;
 		} else {
+			const persistentManager = getPersistentConnectionManager();
+			pool = persistentManager.isManagerActive()
+				? persistentManager.getConnectionPool()
+				: getConnectionPool();
+			
+			if (persistentManager.isManagerActive()) {
+			} else {
+			}
 		}
 		
 		const result = await pool.fetchChartData(
@@ -285,6 +293,7 @@ export async function fetchHistoricalDataPooled(
  * 
  * @param params - Request parameters
  * @param config - Service configuration (optional, uses defaults if not provided)
+ * @param connectionPool - Optional connection pool (uses default pool if not provided)
  * @returns Chart data service result
  */
 export async function getChartData(
@@ -298,7 +307,8 @@ export async function getChartData(
 		userEmail: unknown;
 		userPassword: unknown;
 	},
-	config?: Partial<ChartDataServiceConfig>
+	config?: Partial<ChartDataServiceConfig>,
+	connectionPool?: WebSocketConnectionPool
 ): Promise<ChartDataServiceResult> {
 	// Create service config with defaults
 	const serviceConfig = createChartDataServiceConfig(config);
@@ -408,7 +418,8 @@ export async function getChartData(
 					cvdTimeframe: params.cvdTimeframe || undefined,
 					sessionId: sessionResult.sessionId,
 					sessionIdSign: sessionResult.sessionIdSign
-				}
+				},
+				connectionPool
 			)
 			: await fetchHistoricalData(
 				symbol,

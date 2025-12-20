@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import {
 	createChart,
@@ -97,7 +97,7 @@ function calculateSMA(bars: OHLCVBar[], period: number): SMADataPoint[] {
  * - All indicators injected via indicators[] array
  * - Chart renders whatever is injected
  */
-export function TradingViewLiveChart({
+const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 	symbol = 'NSE:JUNIPER',
 	resolution = '1D',
 	zoomLevel = ChartZoomLevel.MAX,
@@ -109,7 +109,7 @@ export function TradingViewLiveChart({
 	isStreaming = false,
 	onChartReady,
 	onDataLoaded
-}: TradingViewLiveChartProps) {
+}) => {
 	const chartContainerRef = useRef<HTMLDivElement>(null);
 	const chartRef = useRef<IChartApi | null>(null);
 	const { authStatus, isLoading: authLoading } = useAuth();
@@ -577,4 +577,22 @@ export function TradingViewLiveChart({
 			)}
 		</div>
 	);
-}
+};
+
+// Memoize the component with custom comparison for performance
+export const TradingViewLiveChart = React.memo(TradingViewLiveChartComponent, (prevProps, nextProps) => {
+	// Return true to SKIP re-render, false to RE-RENDER
+	return (
+		prevProps.symbol === nextProps.symbol &&
+		prevProps.resolution === nextProps.resolution &&
+		prevProps.barsCount === nextProps.barsCount &&
+		prevProps.zoomLevel === nextProps.zoomLevel &&
+		prevProps.height === nextProps.height &&
+		prevProps.isStreaming === nextProps.isStreaming &&
+		JSON.stringify(prevProps.indicators) === JSON.stringify(nextProps.indicators) &&
+		JSON.stringify(prevProps.global) === JSON.stringify(nextProps.global) &&
+		prevProps.chartData === nextProps.chartData
+	);
+});
+
+TradingViewLiveChart.displayName = 'TradingViewLiveChart';
