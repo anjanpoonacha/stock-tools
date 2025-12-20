@@ -66,16 +66,6 @@ const TOOLS: Tool[] = [
         keywords: ['convert', 'symbol', 'format', 'mio', 'tv', 'tradingview'],
     },
     {
-        id: 'chart',
-        title: 'TradingView Charts',
-        description: 'View and analyze NSE stocks with interactive charts',
-        href: '/chart',
-        icon: 'TrendingUp' as const,
-        category: 'Core Tools',
-        featured: true,
-        keywords: ['chart', 'tradingview', 'analysis', 'nse', 'stocks'],
-    },
-    {
         id: 'miowatchlist',
         title: 'Manage MIO Lists',
         description: 'Create and manage MarketInOut watchlists',

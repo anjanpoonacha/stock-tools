@@ -33,7 +33,12 @@ export const useFormulaExtraction = (): UseFormulaExtractionReturn => {
 	const [extracting, setExtracting] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [extractionErrors, setExtractionErrors] = useState<ExtractionError[]>([]);
+	const [lastFetch, setLastFetch] = useState(0);
 	const showToast = useToast();
+	
+	// Stale-time configuration: 5 minutes
+	// Prevents unnecessary API calls when navigating between pages
+	const STALE_TIME = 5 * 60 * 1000;
 
 	const loadFormulas = useCallback(async () => {
 		setLoading(true);
@@ -56,6 +61,7 @@ export const useFormulaExtraction = (): UseFormulaExtractionReturn => {
 
 			const data = await res.json();
 			setFormulas(data.formulas || []);
+			setLastFetch(Date.now());
 		} catch (err) {
 			const errorMessage = err instanceof Error ? err.message : 'Failed to load formulas';
 			setError(errorMessage);
@@ -190,10 +196,19 @@ export const useFormulaExtraction = (): UseFormulaExtractionReturn => {
 		}
 	}, [formulas, showToast]);
 
-	// Load formulas on mount
+	// Load formulas on mount with stale-time check
+	// Only fetch if data is stale (older than STALE_TIME) or no data exists
 	useEffect(() => {
-		loadFormulas();
-	}, [loadFormulas]);
+		const now = Date.now();
+		const isStale = now - lastFetch >= STALE_TIME;
+		const hasNoData = formulas.length === 0;
+		
+		if (hasNoData || isStale) {
+			loadFormulas();
+		}
+		// Only run on mount - loadFormulas is stable due to useCallback
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	return {
 		formulas,

@@ -5,7 +5,7 @@
  * Used by both TradingViewLiveChart and ReusableChart components.
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { OHLCVBar } from '@/lib/tradingview/types';
 
 export interface ChartDataResponse {
@@ -132,12 +132,49 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
  * ```
  */
 export function useChartData(params: UseChartDataParams): UseChartDataReturn {
-	const [data, setData] = useState<ChartDataResponse | null>(null);
+	const [rawData, setRawData] = useState<ChartDataResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [refetchKey, setRefetchKey] = useState(0);
 
 	const { enabled = true } = params;
+
+	// Stabilize params object to prevent unnecessary re-fetches
+	// This ensures that if parent components re-render and create a new params object,
+	// we only trigger a fetch if the actual values have changed
+	const stableParams = useMemo(() => ({
+		symbol: params.symbol,
+		resolution: params.resolution,
+		barsCount: params.barsCount,
+		apiEndpoint: params.apiEndpoint,
+		cvdEnabled: params.cvdEnabled,
+		cvdAnchorPeriod: params.cvdAnchorPeriod,
+		cvdTimeframe: params.cvdTimeframe,
+	}), [
+		params.symbol,
+		params.resolution,
+		params.barsCount,
+		params.apiEndpoint,
+		params.cvdEnabled,
+		params.cvdAnchorPeriod,
+		params.cvdTimeframe,
+	]);
+
+	// Process data: deduplicate bars efficiently
+	// This moves deduplication from component render to data layer (runs once per fetch)
+	const processedData = useMemo(() => {
+		if (!rawData?.bars) return rawData;
+		
+		// Deduplicate using Set for O(n) performance
+		const seen = new Set<number>();
+		const uniqueBars = rawData.bars.filter(bar => {
+			if (seen.has(bar.time)) return false;
+			seen.add(bar.time);
+			return true;
+		});
+		
+		return { ...rawData, bars: uniqueBars };
+	}, [rawData]);
 
 	useEffect(() => {
 		// Don't fetch if disabled
@@ -152,12 +189,12 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 				setLoading(true);
 				setError(null);
 
-				// Fetch from API
-				const result = await fetchChartData(params);
+				// Fetch from API using stable params
+				const result = await fetchChartData(stableParams);
 
 				if (!mounted) return;
 
-				setData(result);
+				setRawData(result);
 				setLoading(false);
 			} catch (err) {
 				if (!mounted) return;
@@ -172,25 +209,14 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 		return () => {
 			mounted = false;
 		};
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [
-		params.symbol,
-		params.resolution,
-		params.barsCount,
-		params.apiEndpoint,
-		params.cvdEnabled,
-		params.cvdAnchorPeriod,
-		params.cvdTimeframe,
-		enabled,
-		refetchKey
-	]);
+	}, [stableParams, enabled, refetchKey]);
 
 	const refetch = () => {
 		setRefetchKey(prev => prev + 1);
 	};
 
 	return {
-		data,
+		data: processedData,
 		loading,
 		error,
 		refetch

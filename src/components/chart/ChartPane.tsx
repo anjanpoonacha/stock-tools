@@ -130,15 +130,8 @@ export function ChartPane({
 	// Determine if dark mode is active
 	const isDark = resolvedTheme === 'dark' || theme === 'dark';
 
-	// Memoize deduplicated and sorted bars
-	const uniqueBars = useMemo(() => {
-		if (!data?.bars) return [];
-		const uniqueMap = new Map<number, OHLCVBar>();
-		for (const bar of data.bars) {
-			uniqueMap.set(bar.time, bar);
-		}
-		return Array.from(uniqueMap.values()).sort((a, b) => a.time - b.time);
-	}, [data?.bars]);
+	// Use bars directly - deduplication now happens in useChartData hook
+	const bars = data?.bars || [];
 
 	// Create and render chart
 	useEffect(() => {
@@ -208,10 +201,10 @@ export function ChartPane({
 		});
 		
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		candlestickSeries.setData(uniqueBars as any);
+		candlestickSeries.setData(bars as any);
 
 		// Render indicators using IndicatorRenderer
-		const renderer = new IndicatorRenderer(chart, uniqueBars, isDark);
+		const renderer = new IndicatorRenderer(chart, bars, isDark);
 		const indicatorDataMap = extractIndicatorData(data);
 		renderer.renderIndicators(indicators, indicatorDataMap);
 
@@ -227,7 +220,7 @@ export function ChartPane({
 				chartRef.current = null;
 			}
 		};
-	}, [data, height, isDark, indicators, showGrid, uniqueBars]);
+	}, [data, height, isDark, indicators, showGrid, bars]);
 
 	// Subscribe to crosshair move events
 	useEffect(() => {
