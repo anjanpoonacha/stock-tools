@@ -115,6 +115,46 @@ export async function appendSymbolToWatchlist(watchlistId: string, symbol: strin
 }
 
 /**
+ * Create a new watchlist on TradingView.
+ * @param name - The name of the watchlist to create.
+ * @param cookie - The TradingView session cookie (e.g. "sessionid=...")
+ * @returns Promise with the created watchlist ID
+ */
+export async function createWatchlist(name: string, cookie: string): Promise<{ id: string; name: string }> {
+	const url = 'https://www.tradingview.com/api/v1/symbols_list/custom/';
+	const res = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'Content-Type': 'application/json',
+			Cookie: cookie,
+			Origin: 'https://www.tradingview.com',
+			'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+		},
+		body: JSON.stringify({
+			name,
+			symbols: [],
+		}),
+	});
+	
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`[TradingView API] Failed to create watchlist: ${res.status} ${res.statusText} - ${text}`);
+	}
+
+	const data = await res.json();
+	
+	// Validate response structure
+	if (!data || (typeof data.id !== 'string' && typeof data.id !== 'number')) {
+		throw new Error(`[TradingView API] Invalid response structure from create watchlist. Got: ${JSON.stringify(data)}`);
+	}
+
+	return {
+		id: String(data.id), // Convert to string for consistency
+		name: data.name || name,
+	};
+}
+
+/**
  * Validate TradingView session by checking the custom watchlists endpoint.
  * If not logged in, it returns an array with 1 watchlist where id is null.
  * If logged in, it returns the user's actual watchlists with valid IDs.

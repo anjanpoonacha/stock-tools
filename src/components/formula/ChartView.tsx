@@ -131,6 +131,7 @@ export default function ChartView({
 		currentWatchlist,
 		addToCurrentWatchlist,
 		selectWatchlist,
+		refreshWatchlists,
 		isLoading: watchlistLoading,
 		sessionStatus,
 	} = useWatchlistIntegration({
@@ -848,6 +849,7 @@ export default function ChartView({
 					watchlists={watchlists}
 					currentWatchlist={currentWatchlist}
 					currentStock={currentStock || { symbol: currentSymbol, name: currentSymbol }}
+					refreshWatchlists={refreshWatchlists}
 				/>
 			)}
 		</div>

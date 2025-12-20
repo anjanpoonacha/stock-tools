@@ -9,7 +9,7 @@
     - Create shared abstractions usable in both POC and production
   </workflow>
   <security>
-    - Use environment variables from .env for configuration
+    - Use environment variables from .env for configuration. Refer the .env.example for the details
     - Fetch credentials from KV store dynamically
     - NEVER hardcode credentials or sessions in files
     - Load .env file using: node --env-file=.env script.js or tsx --env-file=.env script.ts
