@@ -1,8 +1,11 @@
 // src/components/ui/toast.tsx
-// shadcn/ui toast utility (basic implementation)
+// shadcn/ui toast utility - production-grade implementation
 
 'use client';
 import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { CheckCircle2, XCircle, Info, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -21,15 +24,77 @@ const ToastContext = React.createContext<ToastContextType | undefined>(undefined
 
 let toastId = 0;
 
+// Toast variant styles using theme variables
+const toastVariants = cva(
+    'flex items-start gap-3 rounded-lg border border-l-4 bg-card px-4 py-3 text-sm text-card-foreground shadow-lg max-w-md animate-in slide-in-from-right-full fade-in duration-300',
+    {
+        variants: {
+            variant: {
+                success:
+                    'border-green-500/50 border-l-green-600 dark:border-green-500/30 dark:border-l-green-400 [&>svg]:text-green-600 dark:[&>svg]:text-green-400',
+                error: 'border-destructive/50 border-l-destructive [&>svg]:text-destructive',
+                info: 'border-blue-500/50 border-l-blue-600 dark:border-blue-500/30 dark:border-l-blue-400 [&>svg]:text-blue-600 dark:[&>svg]:text-blue-400',
+            },
+        },
+        defaultVariants: {
+            variant: 'info',
+        },
+    }
+);
+
+interface ToastItemProps extends VariantProps<typeof toastVariants> {
+    message: string;
+    onDismiss: () => void;
+}
+
+function ToastItem({ variant, message, onDismiss }: ToastItemProps) {
+    const icons = {
+        success: CheckCircle2,
+        error: XCircle,
+        info: Info,
+    };
+
+    const Icon = icons[variant!];
+
+    return (
+        <div
+            className={cn(toastVariants({ variant }))}
+            role={variant === 'error' ? 'alert' : 'status'}
+            aria-live={variant === 'error' ? 'assertive' : 'polite'}
+            aria-atomic='true'
+        >
+            <Icon className='h-5 w-5 shrink-0' />
+
+            <p className='flex-1 leading-relaxed'>{message}</p>
+
+            <button
+                onClick={onDismiss}
+                className='ml-auto shrink-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                aria-label='Close notification'
+            >
+                <X className='h-4 w-4' />
+                <span className='sr-only'>Close</span>
+            </button>
+        </div>
+    );
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
     const [toasts, setToasts] = React.useState<Toast[]>([]);
 
     const showToast = React.useCallback((message: string, type: ToastType = 'info') => {
         const id = ++toastId;
         setToasts((prev) => [...prev, { id, message, type }]);
+        
+        // Auto-dismiss: 5s for info/success, 7s for errors
+        const duration = type === 'error' ? 7000 : 5000;
         setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
-        }, 3500);
+        }, duration);
+    }, []);
+
+    const dismissToast = React.useCallback((id: number) => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
     }, []);
 
     return (
@@ -37,18 +102,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             {children}
             <div className='fixed bottom-4 right-4 z-50 flex flex-col gap-2'>
                 {toasts.map((toast) => (
-                    <div
+                    <ToastItem
                         key={toast.id}
-                        className={`rounded px-4 py-2 shadow text-white ${
-                            toast.type === 'success'
-                                ? 'bg-green-600'
-                                : toast.type === 'error'
-                                ? 'bg-destructive'
-                                : 'bg-zinc-800 dark:bg-zinc-700'
-                        }`}
-                    >
-                        {toast.message}
-                    </div>
+                        variant={toast.type}
+                        message={toast.message}
+                        onDismiss={() => dismissToast(toast.id)}
+                    />
                 ))}
             </div>
         </ToastContext.Provider>
