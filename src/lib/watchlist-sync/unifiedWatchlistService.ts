@@ -1,8 +1,42 @@
 import { getStoredCredentials } from '@/lib/auth/authUtils';
 import type { Watchlist } from '@/lib/mio/types';
+import type { MIOResponse } from '@/lib/mio/core/response-types';
 import type { TradingViewWatchlist } from '@/lib/tradingview';
 import type { UnifiedWatchlist, Platform, WatchlistSessions, AddStockResult } from './types';
 import { normalizeSymbol as normalizeSymbolUtil } from '@/lib/utils/exchangeMapper';
+
+// ============================================================================
+// API Response Types
+// ============================================================================
+
+/**
+ * Standard API response wrapper for MIO actions
+ * Used by /api/mio-action endpoint
+ */
+type MIOActionResponse<T> = {
+  /** MIO operation result */
+  result: MIOResponse<T>;
+  /** Session ID that was used for the request */
+  sessionUsed: string;
+  /** Watchlists array (only for list action) */
+  watchlists?: Watchlist[];
+  /** Error message (only on HTTP errors) */
+  error?: string;
+};
+
+/**
+ * Response from TradingView proxy API
+ */
+type TVProxyResponse<T> = {
+  /** Response data from TradingView */
+  data: T;
+  /** HTTP status code */
+  status?: number;
+};
+
+// ============================================================================
+// Service Functions
+// ============================================================================
 
 /**
  * Normalize a symbol between MIO and TradingView formats.
@@ -143,8 +177,8 @@ export async function fetchUnifiedWatchlists(
             }),
           });
           
-          // Parse response body
-          const data = await res.json();
+          // Parse response body with proper typing
+          const data: MIOActionResponse<Watchlist[]> = await res.json();
           
           // Check HTTP status
           if (!res.ok) {
@@ -188,8 +222,8 @@ export async function fetchUnifiedWatchlists(
             throw new Error(`Failed to fetch TV watchlists: ${res.status}`);
           }
 
-          const { data } = await res.json();
-          return Array.isArray(data) ? data : [];
+          const response: TVProxyResponse<TradingViewWatchlist[]> = await res.json();
+          return Array.isArray(response.data) ? response.data : [];
         })()
       );
       platformOrder.push('tv');
@@ -298,8 +332,8 @@ export async function addStockToWatchlist(
               }),
             });
             
-            // Parse response body
-            const data = await res.json();
+            // Parse response body with proper typing
+            const data: MIOActionResponse<{ added: boolean; symbol: string }> = await res.json();
             
             // Check HTTP status
             if (!res.ok) {

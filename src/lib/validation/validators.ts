@@ -67,8 +67,23 @@ export async function validateAndCleanupMarketinoutSession(
 	try {
 		validateSessionId(internalSessionId, 'validateAndCleanupMarketinoutSession', Platform.MARKETINOUT);
 
-		const watchlists = await MIOService.getWatchlistsWithSession(internalSessionId);
-		if (!watchlists || watchlists.length === 0) {
+		const result = await MIOService.getWatchlistsWithSession(internalSessionId);
+		
+		// Check if MIO operation failed
+		if (!result.success) {
+			await cleanupInvalidSession(internalSessionId, 'marketinout');
+
+			const error = ErrorHandler.createSessionExpiredError(
+				Platform.MARKETINOUT,
+				'validateAndCleanupMarketinoutSession',
+				internalSessionId
+			);
+			ErrorLogger.logError(error);
+			throw error;
+		}
+
+		const watchlists = result.data || [];
+		if (watchlists.length === 0) {
 			await cleanupInvalidSession(internalSessionId, 'marketinout');
 
 			const error = ErrorHandler.createSessionExpiredError(

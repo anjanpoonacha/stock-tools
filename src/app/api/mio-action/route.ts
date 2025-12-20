@@ -79,50 +79,50 @@ function getHttpStatusFromMIOError(errorCode?: string): number {
  * Handles MIO watchlist retrieval
  */
 async function handleGetWatchlists(sessionInfo: MIOSessionInfo): Promise<NextResponse<APIResponse>> {
-	try {
-		const watchlists = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
+	const result = await MIOService.getWatchlistsWithSession(sessionInfo.internalId);
 
-		return createSuccessResponse({ watchlists }, sessionInfo.internalId);
-	} catch (error) {
-		const message = getErrorMessage(error);
-
+	// Check if MIO operation succeeded
+	if (!result.success) {
+		const httpStatus = getHttpStatusFromMIOError(result.error?.code);
 		return createErrorResponse(
-			message || ERROR_MESSAGES.WATCHLIST_LOAD_FAILED,
-			HTTP_STATUS.UNAUTHORIZED,
-			true
+			result.error?.message || ERROR_MESSAGES.WATCHLIST_LOAD_FAILED,
+			httpStatus,
+			result.error?.needsRefresh ?? false
 		);
 	}
+
+	return createSuccessResponse({ watchlists: result.data }, sessionInfo.internalId);
 }
 
 /**
- * Handles adding symbols to MIO watchlist
+ * Handles adding symbols to MIO watchlist (bulk operation)
  */
 async function handleAddToWatchlist(
 	sessionInfo: MIOSessionInfo,
 	mioWlid: string,
 	symbols: string[]
 ): Promise<NextResponse<APIResponse>> {
-	try {
-		// Convert symbols array to comma-separated string as expected by MIOService
-		const symbolsString = Array.isArray(symbols) ? symbols.join(',') : symbols;
+	// Convert symbols array to comma-separated string as expected by MIOService
+	const symbolsString = Array.isArray(symbols) ? symbols.join(',') : symbols;
 
-		const result = await MIOService.addWatchlist({
-			sessionKey: sessionInfo.key,
-			sessionValue: sessionInfo.value,
-			mioWlid,
-			symbols: symbolsString,
-		});
+	const result = await MIOService.addWatchlist({
+		sessionKey: sessionInfo.key,
+		sessionValue: sessionInfo.value,
+		mioWlid,
+		symbols: symbolsString,
+	});
 
-		return createSuccessResponse({ result }, sessionInfo.internalId);
-	} catch (error) {
-		const message = getErrorMessage(error);
-
+	// Check if MIO operation succeeded
+	if (!result.success) {
+		const httpStatus = getHttpStatusFromMIOError(result.error?.code);
 		return createErrorResponse(
-			message || ERROR_MESSAGES.WATCHLIST_ADD_FAILED,
-			HTTP_STATUS.INTERNAL_SERVER_ERROR,
-			true
+			result.error?.message || ERROR_MESSAGES.WATCHLIST_ADD_FAILED,
+			httpStatus,
+			result.error?.needsRefresh ?? false
 		);
 	}
+
+	return createSuccessResponse({ result }, sessionInfo.internalId);
 }
 
 /**
@@ -284,18 +284,19 @@ export async function PUT(req: NextRequest): Promise<NextResponse<APIResponse>> 
 		}
 
 
-		try {
-			const result = await MIOService.createWatchlist(sessionInfo.key, sessionInfo.value, name);
-			return createSuccessResponse({ result }, sessionInfo.internalId);
-		} catch (error) {
-			const message = getErrorMessage(error);
+		const result = await MIOService.createWatchlist(sessionInfo.key, sessionInfo.value, name);
 
+		// Check if MIO operation succeeded
+		if (!result.success) {
+			const httpStatus = getHttpStatusFromMIOError(result.error?.code);
 			return createErrorResponse(
-				message || ERROR_MESSAGES.WATCHLIST_CREATE_FAILED,
-				HTTP_STATUS.INTERNAL_SERVER_ERROR,
-				true
+				result.error?.message || ERROR_MESSAGES.WATCHLIST_CREATE_FAILED,
+				httpStatus,
+				result.error?.needsRefresh ?? false
 			);
 		}
+
+		return createSuccessResponse({ result }, sessionInfo.internalId);
 	} catch (error) {
 		const message = getErrorMessage(error);
 
@@ -334,18 +335,19 @@ export async function DELETE(req: NextRequest): Promise<NextResponse<APIResponse
 		}
 
 
-		try {
-			const result = await MIOService.deleteWatchlists(sessionInfo.key, sessionInfo.value, deleteIds);
-			return createSuccessResponse({ result }, sessionInfo.internalId);
-		} catch (error) {
-			const message = getErrorMessage(error);
+		const result = await MIOService.deleteWatchlists(sessionInfo.key, sessionInfo.value, deleteIds);
 
+		// Check if MIO operation succeeded
+		if (!result.success) {
+			const httpStatus = getHttpStatusFromMIOError(result.error?.code);
 			return createErrorResponse(
-				message || ERROR_MESSAGES.WATCHLIST_DELETE_FAILED,
-				HTTP_STATUS.INTERNAL_SERVER_ERROR,
-				true
+				result.error?.message || ERROR_MESSAGES.WATCHLIST_DELETE_FAILED,
+				httpStatus,
+				result.error?.needsRefresh ?? false
 			);
 		}
+
+		return createSuccessResponse({ result }, sessionInfo.internalId);
 	} catch (error) {
 		const message = getErrorMessage(error);
 

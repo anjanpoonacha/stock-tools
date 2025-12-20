@@ -18,6 +18,7 @@ import type {
 } from './types';
 import { RATE_LIMIT } from './types';
 import type { FormulaListItem, MIOFormula, FormulaExtractionResult } from '@/types/formula';
+import { ErrorCode, type MIOResponse } from './core';
 
 /**
  * MIOService - Main facade that coordinates session management and API operations
@@ -58,119 +59,138 @@ export class MIOService {
 
 	/**
 	 * Fetch MIO watchlists using internalSessionId (handles session lookup and HTML parsing).
-	 * Removed retry mechanism - fails immediately on session expiration.
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async getWatchlistsWithSession(internalSessionId: string): Promise<Watchlist[]> {
-		try {
-			// Validate input parameters
-			if (!internalSessionId) {
-				const error = ErrorHandler.createGenericError(
-					Platform.MARKETINOUT,
-					'getWatchlistsWithSession',
-					'Missing required parameter: internalSessionId'
-				);
-				ErrorLogger.logError(error);
-				throw error;
-			}
-
-			console.log('[MIOService] getWatchlistsWithSession called with internalSessionId:', internalSessionId);
-			const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
-			console.log('[MIOService] sessionKeyValue lookup result:', sessionKeyValue ? '✓ Found' : '✗ Not found');
-			if (!sessionKeyValue) {
-				const error = ErrorHandler.createSessionExpiredError(
-					Platform.MARKETINOUT,
-					'getWatchlistsWithSession',
-					internalSessionId
-				);
-				ErrorLogger.logError(error);
-				throw error;
-			}
-
-			return await APIClient.getWatchlists(sessionKeyValue);
-		} catch (error) {
-			// If it's already a SessionError, re-throw it
-			if (error instanceof SessionError) {
-				throw error;
-			}
-
-			// Otherwise, parse and wrap the error
-			const sessionError = ErrorHandler.parseError(
-				error,
-				Platform.MARKETINOUT,
-				'getWatchlistsWithSession',
-				undefined,
-				undefined
-			);
-			ErrorLogger.logError(sessionError);
-			throw sessionError;
+	static async getWatchlistsWithSession(internalSessionId: string): Promise<MIOResponse<Watchlist[]>> {
+		// Validate input parameters
+		if (!internalSessionId) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.INVALID_INPUT,
+					message: 'Missing required parameter: internalSessionId',
+				},
+				meta: {
+					statusCode: 400,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
 		}
+
+		console.log('[MIOService] getWatchlistsWithSession called with internalSessionId:', internalSessionId);
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		console.log('[MIOService] sessionKeyValue lookup result:', sessionKeyValue ? '✓ Found' : '✗ Not found');
+		
+		if (!sessionKeyValue) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.SESSION_EXPIRED,
+					message: 'No MIO session found for this user',
+					needsRefresh: true,
+				},
+				meta: {
+					statusCode: 401,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
+		}
+
+		return await APIClient.getWatchlists(sessionKeyValue);
 	}
 
 	/**
 	 * Add watchlist using internalSessionId (fetches aspSessionId from session store).
-	 * Removed retry mechanism - fails immediately on session expiration.
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
 	static async addWatchlistWithSession({
 		internalSessionId,
 		mioWlid,
 		symbols,
-	}: AddWatchlistWithSessionParams): Promise<string> {
+	}: AddWatchlistWithSessionParams): Promise<MIOResponse<{ added: boolean; wlid: string; message: string }>> {
 		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
-		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
-
-		try {
-			const result = await MIOService.addWatchlist({
-				sessionKey: sessionKeyValue.key,
-				sessionValue: sessionKeyValue.value,
-				mioWlid,
-				symbols,
-			});
-
-			// Update health monitor with successful operation
-			await SessionManager.updateHealthMonitor(internalSessionId);
-
-			return result;
-		} catch (error) {
-			// Health status will be updated automatically during next scheduled check
-			// or when validation is called again
-			throw error;
+		
+		if (!sessionKeyValue) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.SESSION_EXPIRED,
+					message: 'No MIO session found for this user.',
+					needsRefresh: true,
+				},
+				meta: {
+					statusCode: 401,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
 		}
+
+		const result = await MIOService.addWatchlist({
+			sessionKey: sessionKeyValue.key,
+			sessionValue: sessionKeyValue.value,
+			mioWlid,
+			symbols,
+		});
+
+		// Update health monitor with successful operation
+		if (result.success) {
+			await SessionManager.updateHealthMonitor(internalSessionId);
+		}
+
+		return result;
 	}
 
 	/**
 	 * Add symbols to a watchlist using explicit session credentials
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async addWatchlist(params: AddWatchlistParams): Promise<string> {
+	static async addWatchlist(params: AddWatchlistParams): Promise<MIOResponse<{ added: boolean; wlid: string; message: string }>> {
 		return APIClient.addWatchlist(params);
 	}
 
 	/**
 	 * Create a new watchlist
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async createWatchlist(sessionKey: string, sessionValue: string, name: string): Promise<string> {
+	static async createWatchlist(sessionKey: string, sessionValue: string, name: string): Promise<MIOResponse<{ created: boolean; name: string; wlid?: string; message: string }>> {
 		return APIClient.createWatchlist(sessionKey, sessionValue, name);
 	}
 
 	/**
 	 * Delete watchlists by IDs
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async deleteWatchlists(sessionKey: string, sessionValue: string, todeleteIds: string[]): Promise<string> {
+	static async deleteWatchlists(sessionKey: string, sessionValue: string, todeleteIds: string[]): Promise<MIOResponse<{ deleted: boolean; wlids: string[]; message: string }>> {
 		return APIClient.deleteWatchlists(sessionKey, sessionValue, todeleteIds);
 	}
 
 	/**
 	 * Delete watchlists using internalSessionId (fetches aspSessionId from session store).
-	 * Removed retry mechanism - fails immediately on session expiration.
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[]): Promise<string> {
+	static async deleteWatchlistsWithSession(internalSessionId: string, deleteIds: string[]): Promise<MIOResponse<{ deleted: boolean; wlids: string[]; message: string }>> {
 		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
-		if (!sessionKeyValue) throw new Error('No MIO session found for this user.');
-
-		try {
-			return await APIClient.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
-		} catch (error) {
-			throw error;
+		
+		if (!sessionKeyValue) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.SESSION_EXPIRED,
+					message: 'No MIO session found for this user.',
+					needsRefresh: true,
+				},
+				meta: {
+					statusCode: 401,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
 		}
+
+		return await APIClient.deleteWatchlists(sessionKeyValue.key, sessionKeyValue.value, deleteIds);
 	}
 
 	/**

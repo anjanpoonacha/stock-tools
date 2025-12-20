@@ -109,6 +109,20 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 				return;
 			}
 
+			// Check for Quick add (Option+W / Alt+W) first - before blocking modifiers
+			const isQuickAddShortcut = 
+				event.key === 'w' && 
+				event.altKey && 
+				!event.ctrlKey && 
+				!event.metaKey &&
+				!event.shiftKey;
+
+			if (isQuickAddShortcut && inputMode === 'none' && onWatchlistQuickAdd) {
+				event.preventDefault();
+				onWatchlistQuickAdd();
+				return;
+			}
+
 			// Allow browser shortcuts to pass through (Ctrl+R, Cmd+R, Alt+F4, etc.)
 			// Also allow Shift+ combinations for text selection
 			if (hasModifierKey(event) || event.shiftKey) {
@@ -169,20 +183,6 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 				&& onWatchlistSearchOpen) {
 				event.preventDefault();
 				onWatchlistSearchOpen();
-				return;
-			}
-
-			// Quick add (Option+W / Alt+W) - only in 'none' mode
-			const isQuickAddShortcut = 
-				event.key === 'w' && 
-				event.altKey && 
-				!event.ctrlKey && 
-				!event.metaKey &&
-				!event.shiftKey;
-
-			if (isQuickAddShortcut && inputMode === 'none' && onWatchlistQuickAdd) {
-				event.preventDefault();
-				onWatchlistQuickAdd();
 				return;
 			}
 

@@ -26,8 +26,9 @@ export class APIClient {
 
 	/**
 	 * Fetch MIO watchlists using session credentials and parse HTML.
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async getWatchlists(sessionKeyValue: SessionKeyValue): Promise<Watchlist[]> {
+	static async getWatchlists(sessionKeyValue: SessionKeyValue): Promise<MIOResponse<Watchlist[]>> {
 		try {
 			// Fetch the watchlist page from MIO
 			const res = await fetch(URLS.WATCHLIST_PAGE, {
@@ -37,28 +38,37 @@ export class APIClient {
 			});
 
 			if (!res.ok) {
-				const error = ErrorHandler.parseError(
-					`Failed to fetch watchlist page (status: ${res.status})`,
-					Platform.MARKETINOUT,
-					'getWatchlists',
-					res.status,
-					res.url
-				);
-				ErrorLogger.logError(error);
-				throw error;
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.HTTP_ERROR,
+						message: `Failed to fetch watchlist page (status: ${res.status})`,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'html',
+						url: res.url,
+					},
+				};
 			}
 
 			const html = await res.text();
 
 			// Check if we got a login page instead of watchlist page (indicates session expired)
 			if (LOGIN_INDICATORS.some(indicator => html.includes(indicator))) {
-				const error = ErrorHandler.createSessionExpiredError(
-					Platform.MARKETINOUT,
-					'getWatchlists',
-					undefined
-				);
-				ErrorLogger.logError(error);
-				throw error;
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.SESSION_EXPIRED,
+						message: 'Session expired. Please re-authenticate.',
+						needsRefresh: true,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'html',
+						url: res.url,
+					},
+				};
 			}
 
 			// Use dynamic import for cheerio to avoid SSR issues
@@ -81,79 +91,148 @@ export class APIClient {
 				}
 			}
 
-			return watchlists;
+			return {
+				success: true,
+				data: watchlists,
+				meta: {
+					statusCode: res.status,
+					responseType: 'html',
+					url: res.url,
+				},
+			};
 		} catch (error) {
-			// If it's already a SessionError, re-throw it
-			if (error instanceof SessionError) {
-				throw error;
-			}
-
-			// Otherwise, parse and wrap the error
-			const sessionError = ErrorHandler.parseError(
-				error,
-				Platform.MARKETINOUT,
-				'getWatchlists',
-				undefined,
-				URLS.WATCHLIST_PAGE
-			);
-			ErrorLogger.logError(sessionError);
-			throw sessionError;
+			// Handle network errors and unexpected errors
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.NETWORK_ERROR,
+					message: errorMessage,
+				},
+				meta: {
+					statusCode: 0,
+					responseType: 'text',
+					url: URLS.WATCHLIST_PAGE,
+				},
+			};
 		}
 	}
 
 	/**
-	 * Add symbols to a watchlist
+	 * Add symbols to a watchlist (bulk operation)
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
 	static async addWatchlist({
 		sessionKey,
 		sessionValue,
 		mioWlid,
 		symbols,
-	}: AddWatchlistParams): Promise<string> {
-		const formData = new URLSearchParams({
-			mode: 'add',
-			wlid: mioWlid,
-			overwrite: '0',
-			name: '',
-			stock_list: APIClient.regroupTVWatchlist(symbols),
-		}).toString();
+	}: AddWatchlistParams): Promise<MIOResponse<{ added: boolean; wlid: string; message: string }>> {
+		try {
+			const formData = new URLSearchParams({
+				mode: 'add',
+				wlid: mioWlid,
+				overwrite: '0',
+				name: '',
+				stock_list: APIClient.regroupTVWatchlist(symbols),
+			}).toString();
 
-		const res = await fetch(URLS.WATCHLIST_API, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-				Cookie: `${sessionKey}=${sessionValue}`,
-			},
-			body: formData,
-		});
+			const res = await fetch(URLS.WATCHLIST_API, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/x-www-form-urlencoded',
+					Cookie: `${sessionKey}=${sessionValue}`,
+				},
+				body: formData,
+			});
 
-		const text = await res.text();
-		if (!res.ok) {
-			throw new Error(`Failed to sync. Status: ${res.status}. Please check your credentials.`);
+			const text = await res.text();
+
+			if (!res.ok) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.HTTP_ERROR,
+						message: `Failed to add symbols. Status: ${res.status}`,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
+			}
+
+			// Check if response indicates session expired
+			if (LOGIN_INDICATORS.some(indicator => text.includes(indicator))) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.SESSION_EXPIRED,
+						message: 'Session expired. Please re-authenticate with MIO.',
+						needsRefresh: true,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
+			}
+
+			return {
+				success: true,
+				data: {
+					added: true,
+					wlid: mioWlid,
+					message: 'Symbols added successfully',
+				},
+				meta: {
+					statusCode: res.status,
+					responseType: 'text',
+					url: res.url,
+					rawResponse: text,
+				},
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.NETWORK_ERROR,
+					message: errorMessage,
+				},
+				meta: {
+					statusCode: 0,
+					responseType: 'text',
+					url: URLS.WATCHLIST_API,
+				},
+			};
 		}
-
-		// Check if response indicates session expired
-		if (LOGIN_INDICATORS.some(indicator => text.includes(indicator))) {
-			throw new Error('Session expired. Please re-authenticate with MIO.');
-		}
-
-		return text;
 	}
 
 	/**
 	 * Create a new watchlist
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async createWatchlist(sessionKey: string, sessionValue: string, name: string): Promise<string> {
+	static async createWatchlist(sessionKey: string, sessionValue: string, name: string): Promise<MIOResponse<{ created: boolean; name: string; wlid?: string; message: string }>> {
 		try {
 			// Validate input parameters
 			if (!sessionKey || !sessionValue || !name) {
-				const error = ErrorHandler.createGenericError(
-					Platform.MARKETINOUT,
-					'createWatchlist',
-					`Missing required parameters: sessionKey=${!!sessionKey}, sessionValue=${!!sessionValue}, name=${name}`
-				);
-				ErrorLogger.logError(error);
-				throw error;
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: `Missing required parameters: sessionKey=${!!sessionKey}, sessionValue=${!!sessionValue}, name=${!!name}`,
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
 			}
 
 			const url = `${URLS.MY_WATCHLISTS}?mode=new&name=${encodeURIComponent(name)}&wlid=`;
@@ -165,69 +244,173 @@ export class APIClient {
 			});
 
 			const text = await res.text();
+			
 			if (!res.ok) {
-				const error = ErrorHandler.parseError(
-					`Failed to create watchlist. Status: ${res.status}`,
-					Platform.MARKETINOUT,
-					'createWatchlist',
-					res.status,
-					res.url
-				);
-				ErrorLogger.logError(error);
-				throw error;
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.HTTP_ERROR,
+						message: `Failed to create watchlist. Status: ${res.status}`,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
 			}
 
 			// Check if response indicates session expired
 			if (LOGIN_INDICATORS.some(indicator => text.includes(indicator))) {
-				const error = ErrorHandler.createSessionExpiredError(
-					Platform.MARKETINOUT,
-					'createWatchlist',
-					undefined
-				);
-				ErrorLogger.logError(error);
-				throw error;
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.SESSION_EXPIRED,
+						message: 'Session expired. Please re-authenticate.',
+						needsRefresh: true,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
 			}
 
-			return text;
+			// Extract wlid from response if available
+			const wlidMatch = text.match(/wlid=(\d+)/);
+			const wlid = wlidMatch ? wlidMatch[1] : undefined;
+
+			return {
+				success: true,
+				data: {
+					created: true,
+					name,
+					wlid,
+					message: 'Watchlist created successfully',
+				},
+				meta: {
+					statusCode: res.status,
+					responseType: 'text',
+					url: res.url,
+					rawResponse: text,
+				},
+			};
 		} catch (error) {
-			// If it's already a SessionError, re-throw it
-			if (error instanceof SessionError) {
-				throw error;
-			}
-
-			// Otherwise, parse and wrap the error
-			const sessionError = ErrorHandler.parseError(
-				error,
-				Platform.MARKETINOUT,
-				'createWatchlist',
-				undefined,
-				`${URLS.MY_WATCHLISTS}?mode=new&name=${encodeURIComponent(name)}&wlid=`
-			);
-			ErrorLogger.logError(sessionError);
-			throw sessionError;
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.NETWORK_ERROR,
+					message: errorMessage,
+				},
+				meta: {
+					statusCode: 0,
+					responseType: 'text',
+					url: `${URLS.MY_WATCHLISTS}?mode=new&name=${encodeURIComponent(name)}&wlid=`,
+				},
+			};
 		}
 	}
 
 	/**
 	 * Delete watchlists by IDs
+	 * Returns MIOResponse structure for consistent error handling.
 	 */
-	static async deleteWatchlists(sessionKey: string, sessionValue: string, todeleteIds: string[]): Promise<string> {
-		if (!Array.isArray(todeleteIds) || todeleteIds.length === 0) {
-			throw new Error('No watchlist IDs provided for deletion.');
+	static async deleteWatchlists(sessionKey: string, sessionValue: string, todeleteIds: string[]): Promise<MIOResponse<{ deleted: boolean; wlids: string[]; message: string }>> {
+		try {
+			// Validate input parameters
+			if (!Array.isArray(todeleteIds) || todeleteIds.length === 0) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: 'No watchlist IDs provided for deletion.',
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+			const params = todeleteIds.map((id) => `todelete=${encodeURIComponent(id)}`).join('&');
+			const url = `${URLS.MY_WATCHLISTS}?${params}&mode=delete`;
+			const res = await fetch(url, {
+				method: 'GET',
+				headers: {
+					Cookie: `${sessionKey}=${sessionValue}`,
+				},
+			});
+
+			const text = await res.text();
+
+			if (!res.ok) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.HTTP_ERROR,
+						message: `Failed to delete watchlists. Status: ${res.status}`,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
+			}
+
+			// Check if response indicates session expired
+			if (LOGIN_INDICATORS.some(indicator => text.includes(indicator))) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.SESSION_EXPIRED,
+						message: 'Session expired. Please re-authenticate.',
+						needsRefresh: true,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'text',
+						url: res.url,
+						rawResponse: text,
+					},
+				};
+			}
+
+			return {
+				success: true,
+				data: {
+					deleted: true,
+					wlids: todeleteIds,
+					message: 'Watchlists deleted successfully',
+				},
+				meta: {
+					statusCode: res.status,
+					responseType: 'text',
+					url: res.url,
+					rawResponse: text,
+				},
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.NETWORK_ERROR,
+					message: errorMessage,
+				},
+				meta: {
+					statusCode: 0,
+					responseType: 'text',
+					url: URLS.MY_WATCHLISTS,
+				},
+			};
 		}
-		const params = todeleteIds.map((id) => `todelete=${encodeURIComponent(id)}`).join('&');
-		const url = `${URLS.MY_WATCHLISTS}?${params}&mode=delete`;
-		const res = await fetch(url, {
-			method: 'GET',
-			headers: {
-				Cookie: `${sessionKey}=${sessionValue}`,
-			},
-		});
-		const text = await res.text();
-		if (!res.ok) {
-			throw new Error('Failed to delete watchlists.');
-		}
-		return text;
 	}
 
 	/**
