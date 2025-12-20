@@ -9,7 +9,7 @@ import {
 import type { SessionKeyValue, Watchlist, AddWatchlistParams } from './types';
 import { MIO_URLS as URLS, PATTERNS, LOGIN_INDICATORS } from './types';
 import type { FormulaListItem } from '@/types/formula';
-import { MIOHttpClient, RequestValidator, ErrorCode, type MIOResponse, type SingleStockResponse } from './core';
+import { MIOHttpClient, RequestValidator, ResponseParser, ErrorCode, type MIOResponse, type SingleStockResponse } from './core';
 
 /**
  * API Client - Handles HTTP requests, watchlist and formula operations
@@ -533,12 +533,7 @@ export class APIClient {
 			return await MIOHttpClient.request<SingleStockResponse>(
 				url,
 				{ method: 'GET', sessionKeyValue },
-				(html) => ({
-					success: true,
-					action: 'add',
-					wlid,
-					symbol,
-				})
+				(html) => ResponseParser.parseAddAllResponse(html, wlid)
 			);
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(
@@ -608,12 +603,7 @@ export class APIClient {
 			return await MIOHttpClient.request<SingleStockResponse>(
 				url,
 				{ method: 'GET', sessionKeyValue },
-				(html) => ({
-					success: true,
-					action: 'remove',
-					wlid,
-					symbol,
-				})
+				(html) => ResponseParser.parseAddAllResponse(html, wlid)
 			);
 		} catch (error) {
 			const sessionError = ErrorHandler.parseError(

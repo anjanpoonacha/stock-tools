@@ -8,6 +8,11 @@
     - Document API response structures
     - Create shared abstractions usable in both POC and production
   </workflow>
+  <security>
+    - Use environment variables from .env for configuration
+    - Fetch credentials from KV store dynamically
+    - NEVER hardcode credentials or sessions in files
+  </security>
 </principle>
 
 <principle name="dry-compliance">
@@ -35,5 +40,6 @@
 
   <build>
     - NEVER run build during development (breaks pnpm dev)
+    - ALWAYS run build before committing
   </build>
 </project_rules>

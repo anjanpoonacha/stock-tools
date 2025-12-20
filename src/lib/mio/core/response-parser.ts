@@ -175,7 +175,7 @@ export class ResponseParser {
 	static parseAddAllResponse(
 		html: string,
 		wlid: string
-	): { success: boolean; action?: 'add' | 'remove'; symbol?: string; message?: string } {
+	): { success: boolean; action: 'add' | 'remove'; symbol: string; wlid: string; message?: string } | { success: false; action: 'add' | 'remove'; symbol: string; wlid: string; message: string } {
 		// Extract action and symbol from redirect URL
 		const action = this.extractAction(html);
 		const symbol = this.extractSymbolFromRedirect(html);
@@ -186,14 +186,19 @@ export class ResponseParser {
 				success: true,
 				action,
 				symbol,
+				wlid,
 				message: `Stock ${symbol} ${action === 'add' ? 'added to' : 'removed from'} watchlist ${wlid}`,
 			};
 		}
 
-		// If we can't extract action/symbol, it might be an error or non-standard response
+		// If we can't extract action/symbol, it's an error - return with placeholder values
+		// This shouldn't happen in normal operation but provides type safety
 		return {
 			success: false,
-			message: 'Unable to parse add/remove response',
+			action: 'add', // Default action
+			symbol: '', // Empty symbol indicates parsing failure
+			wlid,
+			message: 'Unable to parse add/remove response - operation may have failed',
 		};
 	}
 

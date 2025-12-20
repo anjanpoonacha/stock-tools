@@ -2,30 +2,25 @@ import { getStoredCredentials } from '@/lib/auth/authUtils';
 import type { Watchlist } from '@/lib/mio/types';
 import type { TradingViewWatchlist } from '@/lib/tradingview';
 import type { UnifiedWatchlist, Platform, WatchlistSessions, AddStockResult } from './types';
+import { normalizeSymbol as normalizeSymbolUtil } from '@/lib/utils/exchangeMapper';
 
 /**
  * Normalize a symbol between MIO and TradingView formats.
+ * Uses the centralized exchange mapper for consistent symbol conversion.
  * 
  * @param symbol - The stock symbol to normalize
  * @param platform - The target platform ('mio' or 'tv')
  * @returns The normalized symbol
  * 
  * @example
- * normalizeSymbol('NSE:RELIANCE', 'mio') // Returns: 'RELIANCE'
- * normalizeSymbol('RELIANCE', 'tv')      // Returns: 'NSE:RELIANCE'
- * normalizeSymbol('BSE:TCS', 'tv')       // Returns: 'BSE:TCS' (unchanged)
+ * normalizeSymbol('NSE:RELIANCE', 'mio') // Returns: 'RELIANCE.NS'
+ * normalizeSymbol('RELIANCE', 'mio')     // Returns: 'RELIANCE.NS' (adds .NS suffix)
+ * normalizeSymbol('BSE:TCS', 'mio')      // Returns: 'TCS.BO'
+ * normalizeSymbol('RELIANCE.NS', 'tv')   // Returns: 'NSE:RELIANCE'
+ * normalizeSymbol('TCS.BO', 'tv')        // Returns: 'BSE:TCS'
  */
 export function normalizeSymbol(symbol: string, platform: Platform): string {
-  if (platform === 'mio') {
-    // Remove any exchange prefix: "NSE:RELIANCE" → "RELIANCE"
-    return symbol.replace(/^[A-Z]+:/, '');
-  } else {
-    // For TV: Add NSE prefix if no exchange specified
-    if (symbol.includes(':')) {
-      return symbol; // Already has exchange (e.g., "BSE:TCS")
-    }
-    return `NSE:${symbol}`;
-  }
+  return normalizeSymbolUtil(symbol, platform);
 }
 
 /**
