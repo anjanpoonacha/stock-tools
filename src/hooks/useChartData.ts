@@ -1,43 +1,26 @@
 /**
  * Reusable Chart Data Hook
  * 
- * Centralized hook for fetching chart data.
+ * Centralized hook for fetching chart data using SWR.
+ * Provides automatic deduplication, caching, and revalidation.
  * Used by both TradingViewLiveChart and ReusableChart components.
  */
 
-import { useState, useEffect, useMemo } from 'react';
-import type { OHLCVBar } from '@/lib/tradingview/types';
+import { useMemo } from 'react';
+import useSWR from 'swr';
+import { chartDataFetcher, type ChartDataFetcherParams } from '@/lib/swr/fetchers';
+import { chartDataKey } from '@/lib/swr/keys';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
+import type { ChartDataResponse } from '@/lib/tradingview/types';
 
-export interface ChartDataResponse {
-	success: boolean;
-	symbol: string;
-	resolution: string;
-	bars: OHLCVBar[];
-	metadata: {
-		name?: string;
-		exchange?: string;
-		currency_code?: string;
-		pricescale?: number;
-	};
-	indicators?: {
-		[key: string]: {
-			studyId: string;
-			studyName: string;
-			config: unknown;
-			values: Array<{
-				time: number;
-				values: number[];
-			}>;
-		};
-	};
-	error?: string;
-}
+// Re-export for backward compatibility
+export type { ChartDataResponse };
 
 interface UseChartDataParams {
 	symbol: string;
 	resolution: string;
 	barsCount: number;
-	apiEndpoint?: string;
+	apiEndpoint?: string; // Deprecated: Uses /api/chart-data by default (ignored in SWR version)
 	cvdEnabled?: boolean;
 	cvdAnchorPeriod?: string;
 	cvdTimeframe?: string;
@@ -52,58 +35,13 @@ interface UseChartDataReturn {
 }
 
 /**
- * Fetch chart data from API
+ * SWR fetcher wrapper for chart data
+ * Wraps chartDataFetcher to match hook's parameter format
  */
-async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResponse> {
-	const { 
-		symbol, 
-		resolution, 
-		barsCount, 
-		apiEndpoint = '/api/chart-data',
-		cvdEnabled,
-		cvdAnchorPeriod,
-		cvdTimeframe
-	} = params;
-
-	// Get credentials using centralized utility
-	const { requireCredentials } = await import('@/lib/auth/authUtils');
-	const credentials = requireCredentials();
-
-	// Build API URL
-	const url = new URL(apiEndpoint, window.location.origin);
-	url.searchParams.set('symbol', symbol);
-	url.searchParams.set('resolution', resolution);
-	url.searchParams.set('barsCount', barsCount.toString());
+async function fetchChartDataForSWR(params: ChartDataFetcherParams): Promise<ChartDataResponse> {
+	const result = await chartDataFetcher(params);
 	
-	// Add CVD parameters if enabled
-	if (cvdEnabled) {
-		url.searchParams.set('cvdEnabled', 'true');
-		if (cvdAnchorPeriod) {
-			url.searchParams.set('cvdAnchorPeriod', cvdAnchorPeriod);
-		}
-		if (cvdTimeframe) {
-			url.searchParams.set('cvdTimeframe', cvdTimeframe);
-		}
-	}
-
-	// Fetch data
-	const response = await fetch(url.toString(), {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json'
-		},
-		body: JSON.stringify({
-			userEmail: credentials.userEmail,
-			userPassword: credentials.userPassword
-		})
-	});
-
-	if (!response.ok) {
-		throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-	}
-
-	const result: ChartDataResponse = await response.json();
-
+	// Validate response
 	if (!result.success) {
 		throw new Error(result.error || 'Failed to fetch chart data');
 	}
@@ -116,14 +54,20 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
 }
 
 /**
- * Reusable hook for fetching chart data
+ * Reusable hook for fetching chart data with SWR
+ * 
+ * Features:
+ * - Automatic request deduplication across components
+ * - Shared cache when same symbol/resolution is used
+ * - Conditional fetching based on enabled param and auth status
+ * - Efficient bar deduplication at data layer
  * 
  * @param params - Chart data fetch parameters
  * @returns Chart data, loading state, error state, and refetch function
  * 
  * @example
  * ```typescript
- * const { data, loading, error } = useChartData({
+ * const { data, loading, error, refetch } = useChartData({
  *   symbol: 'NSE:RELIANCE',
  *   resolution: '1D',
  *   barsCount: 300,
@@ -132,33 +76,57 @@ async function fetchChartData(params: UseChartDataParams): Promise<ChartDataResp
  * ```
  */
 export function useChartData(params: UseChartDataParams): UseChartDataReturn {
-	const [rawData, setRawData] = useState<ChartDataResponse | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-	const [refetchKey, setRefetchKey] = useState(0);
+	const { 
+		symbol, 
+		resolution, 
+		barsCount, 
+		cvdEnabled, 
+		cvdAnchorPeriod, 
+		cvdTimeframe,
+		enabled = true 
+	} = params;
 
-	const { enabled = true } = params;
+	// Check if user is authenticated
+	const credentials = getStoredCredentials();
+	const isAuthenticated = !!credentials;
 
-	// Stabilize params object to prevent unnecessary re-fetches
-	// This ensures that if parent components re-render and create a new params object,
-	// we only trigger a fetch if the actual values have changed
-	const stableParams = useMemo(() => ({
-		symbol: params.symbol,
-		resolution: params.resolution,
-		barsCount: params.barsCount,
-		apiEndpoint: params.apiEndpoint,
-		cvdEnabled: params.cvdEnabled,
-		cvdAnchorPeriod: params.cvdAnchorPeriod,
-		cvdTimeframe: params.cvdTimeframe,
-	}), [
-		params.symbol,
-		params.resolution,
-		params.barsCount,
-		params.apiEndpoint,
-		params.cvdEnabled,
-		params.cvdAnchorPeriod,
-		params.cvdTimeframe,
-	]);
+	// Generate stable SWR cache key
+	// Returns null if disabled or not authenticated (prevents fetch)
+	const swrKey = useMemo(() => {
+		if (!enabled || !isAuthenticated) {
+			return null;
+		}
+		
+		return chartDataKey(
+			symbol,
+			resolution,
+			barsCount,
+			cvdEnabled,
+			cvdAnchorPeriod,
+			cvdTimeframe
+		);
+	}, [symbol, resolution, barsCount, cvdEnabled, cvdAnchorPeriod, cvdTimeframe, enabled, isAuthenticated]);
+
+	// Create fetcher params object
+	const fetcherParams = useMemo<ChartDataFetcherParams>(() => ({
+		symbol,
+		resolution,
+		barsCount,
+		cvdEnabled,
+		cvdAnchorPeriod,
+		cvdTimeframe,
+	}), [symbol, resolution, barsCount, cvdEnabled, cvdAnchorPeriod, cvdTimeframe]);
+
+	// Fetch data with SWR
+	const { data: rawData, error: swrError, isLoading, mutate } = useSWR(
+		swrKey,
+		() => fetchChartDataForSWR(fetcherParams),
+		{
+			revalidateOnFocus: false,
+			dedupingInterval: 60000, // 1 minute - chart data doesn't change that fast
+			keepPreviousData: true, // Smooth transitions between symbols
+		}
+	);
 
 	// Process data: deduplicate bars efficiently
 	// This moves deduplication from component render to data layer (runs once per fetch)
@@ -176,49 +144,21 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 		return { ...rawData, bars: uniqueBars };
 	}, [rawData]);
 
-	useEffect(() => {
-		// Don't fetch if disabled
-		if (!enabled) {
-			return;
-		}
+	// Convert SWR error to string format for backward compatibility
+	const errorMessage = useMemo(() => {
+		if (!swrError) return null;
+		return swrError instanceof Error ? swrError.message : 'Unknown error occurred';
+	}, [swrError]);
 
-		let mounted = true;
-
-		async function loadData() {
-			try {
-				setLoading(true);
-				setError(null);
-
-				// Fetch from API using stable params
-				const result = await fetchChartData(stableParams);
-
-				if (!mounted) return;
-
-				setRawData(result);
-				setLoading(false);
-			} catch (err) {
-				if (!mounted) return;
-				const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-				setError(errorMessage);
-				setLoading(false);
-			}
-		}
-
-		loadData();
-
-		return () => {
-			mounted = false;
-		};
-	}, [stableParams, enabled, refetchKey]);
-
+	// Refetch function using SWR's mutate
 	const refetch = () => {
-		setRefetchKey(prev => prev + 1);
+		mutate();
 	};
 
 	return {
-		data: processedData,
-		loading,
-		error,
+		data: processedData || null,
+		loading: isLoading,
+		error: errorMessage,
 		refetch
 	};
 }

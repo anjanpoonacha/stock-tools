@@ -1,17 +1,19 @@
 /**
- * Hook for fetching formula results (no chart data)
+ * Hook for fetching formula results using SWR
  * 
  * This hook:
  * - Fetches only the stock list from the formula
  * - Does not fetch chart data (loaded on-demand)
  * - Provides simple loading/error states
  * - Respects AuthGuard - doesn't fetch if not authenticated
- * 
- * TODO: Migrate to IndexedDB for caching
+ * - Uses SWR for caching and automatic revalidation (replaces IndexedDB TODO)
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo } from 'react';
+import useSWR from 'swr';
 import { useAuth } from '@/contexts/AuthContext';
+import { getStoredCredentials } from '@/lib/auth/authUtils';
+import { formulaResultsFetcher, formulaResultsKey } from '@/lib/swr';
 import type { Stock } from '@/types/stock';
 
 /**
@@ -27,99 +29,57 @@ interface UseFormulaResultsReturn {
 
 /**
  * Hook for fetching formula results without chart data
+ * Uses SWR for automatic caching and revalidation
  */
 export function useFormulaResults(
 	formulaId: string | null
 ): UseFormulaResultsReturn {
 	// Get authentication state
 	const { isAuthenticated, isLoading: authLoading } = useAuth();
-	
-	const [stocks, setStocks] = useState<Stock[]>([]);
-	const [formulaName, setFormulaName] = useState<string>('');
-	const [loading, setLoading] = useState<boolean>(false);
-	const [error, setError] = useState<string | null>(null);
 
-	/**
-	 * Fetch formula results
-	 */
-	const fetchResults = useCallback(async () => {
-		// Don't fetch if not authenticated - let AuthGuard handle this
+	// Get credentials for SWR key
+	const credentials = useMemo(() => {
+		// Only get credentials if authenticated
 		if (!isAuthenticated()) {
-			return;
+			return null;
 		}
+		return getStoredCredentials();
+	}, [isAuthenticated]);
 
-		if (!formulaId) {
-			return;
+	// Generate SWR key (returns null if any param is missing -> no fetch)
+	const swrKey = useMemo(() => {
+		return formulaResultsKey({
+			formulaId: formulaId || undefined,
+			userEmail: credentials?.userEmail,
+			userPassword: credentials?.userPassword,
+		});
+	}, [formulaId, credentials]);
+
+	// Fetch data using SWR
+	const { data, error, isLoading, mutate } = useSWR(
+		swrKey,
+		([_key, params]) => formulaResultsFetcher(_key, params),
+		{
+			// Don't revalidate on focus to avoid unnecessary API calls
+			revalidateOnFocus: false,
+			// Keep previous data while revalidating
+			keepPreviousData: true,
+			// Dedupe requests within 5 seconds
+			dedupingInterval: 5000,
 		}
+	);
 
-		setLoading(true);
-		setError(null);
-
-		try {
-			// Get user credentials using centralized utility
-			const { getStoredCredentials } = await import('@/lib/auth/authUtils');
-		const credentials = getStoredCredentials();
-		
-		if (!credentials) {
-			setError(null); // Don't show error, let AuthGuard handle it
-			return;
-		}
-
-			const response = await fetch('/api/formula-results', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					userEmail: credentials.userEmail,
-					userPassword: credentials.userPassword,
-					formulaId,
-				}),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.details || errorData.error || `HTTP ${response.status}`);
-			}
-
-		const data = await response.json();
-
-		setStocks(data.stocks);
-		setFormulaName(data.formulaName);
-		setError(null);
-
-	} catch (err) {
-		const errorMessage = err instanceof Error ? err.message : 'Failed to load formula results';
-		setError(errorMessage);
-			setStocks([]);
-			setFormulaName('');
-		} finally {
-			setLoading(false);
-		}
-	}, [formulaId, isAuthenticated]);
-
-	/**
-	 * Refetch results
-	 */
-	const refetch = useCallback(() => {
-		if (formulaId) {
-			fetchResults();
-		}
-	}, [formulaId, fetchResults]);
-
-	// Fetch on mount or when formulaId changes (only if authenticated)
-	useEffect(() => {
-		// Wait for auth to complete before attempting fetch
-		if (!authLoading && isAuthenticated()) {
-			fetchResults();
-		}
-	}, [fetchResults, authLoading, isAuthenticated]);
+	// Extract error message
+	const errorMessage = useMemo(() => {
+		if (!error) return null;
+		return error instanceof Error ? error.message : 'Failed to load formula results';
+	}, [error]);
 
 	return {
-		stocks,
-		formulaName,
-		loading: authLoading || loading, // Show loading during auth check
-		error,
-		refetch,
+		stocks: data?.stocks || [],
+		formulaName: data?.formulaName || '',
+		loading: authLoading || isLoading,
+		error: errorMessage,
+		refetch: () => mutate(),
 	};
 }
