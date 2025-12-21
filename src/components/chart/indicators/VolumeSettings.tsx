@@ -19,16 +19,45 @@ export function VolumeSettings({
 	globalSettings,
 	onGlobalChange,
 }: VolumeSettingsProps) {
+	// Local state for input to prevent re-renders on every keystroke
+	const [localMALength, setLocalMALength] = React.useState(globalSettings.volumeMALength)
+	const updateTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+
+	// Sync local state when global settings change externally
+	React.useEffect(() => {
+		setLocalMALength(globalSettings.volumeMALength)
+	}, [globalSettings.volumeMALength])
+
 	const handleShowMAChange = (checked: boolean) => {
 		onGlobalChange('showVolumeMA', checked)
 	}
 
 	const handleMALengthChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const value = parseInt(e.target.value, 10)
-		if (!isNaN(value) && value > 0) {
-			onGlobalChange('volumeMALength', value)
+		
+		// Update local state immediately for responsive UI
+		setLocalMALength(value)
+		
+		// Debounce the actual settings update
+		if (updateTimerRef.current) {
+			clearTimeout(updateTimerRef.current)
 		}
+		
+		updateTimerRef.current = setTimeout(() => {
+			if (!isNaN(value) && value > 0) {
+				onGlobalChange('volumeMALength', value)
+			}
+		}, 500) // 500ms debounce
 	}
+
+	// Cleanup timer on unmount
+	React.useEffect(() => {
+		return () => {
+			if (updateTimerRef.current) {
+				clearTimeout(updateTimerRef.current)
+			}
+		}
+	}, [])
 
 	return (
 		<div className="space-y-4 p-1">
@@ -54,7 +83,7 @@ export function VolumeSettings({
 						id="volume-ma-length"
 						type="number"
 						min="1"
-						value={globalSettings.volumeMALength}
+						value={localMALength}
 						onChange={handleMALengthChange}
 						className="w-20"
 					/>

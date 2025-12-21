@@ -35,6 +35,14 @@
     - Use theme variables only (bg-muted, text-foreground, border-border) - NO hardcoded colors
   </ui>
 
+  <component_organization>
+    - Extract components when file exceeds 200-300 lines
+    - Break down complex JSX into smaller, focused components
+    - Each component should have a single, clear responsibility
+    - Co-locate related components in same directory when they share context
+    - Prefer composition over large monolithic components
+  </component_organization>
+
   <authentication>
     - Add loading states using isLoading from useAuth()
   </authentication>

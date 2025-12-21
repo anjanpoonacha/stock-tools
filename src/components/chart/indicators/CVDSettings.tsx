@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,24 @@ export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
 	const useManualInput = settings.useManualInput || false;
 	const manualPeriod = settings.manualPeriod || '';
 
+	// Local state for manual input to prevent re-renders on every keystroke
+	const [localManualPeriod, setLocalManualPeriod] = React.useState(manualPeriod);
+	const updateTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+
+	// Sync local state when settings change externally
+	React.useEffect(() => {
+		setLocalManualPeriod(manualPeriod);
+	}, [manualPeriod]);
+
+	// Cleanup timer on unmount
+	React.useEffect(() => {
+		return () => {
+			if (updateTimerRef.current) {
+				clearTimeout(updateTimerRef.current);
+			}
+		};
+	}, []);
+
 	const handleAnchorPeriodChange = (value: string) => {
 		onChange({ ...settings, anchorPeriod: value });
 	};
@@ -39,7 +58,19 @@ export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
 	};
 
 	const handleManualPeriodChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		onChange({ ...settings, manualPeriod: e.target.value });
+		const value = e.target.value;
+		
+		// Update local state immediately for responsive UI
+		setLocalManualPeriod(value);
+		
+		// Debounce the actual settings update
+		if (updateTimerRef.current) {
+			clearTimeout(updateTimerRef.current);
+		}
+		
+		updateTimerRef.current = setTimeout(() => {
+			onChange({ ...settings, manualPeriod: value });
+		}, 500); // 500ms debounce
 	};
 
 	return (
@@ -135,7 +166,7 @@ export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
 							<Input
 								id="manual-period"
 								type="text"
-								value={manualPeriod}
+								value={localManualPeriod}
 								onChange={handleManualPeriodChange}
 								placeholder="e.g., 30S, 5, 60, 1D"
 								className="h-8 text-xs bg-background border-border"

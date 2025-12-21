@@ -26,7 +26,6 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import type { OHLCVBar, SymbolMetadata, StudyData } from '@/lib/tradingview/types';
 import { useChartData } from '@/hooks/useChartData';
-import { useChartDimensions } from '@/hooks/useChartDimensions';
 import { parseChartHeight, applyZoom } from '@/lib/chart/utils';
 import { DEFAULT_CHART_HEIGHT } from '@/lib/chart/constants';
 import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
@@ -50,6 +49,7 @@ interface TradingViewLiveChartProps {
 		};
 	};
 	isStreaming?: boolean;
+	layoutKey?: string;              // Optional key to trigger chart recreation on layout changes
 	// Callback props
 	onChartReady?: (chart: IChartApi) => void;
 	onDataLoaded?: (bars: OHLCVBar[]) => void;
@@ -107,6 +107,7 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 	barsCount = 300,
 	chartData: providedChartData,
 	isStreaming = false,
+	layoutKey = '',
 	onChartReady,
 	onDataLoaded
 }) => {
@@ -114,9 +115,6 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 	const chartRef = useRef<IChartApi | null>(null);
 	const { authStatus, isLoading: authLoading } = useAuth();
 	const { theme, resolvedTheme } = useTheme();
-
-	// Track container dimensions for responsive sizing (currently unused but kept for future responsive features)
-	// const containerDimensions = useChartDimensions(chartContainerRef);
 	
 	// ============================================
 	// DI: Extract indicator configs from injected array
@@ -481,9 +479,10 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 				chartRef.current = null;
 			}
 		};
-	}, [data, height, isDark, smaData, volumeData, volumeMAData, cvdData, showPrice, showVolume, global.showVolumeMA, showCVD, uniqueBars, global.showGrid]);
+	}, [data, height, isDark, smaData, volumeData, volumeMAData, cvdData, showPrice, showVolume, global.showVolumeMA, showCVD, uniqueBars, global.showGrid, layoutKey]);
 	// NOTE: onChartReady removed from dependencies - it's a callback, not data
 	// Adding it causes infinite loop when parent component passes inline arrow functions
+	// layoutKey added to trigger recreation on layout changes (same mechanism as grid toggle)
 
 	// Apply zoom level when it changes (without recreating chart)
 	// This effect handles zoom changes after initial chart creation
@@ -517,17 +516,6 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 			},
 		});
 	}, [global.showGrid, isDark]);
-
-	// Zoom is now applied synchronously during chart creation to prevent flicker
-	// No separate effect needed
-
-	// DISABLED: ResizeObserver was causing infinite expansion loop
-	// The chart is already set to height='100%' which makes it responsive
-	// Manual resize is handled during chart creation and layout changes
-	// ResizeObserver was triggering panel resize -> component re-render -> new chart -> new ResizeObserver -> expand...
-	useEffect(() => {
-		// No-op - ResizeObserver removed
-	}, [data]);
 
 	// Show loading if no data AND (fetching OR streaming)
 	const isLoading = !providedChartData && (loading || isStreaming);
@@ -579,20 +567,7 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 	);
 };
 
-// Memoize the component with custom comparison for performance
-export const TradingViewLiveChart = React.memo(TradingViewLiveChartComponent, (prevProps, nextProps) => {
-	// Return true to SKIP re-render, false to RE-RENDER
-	return (
-		prevProps.symbol === nextProps.symbol &&
-		prevProps.resolution === nextProps.resolution &&
-		prevProps.barsCount === nextProps.barsCount &&
-		prevProps.zoomLevel === nextProps.zoomLevel &&
-		prevProps.height === nextProps.height &&
-		prevProps.isStreaming === nextProps.isStreaming &&
-		JSON.stringify(prevProps.indicators) === JSON.stringify(nextProps.indicators) &&
-		JSON.stringify(prevProps.global) === JSON.stringify(nextProps.global) &&
-		prevProps.chartData === nextProps.chartData
-	);
-});
+// Memoize the component for performance optimization
+export const TradingViewLiveChart = React.memo(TradingViewLiveChartComponent);
 
 TradingViewLiveChart.displayName = 'TradingViewLiveChart';

@@ -19,7 +19,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { TradingViewLiveChart } from '@/components/TradingViewLiveChart';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ArrowLeft, LayoutGrid, LayoutList, Clock, Grid3x3, TrendingUp, Search, LayoutPanelLeft, LayoutPanelTop, Link, Unlink } from 'lucide-react';
@@ -118,6 +118,7 @@ export default function ChartView({
 	// SINGLE CENTRALIZED SETTINGS HOOK - TRUE DI SYSTEM
 	const {
 		isLoading,
+		error,
 		panelLayout,
 		updatePanelLayout,
 		getCurrentLayout,
@@ -130,8 +131,8 @@ export default function ChartView({
 		globalSettings,
 	} = useKVSettings();
 
-	// Get current layout configuration
-	const currentLayout = getCurrentLayout();
+	// Get current layout configuration - memoized to prevent unnecessary re-renders
+	const currentLayout = useMemo(() => getCurrentLayout(), [getCurrentLayout]);
 
 	// Chart instance refs for synchronization (support dynamic number of charts)
 	const chartRefs = useRef<(IChartApi | null)[]>([]);
@@ -716,6 +717,7 @@ export default function ChartView({
 											zoomLevel={(currentLayout.slots[0].zoomLevel || ChartZoomLevel.MAX) as ChartZoomLevel}
 											indicators={currentLayout.slots[0].indicators}
 											global={globalSettings}
+											layoutKey={activeLayout}
 											onChartReady={(chart) => handleChartReady(chart, 0)}
 											onDataLoaded={(bars) => handleDataLoaded(bars, 0)}
 										/>
@@ -763,6 +765,7 @@ export default function ChartView({
 														zoomLevel={(slot.zoomLevel || ChartZoomLevel.MAX) as ChartZoomLevel}
 														indicators={slot.indicators}
 														global={globalSettings}
+														layoutKey={activeLayout}
 														onChartReady={(chart) => handleChartReady(chart, slotIndex)}
 														onDataLoaded={(bars) => handleDataLoaded(bars, slotIndex)}
 													/>

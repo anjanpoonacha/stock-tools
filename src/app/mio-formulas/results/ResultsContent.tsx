@@ -139,18 +139,18 @@ export default function ResultsContent() {
 
 	return (
 		<div className='h-full flex flex-col overflow-hidden'>
-			{/* Header - Always visible (preserves layout) */}
-			<div className='flex-shrink-0 p-4 border-b border-border'>
-				<div className='flex items-center justify-between'>
-					<div className='flex-1'>
-						<h1 className='text-3xl font-bold tracking-tight'>Formula Results</h1>
-						<p className='text-muted-foreground mt-1'>
+			{/* Header - Compact version with minimal vertical space */}
+			<div className='flex-shrink-0 px-4 py-2 border-b border-border'>
+				<div className='flex items-center justify-between gap-4'>
+					<div className='flex items-baseline gap-3 flex-1 min-w-0'>
+						<h1 className='text-xl font-bold tracking-tight whitespace-nowrap'>Formula Results</h1>
+						<p className='text-sm text-muted-foreground truncate'>
 							{loading ? 'Loading...' : (formulaName && filteredAndSortedStocks.length > 0 && `${formulaName} • ${filteredAndSortedStocks.length} stocks`)}
 						</p>
 					</div>
 
 					{/* View Toggle */}
-					<div className='flex gap-2'>
+					<div className='flex gap-1.5 flex-shrink-0'>
 						<Button
 							variant='outline'
 							size='sm'
@@ -158,7 +158,7 @@ export default function ResultsContent() {
 							disabled={loading}
 							title='Reload formula results'
 						>
-							<RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+							<RefreshCw className={`h-4 w-4 mr-1.5 ${loading ? 'animate-spin' : ''}`} />
 							Refresh
 						</Button>
 						<Button
@@ -167,7 +167,7 @@ export default function ResultsContent() {
 							onClick={() => setViewMode('table')}
 							disabled={loading}
 						>
-							<TableIcon className='h-4 w-4 mr-2' />
+							<TableIcon className='h-4 w-4 mr-1.5' />
 							Table View
 						</Button>
 						<Button
@@ -176,7 +176,7 @@ export default function ResultsContent() {
 							onClick={handleViewCharts}
 							disabled={loading || filteredAndSortedStocks.length === 0}
 						>
-							<BarChart3 className='h-4 w-4 mr-2' />
+							<BarChart3 className='h-4 w-4 mr-1.5' />
 							Chart View
 						</Button>
 					</div>
