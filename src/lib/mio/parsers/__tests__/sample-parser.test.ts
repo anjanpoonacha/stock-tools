@@ -133,7 +133,7 @@ describe('SampleParser', () => {
 
       // Should have a description
       expect(firstSample.description).toBeTruthy();
-      expect(firstSample.description.length).toBeGreaterThan(0);
+      expect(firstSample.description?.length).toBeGreaterThan(0);
 
       // Should be categorized as sample
       expect(firstSample.category).toBe('sample');

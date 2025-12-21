@@ -1,4 +1,6 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import useSWR from 'swr';
+import useSWRMutation from 'swr/mutation';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { useToast } from '@/components/ui/toast';
@@ -28,238 +30,152 @@ interface UseWatchlistIntegrationReturn {
 
 const CURRENT_WATCHLIST_KEY = 'chart-current-watchlist';
 
+// SWR key generator - returns null if no sessions (conditional fetching)
+const watchlistKey = (sessions: WatchlistSessions | null) =>
+  sessions && (sessions.mio || sessions.tv) ? (['watchlists', sessions] as const) : null;
+
+// SWR fetcher for unified watchlists
+const watchlistFetcher = async ([_key, sessions]: readonly [string, WatchlistSessions]) =>
+  fetchUnifiedWatchlists(sessions);
+
 /**
- * Hook to manage unified watchlist integration across MIO and TradingView platforms.
- * Provides watchlist fetching, selection, search, and stock addition capabilities.
- * 
- * @param props - Current symbol and optional stock data
- * @returns Watchlist state and management functions
- * 
- * @example
- * const {
- *   watchlists,
- *   currentWatchlist,
- *   selectWatchlist,
- *   addToCurrentWatchlist
- * } = useWatchlistIntegration({
- *   currentSymbol: 'RELIANCE',
- *   currentStock: { symbol: 'RELIANCE', name: 'Reliance Industries' }
- * });
+ * Hook to manage unified watchlist integration (SWR version).
+ * Replaces manual state management with automatic cache management and conditional fetching.
  */
 export function useWatchlistIntegration({
   currentSymbol,
 }: UseWatchlistIntegrationProps): UseWatchlistIntegrationReturn {
-  // State management
-  const [watchlists, setWatchlists] = useState<UnifiedWatchlist[]>([]);
-  const [currentWatchlistId, setCurrentWatchlistId] = useState<string | null>(() => {
-    // Initialize from localStorage
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem(CURRENT_WATCHLIST_KEY);
-    }
-    return null;
-  });
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Hooks - use same pattern as useTvSync
   const [mioSessionId, mioLoading] = useSessionBridge('marketinout');
   const [tvSessionId, tvLoading] = useSessionBridge('tradingview');
   const { mioSessionAvailable, tvSessionAvailable } = useSessionAvailability();
   const toast = useToast();
 
-  // Debug logging for session state
-  console.log('[useWatchlistIntegration] Session state:', {
-    mioSessionId: mioSessionId ? '✓' : '✗',
-    tvSessionId: tvSessionId ? '✓' : '✗',
-    mioLoading,
-    tvLoading,
-    mioAvailable: mioSessionAvailable,
-    tvAvailable: tvSessionAvailable,
-  });
+  const [currentWatchlistId, setCurrentWatchlistId] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? localStorage.getItem(CURRENT_WATCHLIST_KEY) : null
+  );
 
-  // Build sessions object from session bridge
-  const sessions: WatchlistSessions = useMemo(() => {
+  // Build sessions object - null until loading completes
+  const sessions: WatchlistSessions | null = useMemo(() => {
+    if (mioLoading || tvLoading || (!mioSessionId && !tvSessionId)) return null;
     const sessionObj: WatchlistSessions = {};
-    
-    if (mioSessionId) {
-      sessionObj.mio = { internalSessionId: mioSessionId };
-    }
-    
-    if (tvSessionId) {
-      sessionObj.tv = { sessionId: tvSessionId };
-    }
-    
+    if (mioSessionId) sessionObj.mio = { internalSessionId: mioSessionId };
+    if (tvSessionId) sessionObj.tv = { sessionId: tvSessionId };
     return sessionObj;
-  }, [mioSessionId, tvSessionId]);
+  }, [mioSessionId, tvSessionId, mioLoading, tvLoading]);
 
-  // Store sessions in ref to stabilize refreshWatchlists callback
-  const sessionsRef = useRef<WatchlistSessions>(sessions);
-  useEffect(() => {
-    sessionsRef.current = sessions;
-  }, [sessions]);
+  // SWR: Fetch watchlists with conditional fetching
+  const { data: watchlists = [], error: swrError, isLoading, mutate: refreshWatchlists } = useSWR(
+    watchlistKey(sessions),
+    watchlistFetcher,
+    { revalidateOnFocus: false, dedupingInterval: 5000, keepPreviousData: true }
+  );
 
-  /**
-   * Refresh watchlists from both platforms.
-   * Uses sessionsRef.current to avoid circular dependencies.
-   */
-  const refreshWatchlists = useCallback(async (): Promise<void> => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // Fetch watchlists using ref to avoid dependency cycles
-      const fetchedWatchlists = await fetchUnifiedWatchlists(sessionsRef.current);
-      setWatchlists(fetchedWatchlists);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch watchlists';
-      console.error('refreshWatchlists error:', err);
-      setError(errorMessage);
-      toast(errorMessage, 'error');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]); // ✅ No sessions dependency - stable callback!
-
-  /**
-   * Add current stock to a watchlist (or currently selected if no ID provided).
-   * Uses sessionsRef.current to avoid circular dependencies.
-   */
-  const addToCurrentWatchlist = useCallback(async (watchlistIdOverride?: string): Promise<void> => {
-    try {
-      // Use override or current watchlist ID
+  // SWR Mutation: Add stock to watchlist
+  const { trigger: addStockMutation, isMutating } = useSWRMutation(
+    watchlistKey(sessions),
+    async (_key, { arg }: { arg: { symbol: string; watchlistIdOverride?: string } }) => {
+      const { symbol, watchlistIdOverride } = arg;
       const targetWatchlistId = watchlistIdOverride || currentWatchlistId;
-      
-      // Validate watchlist exists
-      if (!targetWatchlistId) {
-        toast('No watchlist selected', 'error');
-        return;
-      }
-
-      // Find watchlist
+      if (!targetWatchlistId) throw new Error('No watchlist selected');
+      if (!sessions) throw new Error('No active sessions');
       const watchlist = watchlists.find((w) => w.id === targetWatchlistId);
-      if (!watchlist) {
-        toast('Watchlist not found', 'error');
-        return;
+      if (!watchlist) throw new Error('Watchlist not found');
+      const result = await addStockToWatchlist(symbol, watchlist, sessions);
+      return { result, watchlist, symbol };
+    },
+    { throwOnError: false }
+  );
+
+  // Add current stock to watchlist
+  const addToCurrentWatchlist = useCallback(
+    async (watchlistIdOverride?: string): Promise<void> => {
+      try {
+        const data = await addStockMutation({ symbol: currentSymbol, watchlistIdOverride });
+        if (!data) return toast('Failed to add stock', 'error');
+
+        const { result, watchlist, symbol } = data;
+        const mioSuccess = result.platforms.mio?.success ?? false;
+        const tvSuccess = result.platforms.tv?.success ?? false;
+
+        if (mioSuccess && tvSuccess) {
+          toast(`✓ ${symbol} added to ${watchlist.name}`, 'success');
+        } else if (mioSuccess) {
+          toast(`⚠️ ${symbol} added to ${watchlist.name} (MIO only)\nTV session expired.`, 'info');
+        } else if (tvSuccess) {
+          toast(`⚠️ ${symbol} added to ${watchlist.name} (TV only)\nMIO session expired.`, 'info');
+        } else {
+          toast(`✗ Failed to add ${symbol} to ${watchlist.name}\nCheck your sessions.`, 'error');
+        }
+      } catch (err) {
+        console.error('addToCurrentWatchlist error:', err);
+        toast(err instanceof Error ? err.message : 'Failed to add stock', 'error');
       }
+    },
+    [currentSymbol, addStockMutation, toast]
+  );
 
-      // Add stock to watchlist using ref to avoid dependency cycles
-      const result = await addStockToWatchlist(currentSymbol, watchlist, sessionsRef.current);
+  // Select watchlist and add stock to it
+  const selectWatchlist = useCallback(
+    async (id: string): Promise<void> => {
+      try {
+        const watchlist = watchlists.find((w) => w.id === id);
+        if (!watchlist) return toast('Watchlist not found', 'error');
 
-      // Handle result with appropriate toasts
-      const mioSuccess = result.platforms.mio?.success ?? false;
-      const tvSuccess = result.platforms.tv?.success ?? false;
-
-      if (mioSuccess && tvSuccess) {
-        // Both succeeded
-        toast(`✓ ${currentSymbol} added to ${watchlist.name}`, 'success');
-      } else if (mioSuccess && !tvSuccess) {
-        // MIO only
-        toast(
-          `⚠️ ${currentSymbol} added to ${watchlist.name} (MIO only)\nTV session expired.`,
-          'info'
-        );
-      } else if (!mioSuccess && tvSuccess) {
-        // TV only
-        toast(
-          `⚠️ ${currentSymbol} added to ${watchlist.name} (TV only)\nMIO session expired.`,
-          'info'
-        );
-      } else {
-        // Both failed
-        toast(
-          `✗ Failed to add ${currentSymbol} to ${watchlist.name}\nCheck your sessions.`,
-          'error'
-        );
+        setCurrentWatchlistId(id);
+        if (typeof window !== 'undefined') localStorage.setItem(CURRENT_WATCHLIST_KEY, id);
+        await addToCurrentWatchlist(id);
+        toast(`Selected "${watchlist.name}"`, 'success');
+      } catch (err) {
+        console.error('selectWatchlist error:', err);
+        toast(err instanceof Error ? err.message : 'Failed to select watchlist', 'error');
       }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to add stock';
-      console.error('addToCurrentWatchlist error:', err);
-      toast(errorMessage, 'error');
-    }
-  }, [currentWatchlistId, watchlists, currentSymbol, toast]); // ✅ No sessions dependency!
+    },
+    [watchlists, addToCurrentWatchlist, toast]
+  );
 
-  /**
-   * Select a watchlist and add the current stock to it.
-   */
-  const selectWatchlist = useCallback(async (id: string): Promise<void> => {
+  // Search watchlists by name
+  const searchWatchlists = useCallback(
+    (query: string): UnifiedWatchlist[] =>
+      !query.trim() ? watchlists : watchlists.filter((w) => w.name.toLowerCase().includes(query.toLowerCase())),
+    [watchlists]
+  );
+
+  // Manual refresh with error handling
+  const handleRefreshWatchlists = useCallback(async (): Promise<void> => {
     try {
-      const watchlist = watchlists.find((w) => w.id === id);
-      if (!watchlist) {
-        toast('Watchlist not found', 'error');
-        return;
-      }
-
-      // Update state and localStorage
-      setCurrentWatchlistId(id);
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(CURRENT_WATCHLIST_KEY, id);
-      }
-
-      // Add current stock to the selected watchlist (pass ID directly to avoid state timing issues)
-      await addToCurrentWatchlist(id);
-
-      toast(`Selected "${watchlist.name}"`, 'success');
+      await refreshWatchlists();
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to select watchlist';
-      console.error('selectWatchlist error:', err);
-      toast(errorMessage, 'error');
+      console.error('refreshWatchlists error:', err);
+      toast(err instanceof Error ? err.message : 'Failed to refresh watchlists', 'error');
     }
-  }, [watchlists, addToCurrentWatchlist, toast]);
-
-  /**
-   * Search watchlists by name (case-insensitive).
-   */
-  const searchWatchlists = useCallback((query: string): UnifiedWatchlist[] => {
-    if (!query.trim()) {
-      return watchlists;
-    }
-
-    const lowerQuery = query.toLowerCase();
-    return watchlists.filter((w) => w.name.toLowerCase().includes(lowerQuery));
-  }, [watchlists]);
-
-  // Initial fetch when sessions are loaded and available
-  useEffect(() => {
-    // Wait for session loading to complete
-    if (mioLoading || tvLoading) {
-      console.log('[useWatchlistIntegration] Waiting for sessions to load...');
-      return;
-    }
-
-    // Only fetch if at least one session ID is available
-    if (mioSessionId || tvSessionId) {
-      console.log('[useWatchlistIntegration] Sessions loaded, fetching watchlists...');
-      refreshWatchlists();
-    } else {
-      console.log('[useWatchlistIntegration] No sessions available after loading');
-    }
-  }, [mioSessionId, tvSessionId, mioLoading, tvLoading, refreshWatchlists]);
+  }, [refreshWatchlists, toast]);
 
   // Derived values
-  const currentWatchlist = useMemo(() => {
-    if (!currentWatchlistId) {
-      return null;
-    }
-    return watchlists.find((w) => w.id === currentWatchlistId) ?? null;
-  }, [currentWatchlistId, watchlists]);
+  const currentWatchlist = useMemo(
+    () => (currentWatchlistId ? watchlists.find((w) => w.id === currentWatchlistId) ?? null : null),
+    [currentWatchlistId, watchlists]
+  );
 
   const sessionStatus = useMemo(
-    () => ({
-      mio: mioSessionAvailable,
-      tv: tvSessionAvailable,
-    }),
+    () => ({ mio: mioSessionAvailable, tv: tvSessionAvailable }),
     [mioSessionAvailable, tvSessionAvailable]
   );
+
+  const error = swrError ? (swrError instanceof Error ? swrError.message : 'Failed to fetch watchlists') : null;
+
+  useEffect(() => {
+    if (error) toast(error, 'error');
+  }, [error, toast]);
 
   return {
     watchlists,
     currentWatchlist,
-    isLoading,
+    isLoading: isLoading || isMutating,
     error,
     selectWatchlist,
     addToCurrentWatchlist,
     searchWatchlists,
-    refreshWatchlists,
+    refreshWatchlists: handleRefreshWatchlists,
     sessionStatus,
   };
 }

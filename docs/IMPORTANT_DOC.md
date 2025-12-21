@@ -28,7 +28,6 @@
 **Reference**: 
 - API: `src/app/api/chart-data/route.ts:26`
 - Types: `src/lib/tradingview/types.ts:136`
-- Full spec: `docs/CVD_TIMEFRAME_FORMAT.md`
 
 ---
 
@@ -143,7 +142,237 @@ await kv.set(key, userSettings);
 
 ---
 
+---
+
+## 🔥 MIO Response Validation (CRITICAL)
+
+**Issue**: Response parser returned hardcoded `success: true` without validating HTML - caused false positives  
+**Root Cause**: Parser ignored HTML response, stocks appeared "added" but weren't in MIO watchlist  
+**Fix Location**: `src/lib/mio/apiClient.ts` - use `ResponseParser.parseAddAllResponse()`
+
+**Pattern to Follow:**
+```typescript
+// ❌ WRONG - Only checks HTTP status
+if (!res.ok) throw Error(res.status)
+return { success: true }  // Assumes success
+
+// ✅ RIGHT - Validates business logic result
+if (!res.ok) throw Error(res.status)
+const data = await res.json()
+if (!data.result.success) throw Error(data.result.error.message)
+```
+
+**Remember:** HTTP 200 ≠ Operation Success. Always validate `result.success` field.
+
+---
+
+## 🔤 MIO Symbol Format (CRITICAL)
+
+**Issue**: MIO silently rejects symbols without exchange suffix  
+**Required Format**: `SYMBOL.EXCHANGE` (e.g., `TCS.NS`, `RELIANCE.NS`)  
+**Auto-conversion**: Use `normalizeSymbol(symbol, 'mio')` to add .NS/.BO automatically
+
+```typescript
+// ❌ WRONG
+await addStock('BELRISE')  // Rejected by MIO
+
+// ✅ RIGHT
+await addStock('BELRISE.NS')  // Accepted
+```
+
+**Exchange Mappings:**
+- NSE → `.NS`
+- BSE → `.BO`
+- TradingView → `NSE:SYMBOL` converts to `SYMBOL.NS`
+
+---
+
+## ⚛️ React Refs + Chart Sync Pattern
+
+**Issue**: Refs update but components don't re-render → hooks receive stale values  
+**Root Cause**: `chartRefs.current[0] = chart` doesn't trigger React re-renders  
+**Solution**: Callback Ref Pattern + Version Counter
+
+```typescript
+const [syncVersion, setSyncVersion] = useState(0)
+const handleChartReady = (chart, idx) => {
+  chartRefs.current[idx] = chart
+  setSyncVersion(v => v + 1)  // ✅ Force re-render
+}
+
+// Hook receives fresh ref values on every version increment
+useCrossChartSync({
+  chart1: chartRefs.current[0],
+  chart2: chartRefs.current[1],
+  enabled: syncVersion > 0  // Only enable after charts loaded
+})
+```
+
+**Pattern:** Refs (no re-renders) + State counter (trigger updates) = Best of both worlds
+
+---
+
+## 🎨 Chart Zoom Flicker Fix
+
+**Issue**: Zoom level flashes to max zoom out then back to correct level  
+**Root Cause**: `fitContent()` called before zoom applied  
+**Fix**: Apply zoom synchronously during chart creation
+
+```typescript
+// ❌ WRONG - Causes flicker
+chartRef.current = chart
+chart.timeScale().fitContent()  // Flash of zoom out
+// Later effect applies zoom
+
+// ✅ RIGHT - No flicker
+chartRef.current = chart
+if (bars.length > 0) {
+  applyZoom(chart.timeScale(), zoomLevel, bars)  // Immediate
+} else {
+  chart.timeScale().fitContent()
+}
+```
+
+**Panel Resize:** Remove `fitContent()` from resize handler - Lightweight Charts maintains zoom automatically
+
+---
+
+## 📐 Panel Layout Orientation Collision
+
+**Issue**: Horizontal and vertical layouts shared same localStorage key → wrong sizes when switching  
+**Fix**: Orientation-specific IDs
+
+```typescript
+// ❌ WRONG
+<PanelGroup id="dual-chart" />  // Same for both orientations
+
+// ✅ RIGHT
+<PanelGroup id={`dual-chart-${layoutMode}`} />
+// → dual-chart-horizontal
+// → dual-chart-vertical
+```
+
+**Force Resize Detection:**
+```typescript
+setTimeout(() => window.dispatchEvent(new Event('resize')), 100)
+```
+
+---
+
+## ⌨️ Keyboard Shortcuts - Modifier Key Order
+
+**Issue**: Alt+W handler was AFTER early return on modifier key detection  
+**Fix**: Check specific shortcut BEFORE generic modifier block
+
+**Mac Compatibility:**
+```typescript
+// ❌ WRONG - Mac Option+W produces '∑' special char
+event.key === 'w'
+
+// ✅ RIGHT - Physical key works cross-platform
+event.code === 'KeyW'
+```
+
+---
+
+## 💾 SWR Cache Key Stability (PREVENTS CACHE THRASHING)
+
+**Issue**: Objects/inline arrays break cache (referential equality)
+
+```typescript
+// ❌ WRONG - Re-fetches every render
+useSWR({ symbol, resolution }, fetcher)
+useSWR([symbol, { cvdEnabled }], fetcher)  // Object in array
+
+// ✅ RIGHT - Stable array keys
+useSWR(['chart', symbol, resolution, cvdEnabled], fetcher)
+const key = useMemo(() => [...], deps)  // Or stabilize with useMemo
+```
+
+---
+
+## 🔄 SWR Conditional Fetching
+
+```typescript
+// ❌ WRONG - Empty array is truthy, fetch still happens
+useSWR(condition ? ['key'] : [], fetcher)
+
+// ✅ RIGHT - null prevents fetch
+useSWR(condition ? ['key', id] : null, fetcher)
+```
+
+---
+
+## 🌐 SWR Fetcher Error Handling
+
+```typescript
+// ❌ WRONG - SWR thinks success
+const fetcher = async (url) => {
+  const res = await fetch(url)
+  if (!res.ok) return { error: res.status }
+  return res.json()
+}
+
+// ✅ RIGHT - SWR catches errors
+const fetcher = async (url) => {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
+```
+
+---
+
+## ⏱️ SWR Deduplication Intervals (By Resource Type)
+
+Different resources need different deduplication windows:
+
+```typescript
+// Chart data - stable, changes rarely
+{ dedupingInterval: 60000 }  // 1 minute
+
+// Formulas - infrequent changes
+{ dedupingInterval: 2000 }   // 2 seconds
+
+// Watchlists - moderate updates
+{ dedupingInterval: 5000 }   // 5 seconds
+
+// Settings - debounced mutations
+{ dedupingInterval: 2000 }   // 2 seconds
+```
+
+**Chart-specific:**
+- Use `keepPreviousData: true` for smooth symbol transitions (no flash)
+- Use `revalidateOnFocus: false` (charts don't need focus refresh)
+- Separate cache keys for CVD enabled vs disabled
+
+---
+
+## 🔐 User-Scoped Settings Storage
+
+**Pattern**: SHA-256(email + password) for per-user isolation  
+**Key Format**: `settings:user_{hash32}`  
+**Privacy**: Email/password never stored, only hash used in keys  
+**Auto-Migration**: First load tries global key, then saves to user key
+
+---
+
+## 🚀 WebSocket Connection Pooling
+
+**Architecture**: Server-side singleton with reference counting  
+**Cleanup**: After 5min idle, NOT per-request  
+**Performance**: 40-60% faster (no 3-5s handshake per request)
+
+```typescript
+acquire() → refCount++
+release() → refCount-- → setTimeout(cleanup, 5min) if zero
+```
+
+---
+
 ## 📝 Note
 
 **This is a LEAN document** - only critical production issues/quirks that cause bugs.  
-Implementation details → separate docs. Keep this under 150 lines.
+Implementation details → separate docs. Keep focused on GOTCHAS and WHY decisions were made.
+
+**For detailed consolidation**: See `docs/.consolidation-review/CONSOLIDATED.md`

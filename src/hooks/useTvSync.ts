@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import useSWR from 'swr';
+import useSWRMutation from 'swr/mutation';
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { useSessionAvailability } from '@/hooks/useSessionAvailability';
 import { useToast } from '@/components/ui/toast';
@@ -11,7 +13,6 @@ import {
     createCleanupError,
     createAppendError
 } from '@/lib/tv-sync/errorHelpers';
-
 interface Watchlist {
     id: string;
     name: string;
@@ -23,18 +24,18 @@ interface UseTvSyncProps {
     grouping: 'Sector' | 'Industry' | 'None';
 }
 
+/**
+ * SWR-based hook for TradingView watchlist synchronization
+ * Migrated from manual state management to leverage SWR's automatic caching,
+ * deduplication, and request management.
+ */
 export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSyncProps) {
     const [sessionid, sessionLoading, sessionError] = useSessionBridge('tradingview');
     const { tvSessionAvailable } = useSessionAvailability();
     const [watchlistId, setWatchlistId] = useState('');
-    const [watchlists, setWatchlists] = useState<Watchlist[]>([]);
     const [operationError, setOperationError] = useState<SessionError | null>(null);
-    const [error, setError] = useState<SessionError | Error | string | null>(null);
     const [output, setOutput] = useState('');
     const toast = useToast();
-
-    const fetchedRef = useRef<string | null>(null);
-    const fetchingRef = useRef(false);
 
     // Compute effective URLs from selected formulas + custom URLs
     const effectiveUrls = useMemo(() => {
@@ -55,132 +56,123 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
         return urlsToFetch;
     }, [selectedFormulaUrls, customUrls]);
 
-    // Fetch watchlists from TradingView
-    useEffect(() => {
-        if (!sessionid) return;
-        if (!tvSessionAvailable) {
-            return;
-        }
-        if (fetchingRef.current) return;
-        fetchingRef.current = true;
+    // ============================================================================
+    // SWR: Fetch TradingView watchlists
+    // ============================================================================
+    
+    const shouldFetchWatchlists = Boolean(sessionid && tvSessionAvailable);
 
-        async function fetchWatchlists() {
-            try {
-                setError(null);
-                const res = await fetch('/api/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        url: 'https://www.tradingview.com/api/v1/symbols_list/all/',
-                        method: 'GET',
-                        headers: {
-                            'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-                            Cookie: `sessionid=${sessionid}`,
-                            Accept: 'application/json',
-                        },
-                    }),
-                });
-
-                if (!res.ok) {
-                    setError(createFetchWatchlistsError(res.status, res.statusText, sessionid || ''));
-                    return;
-                }
-
-                const { data } = await res.json();
-                setWatchlists(Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : []);
-
-                if (fetchedRef.current !== sessionid) {
-                    toast('Fetched watchlists.', 'success');
-                    fetchedRef.current = sessionid;
-                }
-            } catch (err) {
-                setError(
-                    createNetworkError(
-                        'fetch_tv_watchlists',
-                        err instanceof Error ? err.message : 'Unable to connect to TradingView API',
-                        { hasSessionId: !!sessionid, sessionIdLength: sessionid?.length || 0 }
-                    )
-                );
-            }
-        }
-
-        fetchWatchlists();
-    }, [sessionid, tvSessionAvailable, toast]);
-
-    // Fetch MIO symbols from URL
-    async function fetchMioSymbols(url: string, signal?: AbortSignal): Promise<string[]> {
-        try {
+    const {
+        data: watchlistsData,
+        error: watchlistsError,
+    } = useSWR(
+        shouldFetchWatchlists ? ['tv-watchlists', sessionid] : null,
+        async () => {
             const res = await fetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                signal,
                 body: JSON.stringify({
-                    url,
+                    url: 'https://www.tradingview.com/api/v1/symbols_list/all/',
                     method: 'GET',
                     headers: {
                         'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-                        Accept: 'text/plain',
+                        Cookie: `sessionid=${sessionid}`,
+                        Accept: 'application/json',
                     },
                 }),
             });
 
             if (!res.ok) {
-                return [];
+                throw createFetchWatchlistsError(res.status, res.statusText, sessionid || '');
             }
 
             const { data } = await res.json();
-            return parseMioSymbols(data);
-        } catch (error) {
-            return [];
+            return Array.isArray(data) ? data.map((w: Watchlist) => ({ id: w.id, name: w.name })) : [];
+        },
+        {
+            onSuccess: () => {
+                toast('Fetched watchlists.', 'success');
+            },
+            onError: (err) => {
+                console.error('Failed to fetch watchlists:', err);
+            },
+            // Don't refetch on window focus for watchlists
+            revalidateOnFocus: false,
         }
-    }
+    );
 
-    // Clean up watchlist
-    async function cleanUpWatchlist() {
-        try {
-            setError(null);
-            const cleanupRes = await fetch('/api/proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/replace/?unsafe=true`,
-                    method: 'POST',
-                    headers: {
-                        'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
-                        'Content-Type': 'application/json',
-                        Cookie: `sessionid=${sessionid}`,
-                        Origin: 'https://www.tradingview.com',
-                    },
-                    body: JSON.stringify([]),
-                }),
-            });
+    const watchlists = watchlistsData || [];
+    const error = watchlistsError || sessionError;
 
-            if (!cleanupRes.ok) {
-                setError(createCleanupError(cleanupRes.status, cleanupRes.statusText, watchlistId));
-                return;
+    // ============================================================================
+    // SWR: Fetch MIO symbols from URLs
+    // ============================================================================
+
+    const shouldFetchSymbols = effectiveUrls.length > 0;
+
+    const {
+        data: symbolsData,
+    } = useSWR(
+        shouldFetchSymbols ? ['mio-symbols', effectiveUrls] : null,
+        async () => {
+            let allSymbols: string[] = [];
+
+            for (const url of effectiveUrls) {
+                try {
+                    const res = await fetch('/api/proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            url,
+                            method: 'GET',
+                            headers: {
+                                'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+                                Accept: 'text/plain',
+                            },
+                        }),
+                    });
+
+                    if (!res.ok) {
+                        continue; // Skip failed URLs
+                    }
+
+                    const { data } = await res.json();
+                    const symbols = parseMioSymbols(data);
+                    allSymbols = allSymbols.concat(symbols);
+                } catch (error) {
+                    // Skip failed URLs silently
+                    continue;
+                }
             }
-            toast('Watchlist cleaned up.', 'success');
-        } catch (err) {
-            setError(
-                createNetworkError(
-                    'cleanup_tv_watchlist',
-                    err instanceof Error ? err.message : 'Unable to connect to TradingView API',
-                    { watchlistId }
-                )
-            );
+
+            const tvSymbols = allSymbols.map(toTV).filter(Boolean) as string[];
+            return groupSymbols(tvSymbols, grouping);
+        },
+        {
+            // Revalidate when URLs or grouping changes
+            revalidateOnFocus: false,
+            dedupingInterval: 2000, // Prevent duplicate requests within 2s
         }
-    }
+    );
 
-    // Append symbols to watchlist
-    async function appendToWatchlist(symbols: string[]) {
-        try {
-            setError(null);
-            setOperationError(null);
+    // Update output when symbols data changes
+    useMemo(() => {
+        if (symbolsData !== undefined) {
+            setOutput(symbolsData);
+        } else if (!shouldFetchSymbols) {
+            setOutput('');
+        }
+    }, [symbolsData, shouldFetchSymbols]);
 
-            // Remove duplicate symbols before sending to TradingView API
-            const { unique: uniqueSymbols, duplicateCount } = removeDuplicateSymbols(symbols);
+    // ============================================================================
+    // SWR Mutation: Append symbols to watchlist
+    // ============================================================================
 
-            const payload = uniqueSymbols;
+    const { trigger: triggerAppend } = useSWRMutation(
+        ['tv-append', watchlistId],
+        async (_key, { arg }: { arg: string[] }) => {
+            const symbols = arg;
+            const { unique: uniqueSymbols } = removeDuplicateSymbols(symbols);
 
             const res = await fetch('/api/proxy', {
                 method: 'POST',
@@ -194,7 +186,7 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
                         Cookie: `sessionid=${sessionid}`,
                         Origin: 'https://www.tradingview.com',
                     },
-                    body: JSON.stringify(payload),
+                    body: JSON.stringify(uniqueSymbols),
                 }),
             });
 
@@ -223,70 +215,102 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
                 );
 
                 if (category.isSessionError) {
-                    setError(error);
+                    throw error; // Will be caught by SWR's error handling
                 } else {
                     setOperationError(error);
+                    throw error;
                 }
-                return;
             }
-            toast('Symbols appended successfully.', 'success');
+
+            return { success: true };
+        },
+        {
+            onSuccess: () => {
+                toast('Symbols appended successfully.', 'success');
+            },
+            onError: (err) => {
+                if (err instanceof Error && !(err instanceof SessionError)) {
+                    // Network error
+                    console.error('Failed to append symbols:', err);
+                }
+            },
+        }
+    );
+
+    // ============================================================================
+    // SWR Mutation: Clean up watchlist
+    // ============================================================================
+
+    const { trigger: triggerCleanup } = useSWRMutation(
+        ['tv-cleanup', watchlistId],
+        async () => {
+            const cleanupRes = await fetch('/api/proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/replace/?unsafe=true`,
+                    method: 'POST',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+                        'Content-Type': 'application/json',
+                        Cookie: `sessionid=${sessionid}`,
+                        Origin: 'https://www.tradingview.com',
+                    },
+                    body: JSON.stringify([]),
+                }),
+            });
+
+            if (!cleanupRes.ok) {
+                throw createCleanupError(cleanupRes.status, cleanupRes.statusText, watchlistId);
+            }
+
+            return { success: true };
+        },
+        {
+            onSuccess: () => {
+                toast('Watchlist cleaned up.', 'success');
+            },
+            onError: (err) => {
+                console.error('Failed to cleanup watchlist:', err);
+            },
+        }
+    );
+
+    // ============================================================================
+    // Public API - matches original interface
+    // ============================================================================
+
+    async function appendToWatchlist(symbols: string[]) {
+        try {
+            setOperationError(null);
+            await triggerAppend(symbols);
         } catch (err) {
-            setError(
-                createNetworkError(
+            // Error already handled by mutation's onError
+            if (err instanceof SessionError) {
+                throw err; // Re-throw SessionErrors for caller
+            } else if (err instanceof Error) {
+                throw createNetworkError(
                     'append_to_tv_watchlist',
-                    err instanceof Error ? err.message : 'Unable to connect to TradingView API',
+                    err.message,
                     { watchlistId, symbolCount: symbols.length }
-                )
-            );
+                );
+            }
         }
     }
 
-    // Fetch and group symbols when URLs or grouping changes
-    useEffect(() => {
-        const abortController = new AbortController();
-        let isMounted = true;
-
-        async function updateSymbolsAndOutput() {
-            try {
-                let allSymbols: string[] = [];
-                const validUrls = effectiveUrls;
-
-                if (validUrls.length === 0) {
-                    if (isMounted) {
-                        setOutput('');
-                    }
-                    return;
-                }
-
-                for (const url of validUrls) {
-                    if (!isMounted || abortController.signal.aborted) {
-                        return;
-                    }
-
-                    try {
-                        const mioSymbols = await fetchMioSymbols(url, abortController.signal);
-                        allSymbols = allSymbols.concat(mioSymbols);
-                    } catch (error) {
-                        continue;
-                    }
-                }
-
-                if (isMounted && !abortController.signal.aborted) {
-                    const tvSymbols = allSymbols.map(toTV).filter(Boolean) as string[];
-                    setOutput(groupSymbols(tvSymbols, grouping));
-                }
-            } catch (error) {
-                // Error in updateSymbolsAndOutput
+    async function cleanUpWatchlist() {
+        try {
+            await triggerCleanup();
+        } catch (err) {
+            if (err instanceof Error) {
+                throw createNetworkError(
+                    'cleanup_tv_watchlist',
+                    err.message,
+                    { watchlistId }
+                );
             }
         }
-
-        updateSymbolsAndOutput();
-
-        return () => {
-            isMounted = false;
-            abortController.abort();
-        };
-    }, [effectiveUrls, grouping]);
+    }
 
     return {
         // State
