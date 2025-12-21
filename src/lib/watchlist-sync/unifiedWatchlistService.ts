@@ -2,7 +2,7 @@ import { getStoredCredentials } from '@/lib/auth/authUtils';
 import type { Watchlist } from '@/lib/mio/types';
 import type { MIOResponse } from '@/lib/mio/core/response-types';
 import type { TradingViewWatchlist } from '@/lib/tradingview';
-import type { UnifiedWatchlist, Platform, WatchlistSessions, AddStockResult } from './types';
+import type { UnifiedWatchlist, Platform, WatchlistSessions, AddStockResult, FetchWatchlistsResult } from './types';
 import { normalizeSymbol as normalizeSymbolUtil } from '@/lib/utils/exchangeMapper';
 
 // ============================================================================
@@ -94,8 +94,10 @@ export function mergeWatchlistsByName(
       existing.platforms.push('mio');
       existing.mioId = mioList.id;
     } else {
+      // Create stable ID based on MIO ID to ensure consistency across fetches
+      // Format: mio-{mioId} to make it clear this is MIO-based
       watchlistMap.set(key, {
-        id: crypto.randomUUID(),
+        id: `mio-${mioList.id}`,
         name: mioList.name,
         platforms: ['mio'],
         mioId: mioList.id,
@@ -112,10 +114,14 @@ export function mergeWatchlistsByName(
       // Merge with existing MIO watchlist
       existing.platforms.push('tv');
       existing.tvId = tvList.id;
+      // Update ID to indicate it's now a merged watchlist
+      // Format: unified-{mioId}-{tvId}
+      existing.id = `unified-${existing.mioId}-${tvList.id}`;
     } else {
       // New TV-only watchlist
+      // Format: tv-{tvId}
       watchlistMap.set(key, {
-        id: crypto.randomUUID(),
+        id: `tv-${tvList.id}`,
         name: tvList.name,
         platforms: ['tv'],
         tvId: tvList.id,
@@ -134,18 +140,20 @@ export function mergeWatchlistsByName(
  * Handles partial failures gracefully - if one platform fails, continues with the other.
  * 
  * @param sessions - Session information for both platforms
- * @returns Promise that resolves to array of unified watchlists
+ * @returns Promise that resolves to result containing watchlists and any errors
  * 
  * @example
  * const sessions = {
  *   mio: { internalSessionId: 'session123' },
  *   tv: { sessionId: 'sessionid=abc...' }
  * };
- * const watchlists = await fetchUnifiedWatchlists(sessions);
+ * const result = await fetchUnifiedWatchlists(sessions);
+ * // result.watchlists contains the merged watchlists
+ * // result.errors contains any platform-specific errors
  */
 export async function fetchUnifiedWatchlists(
   sessions: WatchlistSessions
-): Promise<UnifiedWatchlist[]> {
+): Promise<FetchWatchlistsResult> {
   try {
     console.log('[fetchUnifiedWatchlists] Called with sessions:', {
       hasMio: !!sessions.mio?.internalSessionId,
@@ -229,18 +237,19 @@ export async function fetchUnifiedWatchlists(
       platformOrder.push('tv');
     }
 
-    // If no sessions provided, return empty array
+    // If no sessions provided, return empty result
     if (promises.length === 0) {
       console.log('[fetchUnifiedWatchlists] No sessions available, returning empty array');
-      return [];
+      return { watchlists: [] };
     }
 
     // Execute all fetches in parallel with Promise.allSettled
     const results = await Promise.allSettled(promises);
 
-    // Extract successful results
+    // Extract successful results and collect errors
     let mioWatchlists: Watchlist[] = [];
     let tvWatchlists: TradingViewWatchlist[] = [];
+    const errors: { mio?: string; tv?: string } = {};
 
     results.forEach((result, index) => {
       const platform = platformOrder[index];
@@ -254,24 +263,58 @@ export async function fetchUnifiedWatchlists(
           console.log(`[fetchUnifiedWatchlists] TV returned ${tvWatchlists.length} watchlists`);
         }
       } else {
-        // Log error but continue with other platform
-        console.error(`[fetchUnifiedWatchlists] Failed to fetch ${platform} watchlists:`, result.reason);
+        // Extract user-friendly error message
+        const error = result.reason;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Check for specific error types
+        if (errorMessage.includes('Authentication required') || 
+            errorMessage.includes('Session expired') ||
+            errorMessage.includes('401') ||
+            errorMessage.includes('403')) {
+          // Store user-friendly error message
+          if (platform === 'mio') {
+            errors.mio = 'MIO session expired. Please re-authenticate.';
+          } else {
+            errors.tv = 'TradingView session expired. Please re-authenticate.';
+          }
+        } else {
+          console.error(`[fetchUnifiedWatchlists] Failed to fetch ${platform} watchlists:`, errorMessage);
+          if (platform === 'mio') {
+            errors.mio = 'Failed to fetch MIO watchlists. Please try again.';
+          } else {
+            errors.tv = 'Failed to fetch TradingView watchlists. Please try again.';
+          }
+        }
       }
     });
 
-    // Return empty array if both failed
+    // Return result with watchlists and errors
     if (mioWatchlists.length === 0 && tvWatchlists.length === 0) {
       console.log('[fetchUnifiedWatchlists] Both platforms returned 0 watchlists');
-      return [];
+      return { 
+        watchlists: [], 
+        errors: Object.keys(errors).length > 0 ? errors : undefined 
+      };
     }
 
-    // Merge and return watchlists
+    // Merge and return watchlists with any errors
     const merged = mergeWatchlistsByName(mioWatchlists, tvWatchlists);
     console.log(`[fetchUnifiedWatchlists] Merged into ${merged.length} unified watchlists`);
-    return merged;
+    return { 
+      watchlists: merged, 
+      errors: Object.keys(errors).length > 0 ? errors : undefined 
+    };
   } catch (error) {
     console.error('Error in fetchUnifiedWatchlists:', error);
-    return [];
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return { 
+      watchlists: [], 
+      errors: { 
+        mio: errorMessage, 
+        tv: errorMessage 
+      } 
+    };
   }
 }
 

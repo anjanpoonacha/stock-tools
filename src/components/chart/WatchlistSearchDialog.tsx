@@ -181,11 +181,16 @@ export function WatchlistSearchDialog({
           // 2. Re-fetch watchlists to include the new one
           await refreshWatchlists();
           
-          // 3. Save the watchlist ID to localStorage
-          const watchlistId = data.mioId || data.tvId;
-          if (watchlistId) {
-            localStorage.setItem('chart-current-watchlist', watchlistId);
-          }
+          // 3. Find the newly created watchlist by name and save its unified ID
+          // IMPORTANT: Use the unified ID from the watchlist array, not the raw platform ID
+          // This ensures consistency with the stable ID format (mio-{id}, tv-{id}, or unified-{mioId}-{tvId})
+          setTimeout(() => {
+            const newWatchlist = watchlists.find(w => w.name === fullName);
+            if (newWatchlist) {
+              localStorage.setItem('chart-current-watchlist', newWatchlist.id);
+              onSelect(newWatchlist);
+            }
+          }, 100); // Small delay to ensure watchlists array is updated
           
           // 4. Reset form and close dialog
           setNewWatchlistName('');

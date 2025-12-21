@@ -18,6 +18,27 @@ import { ThemeToggle } from '../ThemeToggle';
 import { useRouter, usePathname } from 'next/navigation';
 
 const TOOLS: Tool[] = [
+    // Featured Tools (Top 3)
+    {
+        id: 'mioformulas',
+        title: 'MIO Formula Manager',
+        description: 'Extract and manage stock screener formulas from MarketInOut',
+        href: '/mio-formulas',
+        icon: 'FileCode' as const,
+        category: 'Management',
+        featured: true,
+        keywords: ['formula', 'screener', 'mio', 'marketinout', 'api'],
+    },
+    {
+        id: 'miowatchlist',
+        title: 'Manage MIO Lists',
+        description: 'Create and manage MarketInOut watchlists',
+        href: '/mio-watchlist',
+        icon: 'List' as const,
+        category: 'Management',
+        featured: true,
+        keywords: ['manage', 'watchlist', 'mio', 'marketinout'],
+    },
     {
         id: 'sync',
         title: 'Screener → TV',
@@ -28,6 +49,7 @@ const TOOLS: Tool[] = [
         featured: true,
         keywords: ['sync', 'screener', 'tradingview'],
     },
+    // Other Tools
     {
         id: 'mio',
         title: 'TV → MIO',
@@ -35,7 +57,6 @@ const TOOLS: Tool[] = [
         href: '/mio-sync',
         icon: 'MIOIcon' as const,
         category: 'Sync Operations',
-        featured: true,
         keywords: ['sync', 'tradingview', 'mio', 'marketinout'],
     },
     {
@@ -66,33 +87,12 @@ const TOOLS: Tool[] = [
         keywords: ['convert', 'symbol', 'format', 'mio', 'tv', 'tradingview'],
     },
     {
-        id: 'miowatchlist',
-        title: 'Manage MIO Lists',
-        description: 'Create and manage MarketInOut watchlists',
-        href: '/mio-watchlist',
-        icon: 'List' as const,
-        category: 'Management',
-        featured: true,
-        keywords: ['manage', 'watchlist', 'mio', 'marketinout'],
-    },
-    {
-        id: 'mioformulas',
-        title: 'MIO Formula Manager',
-        description: 'Extract and manage stock screener formulas from MarketInOut',
-        href: '/mio-formulas',
-        icon: 'FileCode' as const,
-        category: 'Management',
-        featured: true,
-        keywords: ['formula', 'screener', 'mio', 'marketinout', 'api'],
-    },
-    {
         id: 'userauth',
         title: 'User Authentication',
         description: 'User authentication and sessions',
         href: '/user-authentication',
         icon: 'UserCheck' as const,
         category: 'Testing',
-        featured: true,
         keywords: ['auth', 'test', 'user', 'session'],
     },
     {
@@ -111,7 +111,6 @@ const TOOLS: Tool[] = [
         href: '/system-analyzer',
         icon: 'TrendingUp' as const,
         category: 'Calculators',
-        featured: true,
         keywords: ['calculator', 'expectancy', 'system', 'performance', 'r-multiple', 'champion'],
     },
 ];

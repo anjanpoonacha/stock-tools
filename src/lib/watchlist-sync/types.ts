@@ -44,6 +44,17 @@ export interface AddStockResult {
 }
 
 /**
+ * Fetch errors from watchlist operations
+ */
+export interface FetchWatchlistsResult {
+  watchlists: UnifiedWatchlist[];
+  errors?: {
+    mio?: string;
+    tv?: string;
+  };
+}
+
+/**
  * Configuration for keybindings
  */
 export interface KeybindingConfig {
