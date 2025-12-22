@@ -1,18 +1,23 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
 import type { UnifiedWatchlist } from '@/lib/watchlist-sync/types';
 import type { Stock } from '@/types/stock';
 import { getStoredCredentials } from '@/lib/auth/authUtils';
 import { useToast } from '@/components/ui/toast';
 import { WatchlistListItem, getPlatformBadge } from './WatchlistListItem';
 import { ConfirmationDialog } from '@/components/ConfirmationDialog';
+import { PlatformFilterTabs } from './watchlist-search/PlatformFilterTabs';
+import { RecentWatchlistsSection } from './watchlist-search/RecentWatchlistsSection';
+import { CreateWatchlistSection } from './watchlist-search/CreateWatchlistSection';
+import { SearchFooter } from './watchlist-search/SearchFooter';
+import { WatchlistStorage, MAX_RECENT_WATCHLISTS } from '@/lib/storage/watchlistStorage';
+import type { PlatformFilter } from '@/lib/storage/watchlistStorage';
+import { filterByPlatform, filterBySearchQuery, getRecentWatchlists } from '@/lib/watchlist-sync/watchlistFilters';
 
 interface WatchlistSearchDialogProps {
   open: boolean;
@@ -36,26 +41,67 @@ export function WatchlistSearchDialog({
   const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [showCreateInput, setShowCreateInput] = useState(false);
-  const [newWatchlistName, setNewWatchlistName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [watchlistToDelete, setWatchlistToDelete] = useState<UnifiedWatchlist | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [platformFilter, setPlatformFilterState] = useState<PlatformFilter>(
+    WatchlistStorage.getPlatformFilter()
+  );
+  const [recentWatchlistIds, setRecentWatchlistIds] = useState<string[]>(
+    WatchlistStorage.getRecentWatchlistIds()
+  );
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const createInputRef = useRef<HTMLInputElement>(null);
   const listItemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  // Filter watchlists based on search query
-  const filteredWatchlists = watchlists.filter((watchlist) =>
-    watchlist.name.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter watchlists based on platform and search query
+  const platformFilteredWatchlists = filterByPlatform(watchlists, platformFilter);
+  const filteredWatchlists = filterBySearchQuery(platformFilteredWatchlists, searchQuery);
+
+  // Get recent watchlists
+  const recentWatchlists = getRecentWatchlists(
+    watchlists,
+    recentWatchlistIds,
+    MAX_RECENT_WATCHLISTS
   );
 
-  // Reset selection when search query changes
+  // Create combined navigation array for keyboard navigation
+  // When searching: only filtered results
+  // When not searching: recent + filtered (excluding duplicates from filtered)
+  const navigableWatchlists = useMemo(() => {
+    if (searchQuery) {
+      // When searching, only show filtered results (no recent section)
+      return filteredWatchlists;
+    }
+    
+    // When not searching, combine recent + filtered (excluding duplicates)
+    const recentIds = new Set(recentWatchlists.map(w => w.id));
+    const nonRecentFiltered = filteredWatchlists.filter(w => !recentIds.has(w.id));
+    return [...recentWatchlists, ...nonRecentFiltered];
+  }, [searchQuery, recentWatchlists, filteredWatchlists]);
+
+  // Track how many items are in the recent section (for index calculations)
+  const recentCount = searchQuery ? 0 : recentWatchlists.length;
+
+  // Handle platform filter change
+  const handlePlatformFilterChange = (filter: PlatformFilter) => {
+    setPlatformFilterState(filter);
+    WatchlistStorage.setPlatformFilter(filter);
+    setSelectedIndex(0);
+  };
+
+  // Handle watchlist selection
+  const handleWatchlistSelect = (watchlist: UnifiedWatchlist) => {
+    WatchlistStorage.addToRecentWatchlists(watchlist.id);
+    setRecentWatchlistIds(WatchlistStorage.getRecentWatchlistIds());
+    onSelect(watchlist);
+    onClose();
+  };
+
+  // Reset selection when search query or filter changes
   useEffect(() => {
     setSelectedIndex(0);
-  }, [searchQuery]);
+  }, [searchQuery, platformFilter]);
 
   // Auto-focus search input when dialog opens
   useEffect(() => {
@@ -65,20 +111,8 @@ export function WatchlistSearchDialog({
       }, 0);
       setSearchQuery('');
       setSelectedIndex(0);
-      setShowCreateInput(false);
-      setNewWatchlistName('');
-      setCreateError(null);
     }
   }, [open]);
-
-  // Auto-focus create input when shown
-  useEffect(() => {
-    if (showCreateInput) {
-      setTimeout(() => {
-        createInputRef.current?.focus();
-      }, 0);
-    }
-  }, [showCreateInput]);
 
   // Auto-scroll to highlighted item
   useEffect(() => {
@@ -96,7 +130,7 @@ export function WatchlistSearchDialog({
       case 'ArrowDown':
         e.preventDefault();
         setSelectedIndex((prev) => 
-          prev < filteredWatchlists.length - 1 ? prev + 1 : prev
+          prev < navigableWatchlists.length - 1 ? prev + 1 : prev
         );
         break;
       case 'ArrowUp':
@@ -105,9 +139,8 @@ export function WatchlistSearchDialog({
         break;
       case 'Enter':
         e.preventDefault();
-        if (filteredWatchlists[selectedIndex]) {
-          onSelect(filteredWatchlists[selectedIndex]);
-          onClose();
+        if (navigableWatchlists[selectedIndex]) {
+          handleWatchlistSelect(navigableWatchlists[selectedIndex]);
         }
         break;
       case 'Escape':
@@ -117,39 +150,8 @@ export function WatchlistSearchDialog({
     }
   };
 
-
-
-  // Validate watchlist name
-  const validateWatchlistName = (name: string): string | null => {
-    if (name.length < 3) {
-      return 'Name must be at least 3 characters';
-    }
-    if (name.length > 30) {
-      return 'Name must be at most 30 characters';
-    }
-    if (!/^[A-Za-z0-9_]+$/.test(name)) {
-      return 'Only letters, numbers, and underscores allowed';
-    }
-    if (/\s/.test(name)) {
-      return 'No spaces allowed';
-    }
-    return null;
-  };
-
   // Handle create watchlist
-  const handleCreateWatchlist = async () => {
-    setCreateError(null);
-
-    // Validate name
-    const validationError = validateWatchlistName(newWatchlistName);
-    if (validationError) {
-      setCreateError(validationError);
-      return;
-    }
-
-    // Add AUTO_ prefix
-    const fullName = `AUTO_${newWatchlistName}`;
-
+  const handleCreateWatchlist = async (fullName: string) => {
     try {
       setIsCreating(true);
 
@@ -157,8 +159,7 @@ export function WatchlistSearchDialog({
       const credentials = getStoredCredentials();
       
       if (!credentials) {
-        setCreateError('Authentication required. Please log in first.');
-        return;
+        throw new Error('Authentication required. Please log in first.');
       }
 
       const response = await fetch('/api/watchlist/create', {
@@ -187,42 +188,26 @@ export function WatchlistSearchDialog({
           setTimeout(() => {
             const newWatchlist = watchlists.find(w => w.name === fullName);
             if (newWatchlist) {
-              localStorage.setItem('chart-current-watchlist', newWatchlist.id);
+              WatchlistStorage.setCurrentWatchlistId(newWatchlist.id);
               onSelect(newWatchlist);
             }
           }, 100); // Small delay to ensure watchlists array is updated
           
-          // 4. Reset form and close dialog
-          setNewWatchlistName('');
-          setShowCreateInput(false);
-          setCreateError(null);
-          onClose();
+          // 4. Close dialog
+          // onClose(); // Commented out to allow user to add stocks immediately after creation
           
         } catch (error) {
           console.error('Error after creating watchlist:', error);
           toast('Watchlist created but failed to refresh list', 'info');
-          setCreateError('Created successfully but could not refresh. Please refresh page manually.');
+          throw new Error('Created successfully but could not refresh. Please refresh page manually.');
         }
       } else {
-        setCreateError(data.error || 'Failed to create watchlist');
+        throw new Error(data.error || 'Failed to create watchlist');
       }
     } catch (error) {
-      setCreateError(error instanceof Error ? error.message : 'Network error');
+      throw error;
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  // Handle create input key press
-  const handleCreateKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      handleCreateWatchlist();
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      setShowCreateInput(false);
-      setNewWatchlistName('');
-      setCreateError(null);
     }
   };
 
@@ -317,6 +302,12 @@ export function WatchlistSearchDialog({
             </div>
           )}
 
+          {/* Platform Filter */}
+          <PlatformFilterTabs
+            value={platformFilter}
+            onChange={handlePlatformFilterChange}
+          />
+
           {/* Search Input */}
           <Input
             ref={searchInputRef}
@@ -330,7 +321,7 @@ export function WatchlistSearchDialog({
 
           {/* Watchlist List */}
           <ScrollArea className="h-[300px] border border-border rounded-md">
-            {filteredWatchlists.length === 0 ? (
+            {filteredWatchlists.length === 0 && recentWatchlists.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 {watchlists.length === 0
                   ? 'No watchlists available'
@@ -338,115 +329,85 @@ export function WatchlistSearchDialog({
               </div>
             ) : (
               <div className="p-1">
-                {filteredWatchlists.map((watchlist, index) => {
-                  const isSelected = index === selectedIndex;
-                  const isCurrent = currentWatchlist?.id === watchlist.id;
+                {/* Recent Watchlists Section */}
+                {!searchQuery && (
+                  <RecentWatchlistsSection
+                    recentWatchlists={recentWatchlists}
+                    currentWatchlistId={currentWatchlist?.id || null}
+                    selectedIndex={selectedIndex}
+                    startIndex={0}
+                    listItemRefs={listItemRefs}
+                    onSelect={handleWatchlistSelect}
+                    onDelete={(wl) => {
+                      setWatchlistToDelete(wl);
+                      setDeleteDialogOpen(true);
+                    }}
+                  />
+                )}
 
-                  return (
-                    <div
-                      key={watchlist.id}
-                      ref={(el) => {
-                        listItemRefs.current[index] = el;
-                      }}
-                    >
-                      <WatchlistListItem
-                        watchlist={watchlist}
-                        isSelected={isSelected}
-                        isCurrent={isCurrent}
-                        onSelect={(w) => {
-                          onSelect(w);
-                          onClose();
-                        }}
-                        onDelete={(wl) => {
-                          setWatchlistToDelete(wl);
-                          setDeleteDialogOpen(true);
-                        }}
-                      />
+                {/* All Watchlists Section */}
+                {filteredWatchlists.length > 0 ? (
+                  <>
+                    {recentWatchlists.length > 0 && !searchQuery && (
+                      <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+                        All Watchlists
+                      </div>
+                    )}
+                    {filteredWatchlists.map((watchlist, index) => {
+                      // Skip if already shown in recent section (when not searching)
+                      if (!searchQuery && recentWatchlists.some(rw => rw.id === watchlist.id)) {
+                        return null;
+                      }
+
+                      // Calculate global index: when searching, use direct index; otherwise, offset by recent count
+                      const globalIndex = searchQuery ? index : recentCount + filteredWatchlists.filter((w, i) => {
+                        // Count how many non-duplicate items appear before this one
+                        return i < index && !recentWatchlists.some(rw => rw.id === w.id);
+                      }).length;
+                      
+                      const isSelected = globalIndex === selectedIndex;
+                      const isCurrent = currentWatchlist?.id === watchlist.id;
+
+                      return (
+                        <div
+                          key={watchlist.id}
+                          ref={(el) => {
+                            listItemRefs.current[globalIndex] = el;
+                          }}
+                        >
+                          <WatchlistListItem
+                            watchlist={watchlist}
+                            isSelected={isSelected}
+                            isCurrent={isCurrent}
+                            onSelect={handleWatchlistSelect}
+                            onDelete={(wl) => {
+                              setWatchlistToDelete(wl);
+                              setDeleteDialogOpen(true);
+                            }}
+                          />
+                        </div>
+                      );
+                    })}
+                  </>
+                ) : (
+                  !searchQuery && recentWatchlists.length === 0 && (
+                    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                      No watchlists found
                     </div>
-                  );
-                })}
+                  )
+                )}
               </div>
             )}
           </ScrollArea>
 
           {/* Create New Watchlist Section */}
-          <div className="pt-3 border-t border-border">
-            {!showCreateInput ? (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full"
-                onClick={() => setShowCreateInput(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create New Watchlist
-              </Button>
-            ) : (
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">AUTO_</span>
-                  <Input
-                    ref={createInputRef}
-                    type="text"
-                    placeholder="WatchlistName"
-                    value={newWatchlistName}
-                    onChange={(e) => {
-                      setNewWatchlistName(e.target.value);
-                      setCreateError(null);
-                    }}
-                    onKeyDown={handleCreateKeyDown}
-                    disabled={isCreating}
-                    className="flex-1"
-                  />
-                </div>
-                {createError && (
-                  <div className="text-xs text-destructive">{createError}</div>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleCreateWatchlist}
-                    disabled={isCreating || !newWatchlistName}
-                    className="flex-1"
-                  >
-                    {isCreating ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      'Create'
-                    )}
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setShowCreateInput(false);
-                      setNewWatchlistName('');
-                      setCreateError(null);
-                    }}
-                    disabled={isCreating}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  No spaces • 3-30 chars • Letters, numbers, underscore only
-                </div>
-              </div>
-            )}
-          </div>
+          <CreateWatchlistSection
+            isCreating={isCreating}
+            onCreateWatchlist={handleCreateWatchlist}
+          />
 
           {/* Footer with instructions and stock info */}
-          <div className="space-y-2 pt-2 border-t border-border">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>↑↓ Navigate | Enter Select | ESC Close</span>
-            </div>
-            <div className="text-sm text-muted-foreground">
-              Adding: <span className="font-medium text-foreground">{currentStock.symbol}</span>
-            </div>
-          </div>
+          <SearchFooter currentStock={currentStock} />
         </div>
 
         {/* Delete Confirmation Dialog */}

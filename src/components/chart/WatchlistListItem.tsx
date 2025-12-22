@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Check, Trash2 } from 'lucide-react';
 import type { UnifiedWatchlist } from '@/lib/watchlist-sync/types';
+import { isAutoWatchlist } from '@/lib/watchlist-sync/watchlistValidation';
 
 interface WatchlistListItemProps {
   watchlist: UnifiedWatchlist;
@@ -82,7 +83,7 @@ export function WatchlistListItem({
       </Badge>
 
       {/* Delete Button */}
-      {onDelete && watchlist.name.startsWith('AUTO_') && (
+      {onDelete && isAutoWatchlist(watchlist.name) && (
         <Button
           variant="ghost"
           size="icon"
