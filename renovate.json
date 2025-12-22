@@ -22,12 +22,15 @@
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
   "prCreation": "immediate",
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
   "packageRules": [
     {
       "description": "Group all patch updates together (non-major)",
       "groupName": "All patch updates",
       "matchUpdateTypes": ["patch"],
       "automerge": true,
+      "minimumReleaseAge": "3 days",
       "labels": ["dependencies", "patch-update"]
     },
     {
@@ -35,6 +38,7 @@
       "groupName": "All minor updates",
       "matchUpdateTypes": ["minor"],
       "automerge": false,
+      "minimumReleaseAge": "3 days",
       "labels": ["dependencies", "minor-update"]
     },
     {
