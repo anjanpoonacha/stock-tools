@@ -29,8 +29,8 @@ export class PersistentConnectionManager {
 	private refCount: number = 0;
 	private isActive: boolean = false;
 	
-	// Idle timeout (5 minutes recommended)
-	private readonly IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+	// Idle timeout (2 minutes)
+	private readonly IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 	private idleTimer: NodeJS.Timeout | null = null;
 	
 	// Health monitoring
