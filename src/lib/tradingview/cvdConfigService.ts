@@ -23,6 +23,7 @@
 import { kv } from '@vercel/kv';
 import { CVD_PINE_FEATURES } from './cvd-constants';
 import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { debugCvd } from '@/lib/utils/chartDebugLogger';
 
 // Re-export CVD_PINE_FEATURES for use in building StudyConfig
 export { CVD_PINE_FEATURES };
@@ -70,6 +71,7 @@ class CVDConfigService {
 	 * @returns CVD configuration
 	 */
 	async getConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
+		const startTime = Date.now();
 		
 		// If fetch already in progress, wait for it
 		if (this.fetchInProgress) {
@@ -83,6 +85,9 @@ class CVDConfigService {
 			try {
 				const cached = await this.getFromCache();
 				if (cached) {
+					const duration = Date.now() - startTime;
+					debugCvd.configFetched(duration, 'cache');
+					debugCvd.configDetails(cached);
 					return cached;
 				} else {
 				}
@@ -97,6 +102,9 @@ class CVDConfigService {
 
 		try {
 			const config = await this.fetchInProgress;
+			const duration = Date.now() - startTime;
+			debugCvd.configFetched(duration, 'TradingView');
+			debugCvd.configDetails(config);
 			return config;
 		} finally {
 			this.fetchInProgress = null;
@@ -324,5 +332,6 @@ export const cvdConfigService = new CVDConfigService();
  * ```
  */
 export async function getCVDConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
+	debugCvd.configStart('N/A', undefined); // Called from context where anchorPeriod/timeframe not available
 	return cvdConfigService.getConfig(sessionId, sessionIdSign);
 }

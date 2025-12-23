@@ -19,6 +19,7 @@ import type {
 import { validateChartDataRequest, validateUserCredentials } from './validators';
 import { getCachedSession, cacheSession, getCachedJWT, cacheJWT } from './sessionCache';
 import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { debugService, debugSession, debugJwt } from '@/lib/utils/chartDebugLogger';
 
 /**
  * Configuration for chart data service (enables dependency injection)
@@ -62,6 +63,7 @@ export async function resolveUserSession(
 	if (cacheEnabled) {
 		const cached = getCachedSession(userEmail);
 		if (cached) {
+			debugSession.cacheHit(userEmail);
 			return {
 				success: true,
 				sessionId: cached.sessionId,
@@ -72,10 +74,14 @@ export async function resolveUserSession(
 	}
 
 	// Get TradingView session from KV storage
+	debugSession.kvLookupStart('tradingview', userEmail);
+	const kvStart = Date.now();
 	const sessionInfo = await config.sessionResolver.getLatestSessionForUser('tradingview', {
 		userEmail,
 		userPassword
 	});
+	const kvDuration = Date.now() - kvStart;
+	debugSession.kvLookupComplete(kvDuration, !!sessionInfo);
 	
 	if (!sessionInfo) {
 		return {
@@ -143,6 +149,7 @@ export async function fetchJWTToken(
 	if (cacheEnabled) {
 		const cachedToken = getCachedJWT(sessionId);
 		if (cachedToken) {
+			debugJwt.cacheHit(sessionId);
 			return {
 				success: true,
 				token: cachedToken
@@ -151,11 +158,15 @@ export async function fetchJWTToken(
 	}
 
 	try {
+		debugJwt.apiCallStart();
+		const jwtApiStart = Date.now();
 		const token = await config.jwtService.getDataAccessToken(
 			sessionId,
 			sessionIdSign || '', // Pass empty string if missing (will fail but with better error)
 			userId
 		);
+		const jwtApiDuration = Date.now() - jwtApiStart;
+		debugJwt.apiCallComplete(jwtApiDuration);
 		
 		// Cache the JWT token (only if enabled)
 		if (cacheEnabled) {
@@ -363,7 +374,10 @@ export async function getChartData(
 		const { userEmail, userPassword } = credentialsValidation.credentials!;
 		
 		// 3. Resolve user session
+		debugService.sessionStart();
 		const sessionStart = Date.now();
+		// Check if session will be cached before calling
+		const sessionWasCached = isServerCacheEnabled() && !!getCachedSession(userEmail);
 		const sessionResult = await resolveUserSession(
 			userEmail,
 			userPassword,
@@ -378,6 +392,7 @@ export async function getChartData(
 			};
 		}
 		const sessionDuration = Date.now() - sessionStart;
+		debugService.sessionComplete(sessionDuration, sessionWasCached);
 		
 		// Log warnings if any
 		if (sessionResult.warnings) {
@@ -386,7 +401,10 @@ export async function getChartData(
 		}
 		
 		// 4. Fetch JWT token
+		debugService.jwtStart();
 		const jwtStart = Date.now();
+		// Check if JWT will be cached before calling
+		const jwtWasCached = isServerCacheEnabled() && !!getCachedJWT(sessionResult.sessionId!);
 		const jwtResult = await fetchJWTToken(
 			sessionResult.sessionId!,
 			sessionResult.sessionIdSign || '',
@@ -402,11 +420,13 @@ export async function getChartData(
 			};
 		}
 		const jwtDuration = Date.now() - jwtStart;
+		debugService.jwtComplete(jwtDuration, jwtWasCached);
 		
 		// 5. Fetch historical data
 		// Use connection pooling by default for better performance (3-5x faster)
 		// Set DISABLE_CONNECTION_POOL=true to disable
 		const useConnectionPool = !process.env.DISABLE_CONNECTION_POOL;
+		debugService.dataStart(useConnectionPool);
 		const dataStart = Date.now();
 		
 		// Log CVD request parameters
@@ -457,9 +477,11 @@ export async function getChartData(
 			};
 		}
 		const dataDuration = Date.now() - dataStart;
+		debugService.dataComplete(dataDuration);
 		
 		// 6. Return successful response
 		const duration = Date.now() - startTime;
+		debugService.breakdown(sessionDuration, jwtDuration, dataDuration, duration);
 		
 		return {
 			success: true,

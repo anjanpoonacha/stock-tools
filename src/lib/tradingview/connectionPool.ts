@@ -15,6 +15,7 @@ import { BaseWebSocketClient } from './baseWebSocketClient';
 import { createSymbolSpec } from './protocol';
 import type { OHLCVBar, SymbolMetadata, StudyData } from './types';
 import { getCVDConfig, CVD_PINE_FEATURES } from './cvdConfigService';
+import { debugPool } from '@/lib/utils/chartDebugLogger';
 
 interface ChartRequest {
 	symbol: string;
@@ -78,6 +79,8 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 	 * Fetch chart data for a single request (reuses existing connection)
 	 */
 	async fetchChartData(request: ChartRequest): Promise<ChartResult> {
+		const fetchStart = Date.now();
+		
 		try {
 			// Clear previous data before new request
 			this.clearCollectedData();
@@ -157,6 +160,10 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 				throw new Error(`No bars received for symbol ${request.symbol}. Symbol may be invalid or delisted.`);
 			}
 			
+			const duration = Date.now() - fetchStart;
+			if (process.env.DEBUG_CHART_DATA === 'true') {
+				console.log(`[Chart:pool][PooledClient] Fetch complete for ${request.symbol}: ${duration}ms`);
+			}
 			
 			return {
 				bars,
@@ -349,16 +356,20 @@ export class WebSocketConnectionPool {
 		
 		// Process batches in parallel
 		const batchPromises = batches.map(async (batch, batchIndex) => {
+			debugPool.acquiring();
+			
 			// REUSE existing persistent connection if available, otherwise create new
 			let connection: PooledWebSocketClient;
 			let isExistingConnection = false;
 			let needsRefresh = false;
+			const connectionId = batchIndex + 1;
 			
 			if (this.persistentMode && this.persistentConnections.length > 0) {
 				// Check if existing connection should be refreshed
 				const existingConnection = this.persistentConnections[0];
 				if (existingConnection.shouldRefresh()) {
 					needsRefresh = true;
+					debugPool.refreshingConnection(connectionId, existingConnection.getRequestCount());
 					// Remove stale connection
 					this.persistentConnections.shift();
 					existingConnection.disconnect();
@@ -368,9 +379,11 @@ export class WebSocketConnectionPool {
 					// Reuse healthy connection
 					connection = existingConnection;
 					isExistingConnection = true;
+					debugPool.reusingConnection(connectionId, connection.getRequestCount());
 				}
 			} else {
 				// Create new connection
+				debugPool.newConnection(connectionId);
 				connection = new PooledWebSocketClient(jwtToken);
 			}
 			
@@ -428,6 +441,7 @@ export class WebSocketConnectionPool {
 		const duration = Date.now() - startTime;
 		const successful = flatResults.filter(r => r.result).length;
 		
+		debugPool.fetchComplete(duration);
 		
 		return flatResults;
 	}

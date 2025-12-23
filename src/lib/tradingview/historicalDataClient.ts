@@ -9,6 +9,7 @@ import { BaseWebSocketClient, type BaseClientConfig } from './baseWebSocketClien
 import { createSymbolSpec } from './protocol';
 import type { OHLCVBar, SymbolMetadata, StudyData, StudyConfig } from './types';
 import { getCVDConfig, CVD_PINE_FEATURES, type CVDConfig } from './cvdConfigService';
+import { debugWs, debugCvd } from '@/lib/utils/chartDebugLogger';
 
 interface HistoricalDataResult {
 	bars: OHLCVBar[];
@@ -61,34 +62,52 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 	 * requests series data (and optionally CVD indicator), and waits for data to arrive.
 	 */
 	protected async requestHistoricalBars(): Promise<void> {
+		const timings: Record<string, number> = {};
+		
 		// Create chart session
+		const chartSessionStart = performance.now();
 		await this.createChartSession();
+		timings.createChartSession = performance.now() - chartSessionStart;
 		
 		// Create quote session (optional but mimics real client flow)
+		const quoteSessionStart = performance.now();
 		await this.createQuoteSession();
+		timings.createQuoteSession = performance.now() - quoteSessionStart;
 		
 		// Create symbol specification
 		const symbolSpec = createSymbolSpec(this.symbol, 'dividends');
 		
 		// Resolve symbol to get metadata
+		debugWs.resolvingSymbol(this.symbol);
+		const resolveSymbolStart = performance.now();
 		await this.resolveSymbol(symbolSpec);
+		timings.resolveSymbol = performance.now() - resolveSymbolStart;
+		debugWs.symbolResolved(timings.resolveSymbol);
 		
 		// Request historical bars
+		debugWs.creatingSeries(this.resolution, this.barsCount);
+		const createSeriesStart = performance.now();
 		await this.createSeries(this.resolution, this.barsCount);
+		timings.createSeries = performance.now() - createSeriesStart;
+		debugWs.seriesCreated(timings.createSeries);
 		
 		// Request CVD indicator if enabled AND credentials are available
 		// Skip CVD entirely if credentials missing to avoid timeout
 		if (this.cvdEnabled) {
 			
 			if (!this.sessionId || !this.sessionIdSign) {
-				// Don't add study, won't wait for timeout
+				debugCvd.skipped('missing credentials');
 			} else {
 				try {
+					debugCvd.studyStart();
+					const studyStart = performance.now();
 					const cvdConfig = await this.buildCVDConfig();
 					const configText = typeof cvdConfig.text === 'string' ? cvdConfig.text : '';
 					await this.createStudy('cvd_1', 'Script@tv-scripting-101!', cvdConfig);
+					const studyDuration = performance.now() - studyStart;
+					debugCvd.studyCreated(studyDuration);
 				} catch (err) {
-					// Don't propagate error, just skip CVD
+					debugCvd.error(err instanceof Error ? err.message : String(err));
 				}
 			}
 		} else {
@@ -96,13 +115,28 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 		
 		// Wait for data to arrive
 		// TradingView sends data within 3-5 seconds typically
+		debugWs.waitingForData(5000);
+		const waitForDataStart = performance.now();
 		await this.waitForData(5000);
+		timings.waitForData = performance.now() - waitForDataStart;
+		const barCount = this.getBars().length;
+		debugWs.dataReceived(barCount, timings.waitForData);
+		
+		// Log timing breakdown
+		debugWs.breakdown(
+			timings.createChartSession,
+			timings.createQuoteSession,
+			timings.resolveSymbol,
+			timings.createSeries,
+			timings.waitForData
+		);
 	}
 	
 	/**
 	 * Build CVD indicator configuration (uses dynamic config if available)
 	 */
 	private async buildCVDConfig(): Promise<StudyConfig> {
+		debugCvd.configStart(this.cvdAnchorPeriod, this.cvdTimeframe);
 		
 		// Fetch dynamic CVD config if not cached
 		if (!this.cvdConfigCache && this.sessionId) {
@@ -117,7 +151,7 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 		
 		const configText = typeof cvdConfig.text === 'string' ? cvdConfig.text : '';
 		
-		return {
+		const studyConfig = {
 			text: cvdConfig.text,
 			pineId: cvdConfig.pineId,
 			pineVersion: cvdConfig.pineVersion,
@@ -127,6 +161,19 @@ class TradingViewWebSocketClient extends BaseWebSocketClient {
 			in_2: { v: this.cvdTimeframe || '', f: true, t: 'resolution' },
 			__profile: { v: false, f: true, t: 'bool' }
 		};
+		
+		debugCvd.configDetails({
+			pineId: studyConfig.pineId,
+			pineVersion: studyConfig.pineVersion,
+			inputs: {
+				anchorPeriod: this.cvdAnchorPeriod,
+				useCustomTimeframe: !!this.cvdTimeframe,
+				customTimeframe: this.cvdTimeframe || ''
+			},
+			text: studyConfig.text
+		});
+		
+		return studyConfig;
 	}
 	
 	/**

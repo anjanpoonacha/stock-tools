@@ -12,6 +12,7 @@ import type { ChartDataResponse } from '@/lib/tradingview/types';
 import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
 import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
 import { validateCVDSettings } from '@/lib/tradingview/cvdValidation';
+import { debugApi } from '@/lib/utils/chartDebugLogger';
 
 /**
  * POST /api/chart-data
@@ -41,6 +42,8 @@ import { validateCVDSettings } from '@/lib/tradingview/cvdValidation';
  * - error?: string
  */
 export async function POST(request: NextRequest) {
+	const requestStart = Date.now();
+	
 	try {
 		// Parse query parameters
 		const symbol = request.nextUrl.searchParams.get('symbol');
@@ -49,6 +52,14 @@ export async function POST(request: NextRequest) {
 		const cvdEnabled = request.nextUrl.searchParams.get('cvdEnabled');
 		const cvdAnchorPeriod = request.nextUrl.searchParams.get('cvdAnchorPeriod');
 		const cvdTimeframe = request.nextUrl.searchParams.get('cvdTimeframe');
+		
+		// Debug logging: Request started
+		debugApi.requestStart(
+			symbol || 'unknown',
+			resolution || 'unknown',
+			barsCount || '300',
+			cvdEnabled === 'true'
+		);
 		
 		// Validate CVD parameters if CVD is enabled
 		if (cvdEnabled === 'true' && cvdAnchorPeriod && resolution) {
@@ -92,7 +103,12 @@ export async function POST(request: NextRequest) {
 			const cached = getCachedChartData(cacheKey);
 			
 			if (cached) {
+				debugApi.cacheHit(cacheKey);
+				const duration = Date.now() - requestStart;
+				debugApi.requestComplete(duration);
 				return NextResponse.json(cached, { status: 200 });
+			} else {
+				debugApi.cacheMiss(cacheKey);
 			}
 		}
 		
@@ -125,8 +141,14 @@ export async function POST(request: NextRequest) {
 				setCachedChartData(cacheKey, response);
 			}
 			
+			const duration = Date.now() - requestStart;
+			debugApi.requestComplete(duration);
+			
 			return NextResponse.json(response, { status: result.statusCode });
 		} else {
+			const duration = Date.now() - requestStart;
+			debugApi.requestComplete(duration);
+			
 			return NextResponse.json({
 				success: false,
 				error: result.error
