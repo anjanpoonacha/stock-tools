@@ -29,6 +29,10 @@ export class PersistentConnectionManager {
 	private refCount: number = 0;
 	private isActive: boolean = false;
 	
+	// Initialization lock (prevents concurrent initialization race conditions)
+	private isInitializing: boolean = false;
+	private initPromise: Promise<void> | null = null;
+	
 	// Idle timeout (2 minutes)
 	private readonly IDLE_TIMEOUT_MS = 2 * 60 * 1000;
 	private idleTimer: NodeJS.Timeout | null = null;
@@ -64,6 +68,9 @@ export class PersistentConnectionManager {
 	 * Acquire connection manager (increment reference count)
 	 * Should be called when making a request that needs persistent connections
 	 * 
+	 * OPTIMIZED: Prevents concurrent initialization via lock pattern.
+	 * If multiple requests arrive simultaneously, subsequent requests wait for first initialization.
+	 * 
 	 * @param jwtToken - JWT token for authentication (server-side only)
 	 */
 	public async acquire(jwtToken: string): Promise<void> {
@@ -75,13 +82,23 @@ export class PersistentConnectionManager {
 			this.idleTimer = null;
 		}
 		
+		// Wait for ongoing initialization (prevents race conditions)
+		if (this.isInitializing && this.initPromise) {
+			await this.initPromise;
+			return;
+		}
+		
 		// Initialize on first acquire or if not active
 		if (!this.isActive) {
-			await this.initialize(jwtToken);
+			this.initPromise = this.initialize(jwtToken);
+			await this.initPromise;
+			this.initPromise = null;
 		} else if (jwtToken !== this.jwtToken) {
 			// JWT token changed, reinitialize
 			await this.closeAll();
-			await this.initialize(jwtToken);
+			this.initPromise = this.initialize(jwtToken);
+			await this.initPromise;
+			this.initPromise = null;
 		}
 	}
 	
@@ -100,27 +117,35 @@ export class PersistentConnectionManager {
 	
 	/**
 	 * Initialize connection pool
+	 * 
+	 * OPTIMIZED: Sets initialization lock to prevent concurrent calls.
 	 */
 	private async initialize(jwtToken: string): Promise<void> {
+		// Set initialization lock
+		this.isInitializing = true;
 		
-		this.jwtToken = jwtToken;
-		this.isActive = true;
-		
-		// Create connection pool with persistence enabled
-		this.connectionPool = new WebSocketConnectionPool(10, 10);
-		this.connectionPool.enablePersistence();
-		
-		// Reset health
-		this.health = {
-			isHealthy: true,
-			lastActivity: Date.now(),
-			errorCount: 0,
-		};
-		this.reconnectAttempts = 0;
-		
-		// Start health monitoring
-		this.startHealthMonitoring();
-		
+		try {
+			this.jwtToken = jwtToken;
+			this.isActive = true;
+			
+			// Create connection pool with persistence enabled
+			this.connectionPool = new WebSocketConnectionPool(10, 10);
+			this.connectionPool.enablePersistence();
+			
+			// Reset health
+			this.health = {
+				isHealthy: true,
+				lastActivity: Date.now(),
+				errorCount: 0,
+			};
+			this.reconnectAttempts = 0;
+			
+			// Start health monitoring
+			this.startHealthMonitoring();
+		} finally {
+			// Release initialization lock
+			this.isInitializing = false;
+		}
 	}
 	
 	/**

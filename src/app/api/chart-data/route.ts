@@ -7,8 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getChartData, resolveUserSession, fetchJWTToken, createChartDataServiceConfig } from '@/lib/chart-data/chartDataService';
-import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
+import { getChartData } from '@/lib/chart-data/chartDataService';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
 import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
 import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
@@ -63,98 +62,53 @@ export async function POST(request: NextRequest) {
 			} as ChartDataResponse, { status: 401 });
 		}
 		
-		// Acquire persistent connection (if in /mio-formulas section)
-		// This will resolve session and get JWT token for connection management
-		let persistentConnectionAcquired = false;
-		const persistentManager = getPersistentConnectionManager();
+		// Check cache first (only if enabled via env var)
+		const cacheKey = `${symbol}:${resolution}:${barsCount || '300'}:${cvdEnabled || 'false'}`;
+		const cacheEnabled = isServerCacheEnabled();
 		
-		try {
-			// Get JWT token for persistent connection acquisition
-			const serviceConfig = createChartDataServiceConfig();
-			const sessionResult = await resolveUserSession(userEmail, userPassword, serviceConfig);
+		if (cacheEnabled) {
+			const cached = getCachedChartData(cacheKey);
 			
-			if (sessionResult.success) {
-				const jwtResult = await fetchJWTToken(
-					sessionResult.sessionId!,
-					sessionResult.sessionIdSign || '',
-					sessionResult.userId || 0,
-					serviceConfig
-				);
-				
-				if (jwtResult.success) {
-					// Acquire persistent connection with JWT token
-					await persistentManager.acquire(jwtResult.token!);
-					persistentConnectionAcquired = true;
-
-				}
+			if (cached) {
+				return NextResponse.json(cached, { status: 200 });
 			}
-		} catch (connectionError) {
-			// Non-fatal: Continue with regular pooling if persistent connection fails
-
 		}
 		
-		try {
-			// Check cache first (only if enabled via env var)
-			const cacheKey = `${symbol}:${resolution}:${barsCount || '300'}:${cvdEnabled || 'false'}`;
-			const cacheEnabled = isServerCacheEnabled();
+		// Call service layer (handles auth, connection management, and data fetching)
+		// OPTIMIZED: Single auth path - no duplicate session resolution or JWT fetching
+		const result = await getChartData({
+			symbol,
+			resolution,
+			barsCount,
+			cvdEnabled,
+			cvdAnchorPeriod,
+			cvdTimeframe,
+			userEmail,
+			userPassword
+		});
+		
+		// Format response based on service result
+		if (result.success && result.data) {
+			const response = {
+				success: true,
+				symbol: result.data.symbol,
+				resolution: result.data.resolution,
+				bars: result.data.bars,
+				metadata: result.data.metadata,
+				indicators: result.data.indicators
+			} as ChartDataResponse;
 			
+			// Cache successful responses (only if enabled)
 			if (cacheEnabled) {
-				const cached = getCachedChartData(cacheKey);
-				
-				if (cached) {
-					console.log(`[Chart API] Cache HIT for ${cacheKey}`);
-					return NextResponse.json(cached, { status: 200 });
-				}
-				
-				console.log(`[Chart API] Cache MISS for ${cacheKey}`);
-			} else {
-				console.log(`[Chart API] Cache DISABLED (default) for ${cacheKey}`);
+				setCachedChartData(cacheKey, response);
 			}
 			
-			// Get the persistent pool connection
-			const pool = persistentManager.getConnectionPool();
-			
-			// Call service layer and pass the pool
-			const result = await getChartData({
-				symbol,
-				resolution,
-				barsCount,
-				cvdEnabled,
-				cvdAnchorPeriod,
-				cvdTimeframe,
-				userEmail,
-				userPassword
-			}, undefined, pool);
-			
-			// Format response based on service result
-			if (result.success && result.data) {
-				const response = {
-					success: true,
-					symbol: result.data.symbol,
-					resolution: result.data.resolution,
-					bars: result.data.bars,
-					metadata: result.data.metadata,
-					indicators: result.data.indicators
-				} as ChartDataResponse;
-				
-				// Cache successful responses (only if enabled)
-				if (cacheEnabled) {
-					setCachedChartData(cacheKey, response);
-				}
-				
-				return NextResponse.json(response, { status: result.statusCode });
-			} else {
-				return NextResponse.json({
-					success: false,
-					error: result.error
-				} as ChartDataResponse, { status: result.statusCode });
-			}
-		} finally {
-			// Release persistent connection after request completes
-			if (persistentConnectionAcquired) {
-				persistentManager.release();
-
-			}
+			return NextResponse.json(response, { status: result.statusCode });
+		} else {
+			return NextResponse.json({
+				success: false,
+				error: result.error
+			} as ChartDataResponse, { status: result.statusCode });
 		}
 		
 	} catch (error) {

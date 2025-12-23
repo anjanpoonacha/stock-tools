@@ -121,6 +121,41 @@ export async function getPlatformSession(internalId: string, platform: string): 
 }
 
 /**
+ * Get session directly by user credentials (O(1) direct lookup)
+ * 
+ * Bypasses expensive getAllSessions() SCAN + N×GET pattern.
+ * Uses deterministic session ID generation for direct KV access.
+ * 
+ * @param userEmail - User email
+ * @param userPassword - User password  
+ * @param platform - Platform name ('marketinout' or 'tradingview')
+ * @returns Session data or null if not found
+ * 
+ * @performance Reduces 1 SCAN + N GETs to 1 GET (91% reduction for 10 sessions)
+ */
+export async function getSessionByCredentials(
+	userEmail: string,
+	userPassword: string,
+	platform: string
+): Promise<PlatformSessionData | null> {
+	// Generate deterministic session ID (same logic as save)
+	const sessionId = await generateDeterministicSessionId(
+		userEmail,
+		userPassword,
+		platform
+	);
+	
+	// Construct KV key
+	const key = generateSessionKey(sessionId, platform);
+	
+	// Single direct KV GET operation
+	const data = await kv.get(key);
+	
+	// Parse and return (null if not found)
+	return parseKVData(data, key) || null;
+}
+
+/**
  * Get all session data for an internal session ID.
  */
 export async function getSession(internalId: string): Promise<SessionData | undefined> {
