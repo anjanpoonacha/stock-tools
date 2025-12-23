@@ -94,8 +94,8 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
       react-resizable-panels:
-        specifier: ^4.0.8
-        version: 4.0.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        specifier: ^4.0.10
+        version: 4.0.15(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       shadcn-ui:
         specifier: ^0.9.5
         version: 0.9.5
@@ -3256,8 +3256,8 @@ packages:
       '@types/react':
         optional: true
 
-  react-resizable-panels@4.0.8:
-    resolution: {integrity: sha512-JD1ZNGvQ1f9wj8Tti6AaI0y49ZYVPFNb41c8OXbIPiUABr3yt9bbxPLng+E9mM9PspRPEknjsZjL2RyV+T0gOQ==}
+  react-resizable-panels@4.0.15:
+    resolution: {integrity: sha512-+ygM/EI2h4Qc/cl2fasQ2qwOgNfpQwXLNTU5PqhhPerliX+wnbf7ejcqran7lz3BqABzjddf0pJ3j3G/+A0v9Q==}
     peerDependencies:
       react: ^18.0.0 || ^19.0.0
       react-dom: ^18.0.0 || ^19.0.0
@@ -6946,7 +6946,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.2.7
 
-  react-resizable-panels@4.0.8(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+  react-resizable-panels@4.0.15(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
       react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
