@@ -18,6 +18,7 @@ import type {
 } from './types';
 import { validateChartDataRequest, validateUserCredentials } from './validators';
 import { getCachedSession, cacheSession, getCachedJWT, cacheJWT } from './sessionCache';
+import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
 
 /**
  * Configuration for chart data service (enables dependency injection)
@@ -55,15 +56,19 @@ export async function resolveUserSession(
 	userPassword: string,
 	config: ChartDataServiceConfig
 ): Promise<SessionResolutionResult> {
-	// Check cache first
-	const cached = getCachedSession(userEmail);
-	if (cached) {
-		return {
-			success: true,
-			sessionId: cached.sessionId,
-			sessionIdSign: cached.sessionIdSign,
-			userId: cached.userId
-		};
+	// Check cache first (only if enabled via env var)
+	const cacheEnabled = isServerCacheEnabled();
+	
+	if (cacheEnabled) {
+		const cached = getCachedSession(userEmail);
+		if (cached) {
+			return {
+				success: true,
+				sessionId: cached.sessionId,
+				sessionIdSign: cached.sessionIdSign,
+				userId: cached.userId
+			};
+		}
 	}
 
 	// Get TradingView session from KV storage
@@ -103,8 +108,10 @@ export async function resolveUserSession(
 		warnings.push('Please update the browser extension to capture both sessionid and sessionid_sign cookies.');
 	}
 	
-	// Cache the session for future requests
-	cacheSession(userEmail, sessionId, sessionIdSign || '', userId);
+	// Cache the session for future requests (only if enabled)
+	if (cacheEnabled) {
+		cacheSession(userEmail, sessionId, sessionIdSign || '', userId);
+	}
 	
 	return {
 		success: true,
@@ -130,13 +137,17 @@ export async function fetchJWTToken(
 	userId: number,
 	config: ChartDataServiceConfig
 ): Promise<JWTTokenResult> {
-	// Check cache first
-	const cachedToken = getCachedJWT(sessionId);
-	if (cachedToken) {
-		return {
-			success: true,
-			token: cachedToken
-		};
+	// Check cache first (only if enabled via env var)
+	const cacheEnabled = isServerCacheEnabled();
+	
+	if (cacheEnabled) {
+		const cachedToken = getCachedJWT(sessionId);
+		if (cachedToken) {
+			return {
+				success: true,
+				token: cachedToken
+			};
+		}
 	}
 
 	try {
@@ -146,8 +157,10 @@ export async function fetchJWTToken(
 			userId
 		);
 		
-		// Cache the JWT token
-		cacheJWT(sessionId, token);
+		// Cache the JWT token (only if enabled)
+		if (cacheEnabled) {
+			cacheJWT(sessionId, token);
+		}
 		
 		return {
 			success: true,

@@ -11,6 +11,7 @@ import { getChartData, resolveUserSession, fetchJWTToken, createChartDataService
 import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
 import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
+import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
 
 /**
  * POST /api/chart-data
@@ -93,16 +94,22 @@ export async function POST(request: NextRequest) {
 		}
 		
 		try {
-			// Check cache first
+			// Check cache first (only if enabled via env var)
 			const cacheKey = `${symbol}:${resolution}:${barsCount || '300'}:${cvdEnabled || 'false'}`;
-			const cached = getCachedChartData(cacheKey);
+			const cacheEnabled = isServerCacheEnabled();
 			
-			if (cached) {
-				console.log(`[Chart API] Cache HIT for ${cacheKey}`);
-				return NextResponse.json(cached, { status: 200 });
+			if (cacheEnabled) {
+				const cached = getCachedChartData(cacheKey);
+				
+				if (cached) {
+					console.log(`[Chart API] Cache HIT for ${cacheKey}`);
+					return NextResponse.json(cached, { status: 200 });
+				}
+				
+				console.log(`[Chart API] Cache MISS for ${cacheKey}`);
+			} else {
+				console.log(`[Chart API] Cache DISABLED (default) for ${cacheKey}`);
 			}
-			
-			console.log(`[Chart API] Cache MISS for ${cacheKey}`);
 			
 			// Get the persistent pool connection
 			const pool = persistentManager.getConnectionPool();
@@ -130,8 +137,10 @@ export async function POST(request: NextRequest) {
 					indicators: result.data.indicators
 				} as ChartDataResponse;
 				
-				// Cache successful responses
-				setCachedChartData(cacheKey, response);
+				// Cache successful responses (only if enabled)
+				if (cacheEnabled) {
+					setCachedChartData(cacheKey, response);
+				}
 				
 				return NextResponse.json(response, { status: result.statusCode });
 			} else {

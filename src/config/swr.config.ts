@@ -1,4 +1,5 @@
 import type { SWRConfiguration } from 'swr';
+import { isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 
 // Custom error type with status code
 interface FetchError extends Error {
@@ -60,16 +61,26 @@ const onErrorRetry = (
   }, retryInterval);
 };
 
+// Check if client-side caching is enabled via env var (disabled by default)
+const cacheEnabled = isClientCacheEnabled();
+
+if (!cacheEnabled && typeof window !== 'undefined') {
+  console.log('[SWR Config] Client-side caching DISABLED (default)');
+}
+
 export const swrConfig: SWRConfiguration = {
   // Default fetcher
   fetcher: defaultFetcher,
 
-  // Deduplication interval - prevent duplicate requests within 2 seconds
-  dedupingInterval: 2000,
+  // Deduplication interval - only enabled when NEXT_PUBLIC_ENABLE_CLIENT_CACHE=true
+  dedupingInterval: cacheEnabled ? 2000 : 0,
 
   // Revalidation options
   revalidateOnFocus: false, // Prevent unnecessary refetches when window regains focus
   revalidateOnReconnect: true, // Revalidate when network reconnects
+  
+  // Disable cache by default (use fresh Map each time)
+  provider: cacheEnabled ? undefined : () => new Map(),
   
   // Error retry configuration with exponential backoff
   onErrorRetry, // Custom retry logic with exponential backoff (5s, 10s, 20s)

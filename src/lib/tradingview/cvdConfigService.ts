@@ -22,6 +22,7 @@
 
 import { kv } from '@vercel/kv';
 import { CVD_PINE_FEATURES } from './cvd-constants';
+import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
 
 // Re-export CVD_PINE_FEATURES for use in building StudyConfig
 export { CVD_PINE_FEATURES };
@@ -75,14 +76,20 @@ class CVDConfigService {
 			return this.fetchInProgress;
 		}
 
-		// Try to get from KV cache first
-		try {
-			const cached = await this.getFromCache();
-			if (cached) {
-				return cached;
-			} else {
+		// Try to get from KV cache first (only if enabled via env var)
+		const cacheEnabled = isServerCacheEnabled();
+		
+		if (cacheEnabled) {
+			try {
+				const cached = await this.getFromCache();
+				if (cached) {
+					return cached;
+				} else {
+				}
+			} catch (error) {
 			}
-		} catch (error) {
+		} else {
+			console.log('[CVD Config] Cache DISABLED (default) - fetching fresh config');
 		}
 
 		// Cache miss - fetch fresh config
@@ -131,8 +138,10 @@ class CVDConfigService {
 	private async fetchAndCacheConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
 		const config = await this.fetchConfigFromTradingView(sessionId, sessionIdSign);
 		
-		// Try to cache it (but don't fail if caching fails)
-		await this.storeInCache(config);
+		// Try to cache it (but only if caching is enabled)
+		if (isServerCacheEnabled()) {
+			await this.storeInCache(config);
+		}
 		
 		return config;
 	}

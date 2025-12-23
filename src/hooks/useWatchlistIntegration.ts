@@ -7,6 +7,7 @@ import { useToast } from '@/components/ui/toast';
 import { fetchUnifiedWatchlists, addStockToWatchlist } from '@/lib/watchlist-sync/unifiedWatchlistService';
 import type { UnifiedWatchlist, WatchlistSessions } from '@/lib/watchlist-sync/types';
 import type { Stock } from '@/types/stock';
+import { getSwrDedupingInterval, isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 
 interface UseWatchlistIntegrationProps {
   currentSymbol: string;
@@ -76,7 +77,11 @@ export function useWatchlistIntegration({
   const { data: watchlists = [], error: swrError, isLoading, mutate: refreshWatchlists } = useSWR(
     watchlistKey(sessions),
     watchlistFetcher,
-    { revalidateOnFocus: false, dedupingInterval: 5000, keepPreviousData: true }
+    { 
+      revalidateOnFocus: false, 
+      dedupingInterval: getSwrDedupingInterval(5000), 
+      keepPreviousData: isClientCacheEnabled() 
+    }
   );
 
   // SWR Mutation: Add stock to watchlist

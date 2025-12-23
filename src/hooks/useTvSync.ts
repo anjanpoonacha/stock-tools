@@ -13,6 +13,7 @@ import {
     createCleanupError,
     createAppendError
 } from '@/lib/tv-sync/errorHelpers';
+import { getSwrDedupingInterval } from '@/lib/cache/cacheConfig';
 interface Watchlist {
     id: string;
     name: string;
@@ -151,7 +152,7 @@ export function useTvSync({ selectedFormulaUrls, customUrls, grouping }: UseTvSy
         {
             // Revalidate when URLs or grouping changes
             revalidateOnFocus: false,
-            dedupingInterval: 2000, // Prevent duplicate requests within 2s
+            dedupingInterval: getSwrDedupingInterval(2000), // Prevent duplicate requests within 2s (when caching enabled)
         }
     );
 

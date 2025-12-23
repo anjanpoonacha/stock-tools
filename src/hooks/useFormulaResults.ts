@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getStoredCredentials } from '@/lib/auth/authUtils';
 import { formulaResultsFetcher, formulaResultsKey } from '@/lib/swr';
 import type { Stock } from '@/types/stock';
+import { getSwrDedupingInterval, isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 
 /**
  * Hook return interface
@@ -62,10 +63,10 @@ export function useFormulaResults(
 		{
 			// Don't revalidate on focus to avoid unnecessary API calls
 			revalidateOnFocus: false,
-			// Keep previous data while revalidating
-			keepPreviousData: true,
-			// Dedupe requests within 5 seconds
-			dedupingInterval: 5000,
+			// Keep previous data while revalidating (only when caching enabled)
+			keepPreviousData: isClientCacheEnabled(),
+			// Dedupe requests within 5 seconds (only when caching enabled)
+			dedupingInterval: getSwrDedupingInterval(5000),
 		}
 	);
 

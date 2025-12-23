@@ -6,12 +6,13 @@
  * which handles server-side caching (KV) and external API calls.
  * 
  * Caching Strategy:
- * - Memory cache (client-side, session-scoped, instant)
+ * - Memory cache (client-side, session-scoped, instant) - respects NEXT_PUBLIC_ENABLE_CLIENT_CACHE
  * - KV cache (server-side, 24h TTL, handled by API route)
  * - External API (server-side, handled by API route)
  */
 
 import type { CriterionOption } from '@/types/mioCriteria';
+import { isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 
 /**
  * API response structure from our endpoint
@@ -48,10 +49,12 @@ export class CriteriaOptionsClient {
    * @throws Error if API call fails
    */
   async getOptions(criterionId: string): Promise<CriterionOption[]> {
-    // Check memory cache first
-    const memoryCached = this.memoryCache.get(criterionId);
-    if (memoryCached) {
-      return memoryCached;
+    // Check memory cache first (only if caching is enabled)
+    if (isClientCacheEnabled()) {
+      const memoryCached = this.memoryCache.get(criterionId);
+      if (memoryCached) {
+        return memoryCached;
+      }
     }
 
     
@@ -77,8 +80,10 @@ export class CriteriaOptionsClient {
     
     const options = data.options || [];
     
-    // Update memory cache
-    this.memoryCache.set(criterionId, options);
+    // Update memory cache (only if caching is enabled)
+    if (isClientCacheEnabled()) {
+      this.memoryCache.set(criterionId, options);
+    }
     
     
     return options;
