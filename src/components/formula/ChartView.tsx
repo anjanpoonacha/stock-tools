@@ -589,14 +589,15 @@ export default function ChartView({
 														</div>
 														
 														{/* Settings component (injected based on type) */}
-														{indicator.enabled && indicator.type === 'cvd' && (
-															<CVDSettings
-																settings={indicator.settings ?? {}}
-																onChange={(newSettings) => 
-																	updateIndicatorInSlot(slotIndex, 'cvd', { settings: newSettings })
-																}
-															/>
-														)}
+													{indicator.enabled && indicator.type === 'cvd' && (
+														<CVDSettings
+															settings={indicator.settings ?? {}}
+															chartResolution={slot.resolution}
+															onChange={(newSettings) => 
+																updateIndicatorInSlot(slotIndex, 'cvd', { settings: newSettings })
+															}
+														/>
+													)}
 														
 														{indicator.enabled && indicator.type === 'volume' && (
 															<VolumeSettings

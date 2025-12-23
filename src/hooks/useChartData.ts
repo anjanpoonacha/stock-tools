@@ -44,11 +44,25 @@ async function fetchChartDataForSWR(params: ChartDataFetcherParams): Promise<Cha
 	
 	// Validate response
 	if (!result.success) {
+		// Check if it's a CVD validation error
+		if (result.error?.includes('CVD validation failed')) {
+			throw new Error(
+				`${result.error}\n\n💡 Tip: Ensure CVD delta timeframe is less than chart resolution.\nExample: For daily charts, use 1min or 60min deltas (not daily or weekly).`
+			);
+		}
+		
+		// Generic error
 		throw new Error(result.error || 'Failed to fetch chart data');
 	}
 
 	if (!result.bars || result.bars.length === 0) {
-		throw new Error('No chart data received');
+		throw new Error(
+			'No chart data received. This may be due to:\n' +
+			'• Invalid symbol or delisted stock\n' +
+			'• Network connectivity issues\n' +
+			'• TradingView API limitations\n\n' +
+			'Please verify the symbol and try again.'
+		);
 	}
 
 	return result;

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -10,13 +11,15 @@ import {
 	SelectValue,
 } from '@/components/ui/select';
 import { CVD_ANCHOR_PERIODS, CVD_CUSTOM_PERIODS } from '@/lib/chart/constants';
+import { getValidDeltaTimeframes } from '@/lib/tradingview/cvdValidation';
 
 interface CVDSettingsProps {
 	settings: Record<string, any>;
 	onChange: (newSettings: Record<string, any>) => void;
+	chartResolution: string;
 }
 
-export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
+export function CVDSettings({ settings, onChange, chartResolution }: CVDSettingsProps) {
 	const anchorPeriod = settings.anchorPeriod || '3M';
 	const useCustomPeriod = settings.useCustomPeriod || false;
 	const customPeriod = settings.customPeriod || '15S';
@@ -40,6 +43,15 @@ export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
 			}
 		};
 	}, []);
+
+	// Filter custom periods based on chart resolution
+	// Only show timeframes that are less than the chart's resolution
+	const validCustomPeriods = useMemo(() => {
+		const validTimeframes = getValidDeltaTimeframes(chartResolution);
+		return CVD_CUSTOM_PERIODS.filter(period => 
+			validTimeframes.includes(period.value as any)
+		);
+	}, [chartResolution]);
 
 	const handleAnchorPeriodChange = (value: string) => {
 		onChange({ ...settings, anchorPeriod: value });
@@ -128,19 +140,24 @@ export function CVDSettings({ settings, onChange }: CVDSettingsProps) {
 							>
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent>
-								{CVD_CUSTOM_PERIODS.map((period) => (
-									<SelectItem
-										key={period.value}
-										value={period.value}
-										className="text-xs"
-									>
-										{period.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
+						<SelectContent>
+							{validCustomPeriods.map((period) => (
+								<SelectItem
+									key={period.value}
+									value={period.value}
+									className="text-xs"
+								>
+									{period.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+					{validCustomPeriods.length === 0 && (
+						<p className="text-xs text-muted-foreground mt-1">
+							No valid custom periods available for {chartResolution} chart
+						</p>
+					)}
+				</div>
 
 					{/* Manual Input Option */}
 					<div className="flex items-center space-x-2">

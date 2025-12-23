@@ -11,6 +11,7 @@ import { getChartData } from '@/lib/chart-data/chartDataService';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
 import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
 import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { validateCVDSettings } from '@/lib/tradingview/cvdValidation';
 
 /**
  * POST /api/chart-data
@@ -48,6 +49,27 @@ export async function POST(request: NextRequest) {
 		const cvdEnabled = request.nextUrl.searchParams.get('cvdEnabled');
 		const cvdAnchorPeriod = request.nextUrl.searchParams.get('cvdAnchorPeriod');
 		const cvdTimeframe = request.nextUrl.searchParams.get('cvdTimeframe');
+		
+		// Validate CVD parameters if CVD is enabled
+		if (cvdEnabled === 'true' && cvdAnchorPeriod && resolution) {
+			const validation = validateCVDSettings(
+				resolution,
+				cvdAnchorPeriod,
+				cvdTimeframe || undefined
+			);
+			
+			if (!validation.valid) {
+				console.error('[Chart Data API] CVD validation failed:', validation.error);
+				return NextResponse.json(
+					{
+						success: false,
+						error: `CVD validation failed: ${validation.error}`,
+						hint: 'Ensure delta timeframe is less than chart timeframe'
+					},
+					{ status: 400 }
+				);
+			}
+		}
 		
 		// Parse request body
 		const body = await request.json();

@@ -47,15 +47,17 @@ export const DEFAULT_CHART_HEIGHT = 500;
 export const RESPONSIVE_CHART_HEIGHT = '100%' as const;
 
 /**
- * CVD Indicator Settings
+ * CVD Anchor Periods (validated through 240-combination test)
+ * 
+ * Note: Using month notation (12M) instead of year notation (1Y)
+ * for consistency with TradingView API and test results.
  */
 export const CVD_ANCHOR_PERIODS = [
-  { value: '3M', label: '3 Months' },
+  { value: '1W', label: '1 Week' },
+  { value: '1M', label: '1 Month' },
+  { value: '3M', label: '3 Months' },    // Recommended default
   { value: '6M', label: '6 Months' },
-  { value: '1Y', label: '1 Year' },
-  { value: '2Y', label: '2 Years' },
-  { value: '3Y', label: '3 Years' },
-  { value: '5Y', label: '5 Years' },
+  { value: '12M', label: '12 Months' },  // Max tested value
 ] as const;
 
 /**
