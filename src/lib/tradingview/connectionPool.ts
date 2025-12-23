@@ -137,11 +137,12 @@ class PooledWebSocketClient extends BaseWebSocketClient {
 			}
 		}
 			
-			// Wait for data
-			// Both create_series and modify_series take ~3-5 seconds for data
-			// For high bar counts (1000-2000) with CVD, allow more time
-			const waitTime = request.cvdEnabled && request.barsCount > 500 ? 8000 : 5000;
-			await this.waitForData(waitTime);
+		// Wait for data
+		// Both create_series and modify_series take ~3-5 seconds for data
+		// For high bar counts (1000-2000) with CVD, allow more time
+		// Reduce timeout for bulk testing (3s is enough to know if CVD works)
+		const waitTime = request.cvdEnabled && request.barsCount > 500 ? 5000 : 3000;
+		await this.waitForData(waitTime);
 			
 			// Get results
 			const bars = this.getBars();
