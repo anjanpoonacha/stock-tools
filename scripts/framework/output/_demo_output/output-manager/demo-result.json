@@ -1,0 +1,9 @@
+{
+  "status": "success",
+  "timestamp": "2025-12-23T07:37:30.867Z",
+  "data": {
+    "recordsProcessed": 150,
+    "errors": 0,
+    "warnings": 2
+  }
+}

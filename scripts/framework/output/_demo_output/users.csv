@@ -1,0 +1,5 @@
+id,name,email,notes
+1,John Doe,john@example.com,Regular data
+2,Jane Smith,jane@example.com,"Contains, commas, here"
+3,"Bob ""The Builder"" Jones",bob@example.com,"Contains ""quotes"""
+4,Alice,alice@example.com,"Both, comma and ""quotes"" together"

@@ -1,0 +1,27 @@
+[
+  {
+    "level": "info",
+    "message": "Starting operation",
+    "timestamp": "2025-12-23T07:37:30.866Z"
+  },
+  {
+    "level": "success",
+    "message": "Step 1 completed",
+    "timestamp": "2025-12-23T07:37:30.866Z"
+  },
+  {
+    "level": "warning",
+    "message": "Non-critical issue detected",
+    "timestamp": "2025-12-23T07:37:30.867Z"
+  },
+  {
+    "level": "debug",
+    "message": "Variable state: initialized",
+    "timestamp": "2025-12-23T07:37:30.867Z"
+  },
+  {
+    "level": "error",
+    "message": "Sample error for demonstration",
+    "timestamp": "2025-12-23T07:37:30.867Z"
+  }
+]

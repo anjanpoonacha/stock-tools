@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-12-23T07:10:05.728Z",
+  "test": "json_write",
+  "nested": {
+    "array": [
+      1,
+      2,
+      3
+    ],
+    "object": {
+      "key": "value"
+    }
+  }
+}
