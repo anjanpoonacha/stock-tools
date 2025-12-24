@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
 import { StockResultsView } from '@/components/stocks/StockResultsView';
 import { mioToTv } from '@/lib/utils/exchangeMapper';
+import { enrichStockMetadata } from '@/lib/utils';
 
 interface WatchlistStocksViewProps {
 	watchlistId: string | null;
@@ -47,11 +48,14 @@ export default function WatchlistStocksView({ watchlistId, mioWlid, tvWlid }: Wa
 				// Normalize MIO format (WIPRO.NS) to TradingView format (NSE:WIPRO)
 				const tvSymbol = mioToTv(symbol);
 				
+				// Enrich with sector/industry metadata
+				const metadata = enrichStockMetadata(tvSymbol);
+				
 				return {
 					symbol: tvSymbol,
 					name: symbol, // Keep original for display
-					sector: 'Watchlist',
-					industry: 'N/A',
+					sector: metadata.sector,
+					industry: metadata.industry,
 				};
 			});
 		}

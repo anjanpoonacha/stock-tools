@@ -15,6 +15,7 @@ import { watchlistSymbolsFetcher } from '@/lib/swr/watchlist-fetchers';
 import type { Stock } from '@/types/stock';
 import { getSwrDedupingInterval, isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 import { mioToTv } from '@/lib/utils/exchangeMapper';
+import { enrichStockMetadata } from '@/lib/utils';
 
 /**
  * Hook return interface
@@ -87,13 +88,16 @@ const fetchWatchlistStocks = async (
 	// Deduplicate symbols
 	const uniqueSymbols = Array.from(new Set(normalizedSymbols));
 
-	// Convert to Stock format
-	return uniqueSymbols.map(symbol => ({
-		symbol,
-		name: symbol, // Can be enhanced later to fetch full names
-		sector: 'Watchlist',
-		industry: 'N/A',
-	}));
+	// Convert to Stock format with sector/industry enrichment
+	return uniqueSymbols.map(symbol => {
+		const metadata = enrichStockMetadata(symbol);
+		return {
+			symbol,
+			name: symbol, // Can be enhanced later to fetch full names
+			sector: metadata.sector,
+			industry: metadata.industry,
+		};
+	});
 };
 
 /**

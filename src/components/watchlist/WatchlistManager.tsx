@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useWatchlistIntegration } from '@/hooks/useWatchlistIntegration';
 import { ChartLoadingOverlay } from '@/components/ui/chart-loading-overlay';
-import { Loader2, Plus, BarChart3, Trash2, RefreshCw, Search } from 'lucide-react';
+import { Loader2, Plus, BarChart3, RefreshCw, Search } from 'lucide-react';
 import type { UnifiedWatchlist, Platform } from '@/lib/watchlist-sync/types';
 
 type PlatformFilter = 'all' | 'mio' | 'tv' | 'both';
@@ -268,23 +268,6 @@ export function WatchlistManager() {
 								title='View stocks'
 							>
 								<BarChart3 className='h-4 w-4' />
-							</Button>
-							<Button
-								size='sm'
-								variant='ghost'
-								onClick={() => router.push('/mio-watchlist')}
-								title='Manage in MIO'
-								disabled={!watchlist.mioId}
-							>
-								<Plus className='h-4 w-4' />
-							</Button>
-							<Button
-								size='sm'
-								variant='ghost'
-								title='Delete watchlist'
-								disabled
-							>
-								<Trash2 className='h-4 w-4 text-muted-foreground' />
 							</Button>
 						</div>
 					)}
