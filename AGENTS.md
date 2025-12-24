@@ -58,4 +58,11 @@
     - NEVER create summary or results markdown files (e.g., *_SUMMARY.md, *_RESULTS.md)
     - Only create documentation when user specifically asks for it
   </documentation>
+
+  <testing>
+    - NEVER create massive test files with multiple tests at once
+    - Add tests incrementally, ONE at a time
+    - Workflow: Bug report → Add 1 test to reproduce → Fix it → Add next test if scope not covered
+    - Keep test files focused and manageable
+  </testing>
 </project_rules>
