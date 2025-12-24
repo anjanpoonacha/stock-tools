@@ -12,7 +12,7 @@ import { chartDataFetcher, type ChartDataFetcherParams } from '@/lib/swr/fetcher
 import { chartDataKey } from '@/lib/swr/keys';
 import { getStoredCredentials } from '@/lib/auth/authUtils';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
-import { getSwrDedupingInterval, isClientCacheEnabled } from '@/lib/cache/cacheConfig';
+import { isClientCacheEnabled } from '@/lib/cache/cacheConfig';
 
 // Re-export for backward compatibility
 export type { ChartDataResponse };
@@ -138,7 +138,7 @@ export function useChartData(params: UseChartDataParams): UseChartDataReturn {
 		() => fetchChartDataForSWR(fetcherParams),
 		{
 			revalidateOnFocus: false,
-			dedupingInterval: getSwrDedupingInterval(60000), // 1 minute if enabled, else 0
+			dedupingInterval: 0, // No deduping - allow truly parallel dual layout requests
 			keepPreviousData: isClientCacheEnabled(), // Only smooth transitions when cache is enabled
 		}
 	);

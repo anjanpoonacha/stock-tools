@@ -5,12 +5,14 @@
  * and improve response times for repeated requests.
  * 
  * Features:
- * - 5-minute TTL (Time To Live)
+ * - Configurable TTL (Time To Live) via CHART_DATA_CACHE_TTL env var
  * - Automatic stale entry cleanup
  * - Cache statistics for monitoring
+ * - CVD-aware: Only caches successful CVD fetches (validated in route.ts)
  */
 
 import type { ChartDataResponse } from '@/lib/tradingview/types';
+import { getChartDataCacheTTL } from '@/lib/cache/cacheConfig';
 
 interface CacheEntry {
 	data: ChartDataResponse;
@@ -18,7 +20,13 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Get cache TTL from config (supports dynamic TTL via env var)
+ */
+function getCacheTTL(): number {
+	return getChartDataCacheTTL();
+}
 
 /**
  * Retrieves cached chart data if available and not expired
@@ -30,7 +38,8 @@ export function getCachedChartData(key: string): ChartDataResponse | null {
 	const cached = cache.get(key);
 	if (!cached) return null;
 	
-	if (Date.now() - cached.timestamp > CACHE_TTL) {
+	const ttl = getCacheTTL();
+	if (Date.now() - cached.timestamp > ttl) {
 		cache.delete(key);
 		return null;
 	}

@@ -75,6 +75,11 @@ export class PersistentConnectionManager {
 	 */
 	public async acquire(jwtToken: string): Promise<void> {
 		this.refCount++;
+		console.log('[PERSISTENT MGR DEBUG] Acquire called:', {
+			refCount: this.refCount,
+			isActive: this.isActive,
+			isInitializing: this.isInitializing
+		});
 		
 		// Cancel idle timer if it was running
 		if (this.idleTimer) {
@@ -125,12 +130,14 @@ export class PersistentConnectionManager {
 		this.isInitializing = true;
 		
 		try {
+			console.log('[PERSISTENT MGR DEBUG] Initializing persistent connection manager');
 			this.jwtToken = jwtToken;
 			this.isActive = true;
 			
 			// Create connection pool with persistence enabled
 			this.connectionPool = new WebSocketConnectionPool(10, 10);
 			this.connectionPool.enablePersistence();
+			console.log('[PERSISTENT MGR DEBUG] Persistence enabled on connection pool');
 			
 			// Reset health
 			this.health = {
@@ -233,6 +240,12 @@ export class PersistentConnectionManager {
 		if (!this.connectionPool || !this.isActive) {
 			throw new Error('PersistentConnectionManager not initialized. Call acquire() first.');
 		}
+		
+		console.log('[PERSISTENT MGR DEBUG] getConnectionPool called:', {
+			isActive: this.isActive,
+			refCount: this.refCount,
+			poolStats: this.connectionPool.getStats()
+		});
 		
 		// Update last activity time
 		this.health.lastActivity = Date.now();

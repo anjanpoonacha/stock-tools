@@ -8,6 +8,10 @@
  *   - Set DEBUG_CHART_DATA=true in .env (local development only)
  *   - Import and use debug() functions throughout chart data flow
  * 
+ * Output:
+ *   - Console: Real-time logs in terminal
+ *   - File: chart-debug.log (persistent logs for analysis)
+ * 
  * Categories:
  *   - api: API route level
  *   - service: Service layer operations
@@ -18,6 +22,12 @@
  *   - pool: Connection pool operations
  *   - cvd: CVD indicator operations
  */
+
+import fs from 'fs';
+import path from 'path';
+
+// Log file path (root of project)
+const LOG_FILE = path.join(process.cwd(), 'chart-debug.log');
 
 // Performance thresholds for warnings (in milliseconds)
 const THRESHOLDS = {
@@ -56,17 +66,44 @@ function timestamp(): string {
 }
 
 /**
- * Core debug log function
+ * Write log to file (server-side only)
+ */
+function writeToFile(logLine: string): void {
+	if (typeof window !== 'undefined') return; // Skip in browser
+	
+	try {
+		const fs = require('fs');
+		const path = require('path');
+		const logFile = path.join(process.cwd(), 'chart-debug.log');
+		
+		// Append to file with newline
+		fs.appendFileSync(logFile, logLine + '\n', 'utf8');
+	} catch (error) {
+		// Silently fail if file logging fails (don't break app)
+	}
+}
+
+/**
+ * Core debug log function (logs to both console and file)
  */
 function log(category: string, message: string, data?: any): void {
 	if (!isDebugEnabled()) return;
 	
 	const prefix = `[${timestamp()}][Chart:${category}]`;
+	
+	// Format log line for file
+	let logLine = `${prefix} ${message}`;
 	if (data !== undefined) {
+		// Pretty-print objects for readability
+		const dataStr = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+		logLine += ` ${dataStr}`;
 		console.log(prefix, message, data);
 	} else {
 		console.log(prefix, message);
 	}
+	
+	// Write to file (server-side only)
+	writeToFile(logLine);
 }
 
 /**
@@ -83,6 +120,14 @@ export const debugApi = {
 	
 	cacheMiss: (cacheKey: string) => {
 		log('api', `❌ Cache MISS: ${cacheKey}`);
+	},
+	
+	cacheSet: (cacheKey: string) => {
+		log('api', `💾 Cache SET: ${cacheKey}`);
+	},
+	
+	cacheSkipped: (cacheKey: string, reason: string) => {
+		log('api', `⏭️  Cache SKIP: ${cacheKey} - ${reason}`);
 	},
 	
 	requestComplete: (duration: number) => {
@@ -215,7 +260,7 @@ export const debugCvd = {
 		log('cvd', `⚙️  Fetching CVD config: anchor=${anchorPeriod}, timeframe=${timeframe || 'default'}`);
 	},
 	
-	configFetched: (duration: number, source: 'cache' | 'TradingView') => {
+	configFetched: (duration: number, source: 'memory-cache' | 'kv-cache' | 'tradingview-api') => {
 		log('cvd', `⚙️  CVD config fetched: ${formatDuration(duration, THRESHOLDS.cvd_config)} (${source})`);
 	},
 	

@@ -5,24 +5,28 @@
  * from TradingView to avoid hardcoded encrypted text that becomes stale.
  * 
  * Features:
+ * - Two-tier cache: In-memory (1-5ms) + Vercel KV (300-1600ms)
  * - Fetches CVD config from TradingView chart page HTML
- * - Caches config in Vercel KV for 24 hours (shared across instances)
- * - Falls back to fetching again if KV unavailable
+ * - In-memory cache checked first (fast, per-instance)
+ * - KV cache checked on memory miss (persistent, shared across instances)
+ * - Falls back to fetching from TradingView if both caches miss
  * - No hardcoded constants dependency
  * - Type-safe configuration interface
  * 
  * Architecture:
- * 1. Check KV cache first (instant)
- * 2. If cache miss/expired, fetch from TradingView (<2 seconds)
- * 3. If fetch fails, retry once more
- * 4. If KV unavailable, skip caching but still fetch fresh config
+ * 1. Check in-memory cache first (1-5ms) - Tier 1
+ * 2. If memory miss, check KV cache (300-1600ms) - Tier 2
+ * 3. If KV miss, fetch from TradingView (<2 seconds)
+ * 4. Store in both tiers for next time
+ * 5. If fetch fails, retry once more
+ * 6. If KV unavailable, skip KV caching but still use memory cache
  * 
  * @module cvdConfigService
  */
 
 import { kv } from '@vercel/kv';
 import { CVD_PINE_FEATURES } from './cvd-constants';
-import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { isCVDConfigCacheEnabled } from '@/lib/cache/cacheConfig';
 import { debugCvd } from '@/lib/utils/chartDebugLogger';
 
 // Re-export CVD_PINE_FEATURES for use in building StudyConfig
@@ -36,7 +40,7 @@ export interface CVDConfig {
 	text: string;           // Encrypted Pine script
 	pineId: string;         // Study ID (e.g., "STD;Cumulative%1Volume%1Delta")
 	pineVersion: string;    // Pine version (e.g., "7.0")
-	source: 'kv-cache' | 'fresh-fetch'; // Where the config came from
+	source: 'memory-cache' | 'kv-cache' | 'fresh-fetch'; // Where the config came from
 	fetchedAt?: Date;       // When config was fetched (for debugging)
 }
 
@@ -51,20 +55,35 @@ const CVD_CONFIG_KV_KEY = 'tradingview:cvd:config';
 const CACHE_TTL_SECONDS = 24 * 60 * 60;
 
 /**
+ * In-memory cache entry interface
+ */
+interface MemoryCacheEntry {
+	config: CVDConfig;
+	expiresAt: number;
+}
+
+/**
  * CVD Config Service
- * Singleton service for managing CVD configuration
+ * Singleton service for managing CVD configuration with two-tier caching
  */
 class CVDConfigService {
 	private fetchInProgress: Promise<CVDConfig> | null = null;
+	
+	/**
+	 * In-memory cache (Tier 1: Fast, 1-5ms)
+	 * Per-instance, clears on server restart
+	 */
+	private memoryCache: Map<string, MemoryCacheEntry> = new Map();
 
 	/**
-	 * Get CVD configuration (with KV caching)
+	 * Get CVD configuration (with two-tier caching)
 	 * 
 	 * Flow:
-	 * 1. Try to get from KV cache
-	 * 2. If cache miss, fetch from TradingView
-	 * 3. Store in KV for next time
-	 * 4. If KV fails, still fetch fresh config
+	 * 1. Check in-memory cache (Tier 1: 1-5ms)
+	 * 2. If memory miss, check KV cache (Tier 2: 300-1600ms)
+	 * 3. If KV miss, fetch from TradingView
+	 * 4. Store in both tiers for next time
+	 * 5. If KV fails, still use memory cache
 	 * 
 	 * @param sessionId TradingView session ID
 	 * @param sessionIdSign Optional session signature
@@ -72,38 +91,54 @@ class CVDConfigService {
 	 */
 	async getConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
 		const startTime = Date.now();
+		const cacheKey = CVD_CONFIG_KV_KEY;
 		
 		// If fetch already in progress, wait for it
 		if (this.fetchInProgress) {
 			return this.fetchInProgress;
 		}
 
-		// Try to get from KV cache first (only if enabled via env var)
-		const cacheEnabled = isServerCacheEnabled();
+		// Tier 1: Check in-memory cache FIRST (1-5ms)
+		const memCached = this.memoryCache.get(cacheKey);
+		if (memCached && Date.now() < memCached.expiresAt) {
+			const duration = Date.now() - startTime;
+			debugCvd.configFetched(duration, 'memory-cache');
+			debugCvd.configDetails(memCached.config);
+			return memCached.config;
+		}
+
+		// Tier 2: Check KV cache on memory miss (only if enabled via env var)
+		const cacheEnabled = isCVDConfigCacheEnabled();
 		
 		if (cacheEnabled) {
 			try {
-				const cached = await this.getFromCache();
-				if (cached) {
+				const kvCached = await this.getFromCache();
+				if (kvCached) {
+					// Store in memory for next time
+					this.memoryCache.set(cacheKey, {
+						config: kvCached,
+						expiresAt: Date.now() + (CACHE_TTL_SECONDS * 1000)
+					});
+					
 					const duration = Date.now() - startTime;
-					debugCvd.configFetched(duration, 'cache');
-					debugCvd.configDetails(cached);
-					return cached;
-				} else {
+					debugCvd.configFetched(duration, 'kv-cache');
+					debugCvd.configDetails(kvCached);
+					return kvCached;
 				}
 			} catch (error) {
+				// KV error, continue to fetch
 			}
 		} else {
 			console.log('[CVD Config] Cache DISABLED (default) - fetching fresh config');
 		}
 
-		// Cache miss - fetch fresh config
-		this.fetchInProgress = this.fetchAndCacheConfig(sessionId, sessionIdSign);
+		// Both caches miss - fetch fresh config
+		this.fetchInProgress = this.fetchAndCacheConfig(sessionId, sessionIdSign, cacheKey);
 
 		try {
 			const config = await this.fetchInProgress;
 			const duration = Date.now() - startTime;
-			debugCvd.configFetched(duration, 'TradingView');
+			debugCvd.configFetched(duration, 'tradingview-api');
 			debugCvd.configDetails(config);
 			return config;
 		} finally {
@@ -141,13 +176,19 @@ class CVDConfigService {
 	}
 
 	/**
-	 * Fetch config from TradingView and cache it
+	 * Fetch config from TradingView and cache it in both tiers
 	 */
-	private async fetchAndCacheConfig(sessionId: string, sessionIdSign?: string): Promise<CVDConfig> {
+	private async fetchAndCacheConfig(sessionId: string, sessionIdSign: string | undefined, cacheKey: string): Promise<CVDConfig> {
 		const config = await this.fetchConfigFromTradingView(sessionId, sessionIdSign);
 		
-		// Try to cache it (but only if caching is enabled)
-		if (isServerCacheEnabled()) {
+		// Store in memory cache (Tier 1) - always enabled
+		this.memoryCache.set(cacheKey, {
+			config,
+			expiresAt: Date.now() + (CACHE_TTL_SECONDS * 1000)
+		});
+		
+		// Store in KV cache (Tier 2) - only if enabled
+		if (isCVDConfigCacheEnabled()) {
 			await this.storeInCache(config);
 		}
 		
@@ -283,13 +324,31 @@ class CVDConfigService {
 	}
 
 	/**
-	 * Manually invalidate KV cache
+	 * Manually invalidate both cache tiers
 	 * Useful for forcing a fresh fetch or when TradingView updates are detected
 	 */
 	async invalidateCache(): Promise<void> {
+		// Clear memory cache (Tier 1)
+		this.memoryCache.clear();
+		
+		// Clear KV cache (Tier 2)
 		try {
 			await kv.del(CVD_CONFIG_KV_KEY);
 		} catch (error) {
+			// KV error, ignore
+		}
+	}
+
+	/**
+	 * Clean up expired entries from memory cache
+	 * Optional maintenance method to prevent memory buildup
+	 */
+	private cleanupExpiredConfigs(): void {
+		const now = Date.now();
+		for (const [key, value] of this.memoryCache.entries()) {
+			if (now >= value.expiresAt) {
+				this.memoryCache.delete(key);
+			}
 		}
 	}
 
@@ -297,22 +356,46 @@ class CVDConfigService {
 	 * Get cache status (for debugging)
 	 */
 	async getCacheStatus(): Promise<{ 
-		cached: boolean; 
+		memory: {
+			cached: boolean;
+			expiresAt?: number;
+		};
+		kv: {
+			cached: boolean;
+			ttl?: number;
+		};
 		config?: CVDConfig;
-		ttl?: number;
 	}> {
+		// Check memory cache
+		const memCached = this.memoryCache.get(CVD_CONFIG_KV_KEY);
+		const memoryStatus = {
+			cached: !!memCached && Date.now() < memCached.expiresAt,
+			expiresAt: memCached?.expiresAt
+		};
+
+		// Check KV cache
+		let kvStatus = { cached: false, ttl: undefined as number | undefined };
+		let config: CVDConfig | undefined;
+		
 		try {
 			const cached = await kv.get<CVDConfig>(CVD_CONFIG_KV_KEY);
 			const ttl = await kv.ttl(CVD_CONFIG_KV_KEY);
 			
-			return {
+			kvStatus = {
 				cached: !!cached,
-				config: cached || undefined,
 				ttl: ttl > 0 ? ttl : undefined
 			};
+			
+			config = cached || undefined;
 		} catch (error) {
-			return { cached: false };
+			// KV error, ignore
 		}
+
+		return {
+			memory: memoryStatus,
+			kv: kvStatus,
+			config
+		};
 	}
 }
 

@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getChartData } from '@/lib/chart-data/chartDataService';
 import type { ChartDataResponse } from '@/lib/tradingview/types';
 import { getCachedChartData, setCachedChartData } from '@/lib/cache/chartDataCache';
-import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { isChartDataCacheEnabled } from '@/lib/cache/cacheConfig';
 import { validateCVDSettings } from '@/lib/tradingview/cvdValidation';
 import { debugApi } from '@/lib/utils/chartDebugLogger';
 
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
 		
 		// Check cache first (only if enabled via env var)
 		const cacheKey = `${symbol}:${resolution}:${barsCount || '300'}:${cvdEnabled || 'false'}`;
-		const cacheEnabled = isServerCacheEnabled();
+		const cacheEnabled = isChartDataCacheEnabled();
 		
 		if (cacheEnabled) {
 			const cached = getCachedChartData(cacheKey);
@@ -136,9 +136,25 @@ export async function POST(request: NextRequest) {
 				indicators: result.data.indicators
 			} as ChartDataResponse;
 			
-			// Cache successful responses (only if enabled)
-			if (cacheEnabled) {
+			// CVD-aware caching logic: Only cache if CVD requirement is met
+			const cvdWasRequested = cvdEnabled === 'true';
+			const cvdWasDelivered = 
+				response.indicators?.cvd?.values !== undefined && 
+				response.indicators.cvd.values.length > 0;
+			
+			// Cache only if:
+			// 1. Caching is enabled
+			// 2. Response is successful
+			// 3. If CVD was requested, it must be delivered with data points
+			const shouldCache = 
+				cacheEnabled && 
+				(!cvdWasRequested || cvdWasDelivered);
+			
+			if (shouldCache) {
 				setCachedChartData(cacheKey, response);
+				debugApi.cacheSet(cacheKey);
+			} else if (cacheEnabled && cvdWasRequested && !cvdWasDelivered) {
+				debugApi.cacheSkipped(cacheKey, 'CVD requested but not delivered');
 			}
 			
 			const duration = Date.now() - requestStart;

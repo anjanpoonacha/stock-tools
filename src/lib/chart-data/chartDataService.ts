@@ -18,7 +18,7 @@ import type {
 } from './types';
 import { validateChartDataRequest, validateUserCredentials } from './validators';
 import { getCachedSession, cacheSession, getCachedJWT, cacheJWT } from './sessionCache';
-import { isServerCacheEnabled } from '@/lib/cache/cacheConfig';
+import { isSessionJWTCacheEnabled } from '@/lib/cache/cacheConfig';
 import { debugService, debugSession, debugJwt } from '@/lib/utils/chartDebugLogger';
 
 /**
@@ -58,7 +58,7 @@ export async function resolveUserSession(
 	config: ChartDataServiceConfig
 ): Promise<SessionResolutionResult> {
 	// Check cache first (only if enabled via env var)
-	const cacheEnabled = isServerCacheEnabled();
+	const cacheEnabled = isSessionJWTCacheEnabled();
 	
 	if (cacheEnabled) {
 		const cached = getCachedSession(userEmail);
@@ -144,7 +144,7 @@ export async function fetchJWTToken(
 	config: ChartDataServiceConfig
 ): Promise<JWTTokenResult> {
 	// Check cache first (only if enabled via env var)
-	const cacheEnabled = isServerCacheEnabled();
+	const cacheEnabled = isSessionJWTCacheEnabled();
 	
 	if (cacheEnabled) {
 		const cachedToken = getCachedJWT(sessionId);
@@ -377,7 +377,7 @@ export async function getChartData(
 		debugService.sessionStart();
 		const sessionStart = Date.now();
 		// Check if session will be cached before calling
-		const sessionWasCached = isServerCacheEnabled() && !!getCachedSession(userEmail);
+		const sessionWasCached = isSessionJWTCacheEnabled() && !!getCachedSession(userEmail);
 		const sessionResult = await resolveUserSession(
 			userEmail,
 			userPassword,
@@ -404,7 +404,7 @@ export async function getChartData(
 		debugService.jwtStart();
 		const jwtStart = Date.now();
 		// Check if JWT will be cached before calling
-		const jwtWasCached = isServerCacheEnabled() && !!getCachedJWT(sessionResult.sessionId!);
+		const jwtWasCached = isSessionJWTCacheEnabled() && !!getCachedJWT(sessionResult.sessionId!);
 		const jwtResult = await fetchJWTToken(
 			sessionResult.sessionId!,
 			sessionResult.sessionIdSign || '',
