@@ -157,100 +157,6 @@ From our comprehensive testing:
 - **Connection pooling speedup**: 3-5x faster than new connections
 - **Parallel test completion**: ~2-3 minutes for 240 combinations
 
-## API Usage
-
-### Using the Chart Data API
-
-```typescript
-// Fetch chart data with CVD
-const response = await fetch('/api/chart-data', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    userEmail: 'user@example.com',
-    userPassword: 'password',
-    symbol: 'NSE:RELIANCE',
-    resolution: '1D',
-    barsCount: 300,
-    cvdEnabled: true,
-    cvdAnchorPeriod: '3M',
-    cvdTimeframe: '1'
-  })
-});
-
-const data = await response.json();
-// data.indicators.cvd.values contains CVD data
-```
-
-### Validation Errors
-
-If you provide invalid CVD settings, the API will return a 400 error:
-
-```json
-{
-  "success": false,
-  "error": "CVD validation failed: Delta timeframe \"W\" must be less than chart timeframe \"1D\". Valid options: 15S, 30S, 1, 5, 15, 30, 60",
-  "hint": "Ensure delta timeframe is less than chart timeframe"
-}
-```
-
-## Programmatic Usage
-
-### Getting Valid Delta Timeframes
-
-```typescript
-import { getValidDeltaTimeframes } from '@/lib/tradingview/cvdValidation';
-
-// For a daily chart
-const validTimeframes = getValidDeltaTimeframes('1D');
-// Returns: ['15S', '30S', '1', '5', '15', '30', '60']
-
-// For a 15-minute chart
-const validTimeframes = getValidDeltaTimeframes('15');
-// Returns: ['15S', '30S', '1', '5']
-```
-
-### Validating CVD Settings
-
-```typescript
-import { validateCVDSettings } from '@/lib/tradingview/cvdValidation';
-
-const result = validateCVDSettings('1D', '3M', 'W');
-if (!result.valid) {
-  console.error(result.error);
-  // Error: Delta timeframe "W" must be less than chart timeframe "1D"
-}
-```
-
-### Getting Optimal Settings
-
-```typescript
-import { getOptimalCVDSettings } from '@/lib/tradingview/cvdValidation';
-
-const optimal = getOptimalCVDSettings('1D');
-// Returns: { anchorPeriod: '3M', deltaTimeframe: '1' }
-
-const optimal = getOptimalCVDSettings('15');
-// Returns: { anchorPeriod: '3M', deltaTimeframe: '15S' }
-```
-
-## UI Integration
-
-The CVD Settings component automatically filters invalid timeframes based on the current chart resolution:
-
-```tsx
-<CVDSettings
-  settings={cvdSettings}
-  chartResolution={currentResolution}  // Required
-  onChange={handleCVDSettingsChange}
-/>
-```
-
-When the chart resolution changes (e.g., from 1D to 15min), the component will:
-1. Hide invalid delta timeframes from the dropdown
-2. Show a message if no valid timeframes are available
-3. Prevent users from selecting invalid combinations
-
 ## Troubleshooting
 
 ### Issue: CVD data not loading
@@ -294,11 +200,9 @@ A: Yes, enable "Custom Value" input, but ensure you follow the constraint rules.
 **Q: Why did you change from 1Y to 12M?**  
 A: For consistency with TradingView's API and our test results. Both are equivalent, but `12M` is more precise.
 
-## References
+## Summary
 
-- [CVD Test Results Summary](../CVD_TEST_RESULTS_SUMMARY.md) - Full test report
-- [CVD Test Fix Summary](../scripts/migrated/tests/CVD_TEST_FIX_SUMMARY.md) - Technical details
-- [Test Script](../scripts/migrated/tests/test-cvd-settings-combinations.ts) - Actual test code
+This guide documents all tested CVD parameter combinations for TradingView WebSocket API integration.
 
 ## Version History
 

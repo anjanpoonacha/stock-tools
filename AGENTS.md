@@ -51,4 +51,11 @@
     - NEVER run build during development (breaks pnpm dev)
     - ALWAYS run build before committing
   </build>
+
+  <documentation>
+    - NEVER create documentation files unless explicitly requested by user
+    - NEVER create status/completion markdown files (e.g., *_COMPLETE.md, *_INTEGRATION_COMPLETE.md)
+    - NEVER create summary or results markdown files (e.g., *_SUMMARY.md, *_RESULTS.md)
+    - Only create documentation when user specifically asks for it
+  </documentation>
 </project_rules>

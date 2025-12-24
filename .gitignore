@@ -101,3 +101,4 @@ web-ext-artifacts/
 # POC outputs (contains sensitive session/token data)
 /scripts/poc-output/
 /scripts/poc-tradingview/poc-config.ts
+credentials.json
