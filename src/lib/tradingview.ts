@@ -101,6 +101,37 @@ export async function getWatchlists(cookie: string): Promise<TradingViewWatchlis
 }
 
 /**
+ * Get a specific watchlist by ID (sets it as active)
+ * @param watchlistId - The watchlist ID
+ * @param cookie - TradingView session cookie
+ * @returns The watchlist data
+ */
+export async function getWatchlistById(
+	watchlistId: string,
+	cookie: string
+): Promise<TradingViewWatchlist> {
+	const url = `https://www.tradingview.com/api/v1/symbols_list/active/${watchlistId}/`;
+	const res = await fetch(url, {
+		method: 'POST',
+		headers: {
+			Cookie: cookie,
+			Origin: 'https://www.tradingview.com',
+			'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+		},
+	});
+
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(
+			`[TradingView API] Failed to get watchlist: ${res.status} ${res.statusText} - ${text}`
+		);
+	}
+
+	const data = await res.json();
+	return data;
+}
+
+/**
  * Append a symbol to a TradingView watchlist.
  * @param watchlistId - The ID of the watchlist.
  * @param symbol - The symbol to append (e.g. "NSE:TCS").
@@ -121,6 +152,31 @@ export async function appendSymbolToWatchlist(watchlistId: string, symbol: strin
 	if (!res.ok) {
 		const text = await res.text();
 		throw new Error(`[TradingView API] Failed to append symbol: ${res.status} ${res.statusText} - ${text}`);
+	}
+}
+
+/**
+ * Remove a symbol from a TradingView watchlist.
+ * @param watchlistId - The ID of the watchlist.
+ * @param symbol - The symbol to remove (e.g. "NSE:TCS").
+ * @param cookie - The TradingView session cookie (e.g. "sessionid=..." or "sessionid=...; sessionid_sign=...")
+ */
+export async function removeSymbolFromWatchlist(watchlistId: string, symbol: string, cookie: string): Promise<void> {
+	const url = `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlistId}/remove/`;
+	const res = await fetch(url, {
+		method: 'POST',
+		headers: {
+			'accept': '*/*',
+			'content-type': 'application/json',
+			'Cookie': cookie,
+			'Origin': 'https://www.tradingview.com',
+			'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+		},
+		body: JSON.stringify([symbol]),
+	});
+	if (!res.ok) {
+		const text = await res.text();
+		throw new Error(`[TradingView API] Failed to remove symbol: ${res.status} ${res.statusText} - ${text}`);
 	}
 }
 

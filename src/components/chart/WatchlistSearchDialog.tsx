@@ -253,7 +253,7 @@ export function WatchlistSearchDialog({
 
       // Check results
       const mioSuccess = results[0].status === 'fulfilled' && results[0].value?.success;
-      const tvSuccess = results[1].status === 'fulfilled';
+      const tvSuccess = results[1].status === 'fulfilled' && results[1].value?.success;
       
       if (mioSuccess && tvSuccess) {
         // Full success
