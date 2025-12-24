@@ -23,6 +23,7 @@ export interface UseChartKeybindingsOptions {
 	onTabKeyPress?: () => void; // Cycle through charts in dual view
 	onWatchlistSearchOpen?: () => void; // Triggered by ;
 	onWatchlistQuickAdd?: () => void; // Triggered by Option+W
+	onStockRemove?: () => void; // Triggered by Option+D
 	// Pass the current mode from parent to determine which overlay is active
 	inputMode: 'none' | 'timeframe' | 'symbol' | 'watchlist';
 	activeChartIndex?: number;
@@ -85,6 +86,7 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onTabKeyPress,
 		onWatchlistSearchOpen,
 		onWatchlistQuickAdd,
+		onStockRemove,
 		inputMode,
 		enabled = true,
 	} = options;
@@ -121,6 +123,20 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 			if (isQuickAddShortcut && inputMode === 'none' && onWatchlistQuickAdd) {
 				event.preventDefault();
 				onWatchlistQuickAdd();
+				return;
+			}
+
+			// Check for Quick remove (Option+D / Alt+D) - before blocking modifiers
+			const isQuickRemoveShortcut = 
+				event.code === 'KeyD' && 
+				event.altKey && 
+				!event.ctrlKey && 
+				!event.metaKey &&
+				!event.shiftKey;
+
+			if (isQuickRemoveShortcut && inputMode === 'none' && onStockRemove) {
+				event.preventDefault();
+				onStockRemove();
 				return;
 			}
 
@@ -252,6 +268,7 @@ export function useChartKeybindings(options: UseChartKeybindingsOptions): UseCha
 		onTabKeyPress,
 		onWatchlistSearchOpen,
 		onWatchlistQuickAdd,
+		onStockRemove,
 		inputMode,
 	]);
 

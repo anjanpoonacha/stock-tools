@@ -319,6 +319,163 @@ export async function fetchUnifiedWatchlists(
 }
 
 /**
+ * Remove a stock symbol from a unified watchlist on applicable platforms.
+ * Automatically normalizes the symbol for each platform and handles parallel execution.
+ * 
+ * @param symbol - The stock symbol to remove (can be in any format)
+ * @param watchlist - The unified watchlist to remove the stock from
+ * @param sessions - Session information for both platforms
+ * @returns Promise that resolves to AddStockResult with per-platform status
+ * 
+ * @example
+ * const result = await removeStockFromUnifiedWatchlist(
+ *   'RELIANCE',
+ *   { id: '1', name: 'My List', platforms: ['mio', 'tv'], mioId: '123', tvId: 'abc' },
+ *   { mio: { internalSessionId: 'session123' }, tv: { sessionId: 'sessionid=...' } }
+ * );
+ * // Returns: { success: true, platforms: { mio: { success: true }, tv: { success: true } } }
+ */
+export async function removeStockFromUnifiedWatchlist(
+  symbol: string,
+  watchlist: UnifiedWatchlist,
+  sessions: WatchlistSessions
+): Promise<AddStockResult> {
+  const result: AddStockResult = {
+    success: false,
+    platforms: {},
+  };
+
+  try {
+    // Prepare promises for each platform
+    const promises: Promise<{ platform: Platform; success: boolean; error?: string }>[] = [];
+
+    // Remove from MIO if watchlist exists on MIO
+    if (watchlist.platforms.includes('mio') && watchlist.mioId && sessions.mio?.internalSessionId) {
+      promises.push(
+        (async () => {
+          try {
+            const credentials = getStoredCredentials();
+            
+            if (!credentials) {
+              throw new Error('Authentication required. Please log in first.');
+            }
+
+            const normalizedSymbol = normalizeSymbol(symbol, 'mio');
+            
+            // Use single-stock remove endpoint
+            const res = await fetch('/api/mio-action', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'removeSingle',
+                mioWlid: watchlist.mioId!,
+                symbol: normalizedSymbol,
+                userEmail: credentials.userEmail,
+                userPassword: credentials.userPassword,
+              }),
+            });
+            
+            // Parse response body with proper typing
+            const data: MIOActionResponse<{ removed: boolean; symbol: string }> = await res.json();
+            
+            // Check HTTP status
+            if (!res.ok) {
+              throw new Error(data.error || `Failed to remove from MIO watchlist: ${res.status}`);
+            }
+            
+            // Check MIOResponse structure (defensive - backend should handle this)
+            if (data.result && !data.result.success) {
+              const errorMsg = data.result.error?.message || 'Operation failed';
+              throw new Error(`MIO operation failed: ${errorMsg}`);
+            }
+            
+            return { platform: 'mio' as Platform, success: true };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`Failed to remove ${symbol} from MIO watchlist:`, error);
+            return { platform: 'mio' as Platform, success: false, error: errorMessage };
+          }
+        })()
+      );
+    }
+
+    // Remove from TradingView if watchlist exists on TV
+    if (watchlist.platforms.includes('tv') && watchlist.tvId && sessions.tv?.sessionId) {
+      promises.push(
+        (async () => {
+          try {
+            const normalizedSymbol = normalizeSymbol(symbol, 'tv');
+            
+            // Use proxy API to avoid CORS issues
+            const res = await fetch('/api/proxy', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                url: `https://www.tradingview.com/api/v1/symbols_list/custom/${watchlist.tvId}/remove/`,
+                method: 'POST',
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (compatible; StockFormatConverter/1.0)',
+                  Cookie: `sessionid=${sessions.tv!.sessionId}`,
+                  'Content-Type': 'application/json',
+                  'Origin': 'https://www.tradingview.com',
+                },
+                body: [normalizedSymbol], // Don't stringify - proxy will do it
+              }),
+            });
+            
+            if (!res.ok) {
+              throw new Error(`Failed to remove from TV watchlist: ${res.status}`);
+            }
+            
+            return { platform: 'tv' as Platform, success: true };
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            console.error(`Failed to remove ${symbol} from TV watchlist:`, error);
+            return { platform: 'tv' as Platform, success: false, error: errorMessage };
+          }
+        })()
+      );
+    }
+
+    // If no platforms to remove from, return early
+    if (promises.length === 0) {
+      return result;
+    }
+
+    // Execute all removals in parallel with Promise.allSettled
+    const results = await Promise.allSettled(promises);
+
+    // Process results
+    let anySuccess = false;
+
+    results.forEach((promiseResult) => {
+      if (promiseResult.status === 'fulfilled') {
+        const { platform, success, error } = promiseResult.value;
+        
+        if (platform === 'mio') {
+          result.platforms.mio = { success, error };
+        } else {
+          result.platforms.tv = { success, error };
+        }
+
+        if (success) {
+          anySuccess = true;
+        }
+      } else {
+        // Promise rejected unexpectedly
+        console.error('Unexpected promise rejection:', promiseResult.reason);
+      }
+    });
+
+    result.success = anySuccess;
+    return result;
+  } catch (error) {
+    console.error('Error in removeStockFromUnifiedWatchlist:', error);
+    return result;
+  }
+}
+
+/**
  * Add a stock symbol to a unified watchlist on applicable platforms.
  * Automatically normalizes the symbol for each platform and handles parallel execution.
  * 

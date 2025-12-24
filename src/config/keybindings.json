@@ -3,6 +3,7 @@
     "watchlist": {
       "openSearch": ";",
       "quickAdd": "Alt+W",
+      "quickRemove": "Alt+D",
       "description": "Watchlist management shortcuts"
     },
     "navigation": {

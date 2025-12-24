@@ -19,10 +19,10 @@
 
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { TradingViewLiveChart } from '@/components/TradingViewLiveChart';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowLeft, LayoutGrid, LayoutList, Clock, Grid3x3, TrendingUp, Search, LayoutPanelLeft, LayoutPanelTop, Link, Unlink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowLeft, LayoutList, Clock, Grid3x3, TrendingUp, Search, LayoutPanelLeft, LayoutPanelTop, Link, Unlink, HelpCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -49,6 +49,11 @@ import type { IChartApi } from 'lightweight-charts';
 import type { OHLCVBar } from '@/lib/tradingview/types';
 import { useWatchlistIntegration } from '@/hooks/useWatchlistIntegration';
 import { WatchlistSearchDialog } from '@/components/chart/WatchlistSearchDialog';
+import { KeybindingsHelpDialog } from '@/components/chart/KeybindingsHelpDialog';
+import { removeStockFromUnifiedWatchlist, addStockToWatchlist } from '@/lib/watchlist-sync/unifiedWatchlistService';
+import { useSessionBridge } from '@/lib/useSessionBridge';
+import { useToast } from '@/components/ui/toast';
+import type { WatchlistSessions } from '@/lib/watchlist-sync/types';
 
 interface ChartViewProps {
 	stocks: Stock[];
@@ -158,6 +163,9 @@ export default function ChartView({
 	// Watchlist dialog state
 	const [showWatchlistDialog, setShowWatchlistDialog] = useState(false);
 
+	// Keybindings help dialog state
+	const [showKeybindingsHelp, setShowKeybindingsHelp] = useState(false);
+
 	// Watchlist integration
 	const {
 		watchlists,
@@ -165,12 +173,18 @@ export default function ChartView({
 		addToCurrentWatchlist,
 		selectWatchlist,
 		refreshWatchlists,
-		isLoading: watchlistLoading,
-		sessionStatus,
 	} = useWatchlistIntegration({
 		currentSymbol,
 		currentStock,
 	});
+
+	// Get sessions for remove operation
+	const [mioSessionId] = useSessionBridge('marketinout');
+	const [tvSessionId] = useSessionBridge('tradingview');
+	const toast = useToast();
+
+	// Watchlist dialog mode
+	const [watchlistDialogMode, setWatchlistDialogMode] = useState<'select' | 'remove'>('select');
 
 	// Determine if we're in dual view mode (2+ charts)
 	const isDualView = currentLayout.slots.length > 1;
@@ -359,6 +373,88 @@ export default function ChartView({
 		setCurrentIndex(index);
 	}, [setCurrentIndex]);
 
+	// Handle stock removal from watchlist
+	const handleRemoveStock = useCallback(async () => {
+		// Check if watchlist is selected
+		if (!currentWatchlist) {
+			// Show dialog for watchlist selection in remove mode
+			setWatchlistDialogMode('remove');
+			setShowWatchlistDialog(true);
+			return;
+		}
+
+		// Build sessions object
+		const sessions: WatchlistSessions = {};
+		if (mioSessionId) sessions.mio = { internalSessionId: mioSessionId };
+		if (tvSessionId) sessions.tv = { sessionId: tvSessionId };
+
+		if (!sessions.mio && !sessions.tv) {
+			toast('No active sessions. Please log in first.', 'error');
+			return;
+		}
+
+		try {
+			// Store context before removal for undo functionality
+			const removalContext = {
+				symbol: currentSymbol,
+				watchlist: currentWatchlist,
+				sessions: { ...sessions }, // Clone to capture current state
+			};
+
+			// Remove stock from watchlist
+			const result = await removeStockFromUnifiedWatchlist(currentSymbol, currentWatchlist, sessions);
+
+			if (!result.success) {
+				toast(`Failed to remove ${currentSymbol} from ${currentWatchlist.name}`, 'error');
+				return;
+			}
+
+			// Show success toast with platforms info
+			const mioSuccess = result.platforms.mio?.success ?? false;
+			const tvSuccess = result.platforms.tv?.success ?? false;
+
+			let successMessage = '';
+			if (mioSuccess && tvSuccess) {
+				successMessage = `${currentSymbol} removed from ${currentWatchlist.name}`;
+			} else if (mioSuccess) {
+				successMessage = `${currentSymbol} removed from ${currentWatchlist.name} (MIO only)`;
+			} else if (tvSuccess) {
+				successMessage = `${currentSymbol} removed from ${currentWatchlist.name} (TV only)`;
+			}
+
+			// Show toast with UNDO action
+			toast(successMessage, 'success', {
+				duration: 5000,
+				action: {
+					label: 'UNDO',
+					onClick: async () => {
+						try {
+							// Re-add stock to the same watchlist
+							const undoResult = await addStockToWatchlist(
+								removalContext.symbol,
+								removalContext.watchlist,
+								removalContext.sessions
+							);
+
+							if (undoResult.success) {
+								toast(`${removalContext.symbol} restored to ${removalContext.watchlist.name}`, 'success');
+							} else {
+								toast(`Failed to restore ${removalContext.symbol}`, 'error');
+							}
+						} catch (undoError) {
+							console.error('Failed to undo removal:', undoError);
+							toast(undoError instanceof Error ? undoError.message : 'Failed to undo removal', 'error');
+						}
+					},
+				},
+			});
+
+		} catch (error) {
+			console.error('Failed to remove stock:', error);
+			toast(error instanceof Error ? error.message : 'Failed to remove stock', 'error');
+		}
+	}, [currentSymbol, currentWatchlist, mioSessionId, tvSessionId, toast]);
+
 	// Keyboard shortcuts - MUST be before early returns (React Hooks Rule)
 	const inputMode: 'none' | 'timeframe' | 'symbol' = showTimeframeOverlay 
 		? 'timeframe' 
@@ -376,8 +472,12 @@ export default function ChartView({
 		onSymbolBackspace: handleSymbolBackspace,
 		onSymbolSubmit: jumpToSymbol,
 		onTabKeyPress: handleTabKey,
-		onWatchlistSearchOpen: () => setShowWatchlistDialog(true),
+		onWatchlistSearchOpen: () => {
+			setWatchlistDialogMode('select');
+			setShowWatchlistDialog(true);
+		},
 		onWatchlistQuickAdd: addToCurrentWatchlist,
+		onStockRemove: handleRemoveStock,
 		inputMode: showWatchlistDialog ? 'watchlist' : inputMode,
 		activeChartIndex: focusedChartIndex,
 		enabled: true,
@@ -428,9 +528,10 @@ export default function ChartView({
 					collapsible={false}
 					id='toolbar-panel'
 				>
-					<div className='h-full w-full bg-muted/30 border-r border-border flex flex-col items-center py-4 gap-3'>
-						{/* Layout Mode Toggle Buttons */}
-						<div className='flex flex-col gap-1'>
+					<ScrollArea className='h-full w-full'>
+						<div className='w-full bg-muted/30 border-r border-border flex flex-col items-center py-4 gap-3'>
+							{/* Layout Mode Toggle Buttons */}
+							<div className='flex flex-col gap-1'>
 							<Button
 								variant={activeLayout === 'single' ? 'default' : 'outline'}
 								size='icon'
@@ -459,6 +560,19 @@ export default function ChartView({
 								<LayoutPanelTop className='h-5 w-5' />
 							</Button>
 						</div>
+
+						<Separator className='w-10' />
+
+						{/* Keyboard Shortcuts Help Button */}
+						<Button
+							variant='outline'
+							size='icon'
+							onClick={() => setShowKeybindingsHelp(true)}
+							className='h-10 w-10'
+							title='Keyboard shortcuts'
+						>
+							<HelpCircle className='h-5 w-5' />
+						</Button>
 
 						<Separator className='w-10' />
 
@@ -617,7 +731,8 @@ export default function ChartView({
 								</div>
 							</PopoverContent>
 						</Popover>
-					</div>
+						</div>
+					</ScrollArea>
 				</Panel>
 
 				<ResizeHandle className='w-1 bg-border hover:bg-primary transition-colors cursor-col-resize' />
@@ -883,15 +998,53 @@ export default function ChartView({
 					open={showWatchlistDialog}
 					onClose={() => setShowWatchlistDialog(false)}
 					onSelect={async (watchlist) => {
-						await selectWatchlist(watchlist.id);
-						setShowWatchlistDialog(false);
+						if (watchlistDialogMode === 'remove') {
+							// Remove mode: remove stock and close dialog
+							const sessions: WatchlistSessions = {};
+							if (mioSessionId) sessions.mio = { internalSessionId: mioSessionId };
+							if (tvSessionId) sessions.tv = { sessionId: tvSessionId };
+
+							try {
+								const result = await removeStockFromUnifiedWatchlist(currentSymbol, watchlist, sessions);
+								if (result.success) {
+									const mioSuccess = result.platforms.mio?.success ?? false;
+									const tvSuccess = result.platforms.tv?.success ?? false;
+
+									let successMessage = '';
+									if (mioSuccess && tvSuccess) {
+										successMessage = `${currentSymbol} removed from ${watchlist.name}`;
+									} else if (mioSuccess) {
+										successMessage = `${currentSymbol} removed from ${watchlist.name} (MIO only)`;
+									} else if (tvSuccess) {
+										successMessage = `${currentSymbol} removed from ${watchlist.name} (TV only)`;
+									}
+									toast(successMessage, 'success');
+								} else {
+									toast(`Failed to remove ${currentSymbol} from ${watchlist.name}`, 'error');
+								}
+							} catch (error) {
+								toast(error instanceof Error ? error.message : 'Failed to remove stock', 'error');
+							}
+							setShowWatchlistDialog(false);
+						} else {
+							// Select mode: add stock to watchlist
+							await selectWatchlist(watchlist.id);
+							setShowWatchlistDialog(false);
+						}
 					}}
 					watchlists={watchlists}
 					currentWatchlist={currentWatchlist}
 					currentStock={currentStock || { symbol: currentSymbol, name: currentSymbol }}
 					refreshWatchlists={refreshWatchlists}
+					mode={watchlistDialogMode}
 				/>
 			)}
+
+			{/* Keybindings Help Dialog */}
+			<KeybindingsHelpDialog
+				open={showKeybindingsHelp}
+				onClose={() => setShowKeybindingsHelp(false)}
+			/>
 		</div>
 	);
 }

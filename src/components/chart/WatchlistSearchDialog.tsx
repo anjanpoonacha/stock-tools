@@ -27,6 +27,7 @@ interface WatchlistSearchDialogProps {
   currentWatchlist: UnifiedWatchlist | null;
   currentStock: Stock;
   refreshWatchlists: () => Promise<void>;
+  mode?: 'select' | 'remove';
 }
 
 export function WatchlistSearchDialog({
@@ -37,6 +38,7 @@ export function WatchlistSearchDialog({
   currentWatchlist,
   currentStock,
   refreshWatchlists,
+  mode = 'select',
 }: WatchlistSearchDialogProps) {
   const toast = useToast();
   const [searchQuery, setSearchQuery] = useState('');
@@ -285,7 +287,7 @@ export function WatchlistSearchDialog({
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Add to Watchlist</DialogTitle>
+          <DialogTitle>{mode === 'remove' ? 'Remove from Watchlist' : 'Add to Watchlist'}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">

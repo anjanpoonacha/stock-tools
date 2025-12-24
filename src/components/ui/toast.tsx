@@ -9,15 +9,22 @@ import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'info';
 
+type ToastAction = {
+    label: string;
+    onClick: () => void;
+};
+
 type Toast = {
     id: number;
     message: string;
     type: ToastType;
+    action?: ToastAction;
+    duration?: number;
 };
 
 type ToastContextType = {
     toasts: Toast[];
-    showToast: (message: string, type?: ToastType) => void;
+    showToast: (message: string, type?: ToastType, options?: { action?: ToastAction; duration?: number }) => void;
 };
 
 const ToastContext = React.createContext<ToastContextType | undefined>(undefined);
@@ -44,10 +51,11 @@ const toastVariants = cva(
 
 interface ToastItemProps extends VariantProps<typeof toastVariants> {
     message: string;
+    action?: ToastAction;
     onDismiss: () => void;
 }
 
-function ToastItem({ variant, message, onDismiss }: ToastItemProps) {
+function ToastItem({ variant, message, action, onDismiss }: ToastItemProps) {
     const icons = {
         success: CheckCircle2,
         error: XCircle,
@@ -67,9 +75,22 @@ function ToastItem({ variant, message, onDismiss }: ToastItemProps) {
 
             <p className='flex-1 leading-relaxed'>{message}</p>
 
+            {action && (
+                <button
+                    onClick={() => {
+                        action.onClick();
+                        onDismiss();
+                    }}
+                    className='shrink-0 rounded-md px-3 py-1 text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                    aria-label={action.label}
+                >
+                    {action.label}
+                </button>
+            )}
+
             <button
                 onClick={onDismiss}
-                className='ml-auto shrink-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
+                className='ml-2 shrink-0 rounded-sm opacity-70 hover:opacity-100 transition-opacity focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
                 aria-label='Close notification'
             >
                 <X className='h-4 w-4' />
@@ -81,20 +102,50 @@ function ToastItem({ variant, message, onDismiss }: ToastItemProps) {
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
     const [toasts, setToasts] = React.useState<Toast[]>([]);
+    const timeoutRefs = React.useRef<Map<number, NodeJS.Timeout>>(new Map());
 
-    const showToast = React.useCallback((message: string, type: ToastType = 'info') => {
+    const showToast = React.useCallback((
+        message: string, 
+        type: ToastType = 'info',
+        options?: { action?: ToastAction; duration?: number }
+    ) => {
         const id = ++toastId;
-        setToasts((prev) => [...prev, { id, message, type }]);
+        const toast: Toast = { 
+            id, 
+            message, 
+            type,
+            action: options?.action,
+            duration: options?.duration
+        };
         
-        // Auto-dismiss: 5s for info/success, 7s for errors
-        const duration = type === 'error' ? 7000 : 5000;
-        setTimeout(() => {
+        setToasts((prev) => [...prev, toast]);
+        
+        // Auto-dismiss: custom duration or default (5s for info/success, 7s for errors)
+        const duration = options?.duration ?? (type === 'error' ? 7000 : 5000);
+        const timeout = setTimeout(() => {
             setToasts((prev) => prev.filter((t) => t.id !== id));
+            timeoutRefs.current.delete(id);
         }, duration);
+        
+        timeoutRefs.current.set(id, timeout);
     }, []);
 
     const dismissToast = React.useCallback((id: number) => {
+        // Clear timeout if exists
+        const timeout = timeoutRefs.current.get(id);
+        if (timeout) {
+            clearTimeout(timeout);
+            timeoutRefs.current.delete(id);
+        }
         setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, []);
+
+    // Cleanup timeouts on unmount
+    React.useEffect(() => {
+        return () => {
+            timeoutRefs.current.forEach((timeout) => clearTimeout(timeout));
+            timeoutRefs.current.clear();
+        };
     }, []);
 
     return (
@@ -106,6 +157,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                         key={toast.id}
                         variant={toast.type}
                         message={toast.message}
+                        action={toast.action}
                         onDismiss={() => dismissToast(toast.id)}
                     />
                 ))}
