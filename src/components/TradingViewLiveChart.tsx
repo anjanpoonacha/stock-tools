@@ -199,6 +199,16 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 			return [];
 		}
 		
+		// DEBUG: Log CVD configuration
+		const cvdConfig = indicators.find(ind => ind.type === 'cvd');
+		console.log(`[CVD Debug] Config:`, {
+			chartResolution: resolution,
+			cvdSettings: cvdConfig?.settings
+		});
+		
+		// DEBUG: Log raw CVD data
+		console.log(`[CVD Debug] Raw data from API, first 3 values:`, data.indicators.cvd.values.slice(0, 3));
+		
 		// CVD values: [open, high, low, close, ...] - convert to candlestick format
 		const filtered = data.indicators.cvd.values
 			.filter((d: { values: number[] }) => d.values[3] !== 1e+100); // Filter out placeholder values
@@ -213,6 +223,10 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 		}>();
 		
 		for (const d of filtered) {
+			// DEBUG: Check CVD timestamp format
+			if (filtered.indexOf(d) < 3) {
+				console.log(`[CVD Debug] time=${d.time}, date(sec)=${new Date(d.time * 1000).toISOString()}, date(ms)=${new Date(d.time).toISOString()}, close=${d.values[3]}`);
+			}
 			uniqueMap.set(d.time, {
 				time: d.time,
 				open: d.values[0],  // CVD open
@@ -337,6 +351,7 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 				},
 				base: 0,  // Ensure bars start from 0
 				priceScaleId: 'right',  // Show scale on right side
+				priceLineVisible: false,  // Hide horizontal price line
 			});
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			volumeSeries.setData(volumeData as any);
@@ -348,7 +363,7 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 				const volumeMASeries = chart.addSeries(LineSeries, {
 					color: isDark ? '#FB923C' : '#F97316',  // Orange/amber color
 					lineWidth: 1,
-					priceLineVisible: false,
+					priceLineVisible: false,  // Already set - Hide horizontal price line
 					lastValueVisible: false,  // Hide value in legend (no label requested)
 					// No title property - removes label from legend
 					priceFormat: {
@@ -384,17 +399,18 @@ const TradingViewLiveChartComponent: React.FC<TradingViewLiveChartProps> = ({
 				return sign + absValue.toFixed(0);
 			};
 			
-			const cvdSeries = chart.addSeries(CandlestickSeries, {
-				upColor: '#26a69a',        // Teal for positive CVD
-				downColor: '#ef5350',      // Red for negative CVD
-				borderVisible: false,
-				wickUpColor: '#26a69a',
-				wickDownColor: '#ef5350',
-				priceFormat: {
-					type: 'custom',
-					formatter: formatCVDValue,
-				},
-			});
+		const cvdSeries = chart.addSeries(CandlestickSeries, {
+			upColor: '#26a69a',        // Teal for positive CVD
+			downColor: '#ef5350',      // Red for negative CVD
+			borderVisible: false,
+			wickUpColor: '#26a69a',
+			wickDownColor: '#ef5350',
+			priceLineVisible: false,
+			priceFormat: {
+				type: 'custom',
+				formatter: formatCVDValue,
+			},
+		});
 			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			cvdSeries.setData(cvdData as any);
 			// Move to appropriate pane (creates pane if it doesn't exist)

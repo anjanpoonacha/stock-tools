@@ -97,6 +97,7 @@ function renderCVD(
 		borderVisible: false,
 		wickUpColor: config.colors?.up || '#26a69a',
 		wickDownColor: config.colors?.down || '#ef5350',
+		lastValueVisible: false,  // Hide current value line
 	});
 	
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +138,7 @@ function renderVolume(
 		priceFormat: {
 			type: 'volume',
 		},
+		priceLineVisible: false,  // Hide horizontal price line
 	});
 	
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -177,7 +179,7 @@ function renderSMA(
 		lineWidth: (config.options.lineWidth || 1) as 1 | 2 | 3 | 4,
 		title: config.name || `SMA(${config.options.period})`,
 		priceLineVisible: false,
-		lastValueVisible: true,
+		lastValueVisible: false,
 	});
 	
 	// eslint-disable-next-line @typescript-eslint/no-explicit-any

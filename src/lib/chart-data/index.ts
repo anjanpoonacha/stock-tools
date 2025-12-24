@@ -8,7 +8,7 @@ export {
 	getChartData,
 	resolveUserSession,
 	fetchJWTToken,
-	fetchHistoricalData,
+	fetchHistoricalDataV2,
 	createChartDataServiceConfig,
 	type ChartDataServiceConfig
 } from './chartDataService';

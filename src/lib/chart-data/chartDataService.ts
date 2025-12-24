@@ -7,9 +7,7 @@
 
 import { SessionResolver } from '@/lib/SessionResolver';
 import { getDataAccessToken } from '@/lib/tradingview/jwtService';
-import { fetchHistoricalBars, type Resolution } from '@/lib/tradingview/historicalDataClient';
-import { getConnectionPool, WebSocketConnectionPool } from '@/lib/tradingview/connectionPool';
-import { getPersistentConnectionManager } from '@/lib/tradingview/persistentConnectionManager';
+import { WebSocketConnectionManager } from '@/lib/tradingview/v2/WebSocketConnectionManager';
 import type { 
 	SessionResolutionResult, 
 	JWTTokenResult, 
@@ -27,7 +25,6 @@ import { debugService, debugSession, debugJwt } from '@/lib/utils/chartDebugLogg
 export interface ChartDataServiceConfig {
 	sessionResolver: typeof SessionResolver;
 	jwtService: { getDataAccessToken: typeof getDataAccessToken };
-	dataClient: { fetchHistoricalBars: typeof fetchHistoricalBars };
 }
 
 /**
@@ -40,7 +37,6 @@ export function createChartDataServiceConfig(
 	return {
 		sessionResolver: config?.sessionResolver || SessionResolver,
 		jwtService: config?.jwtService || { getDataAccessToken },
-		dataClient: config?.dataClient || { fetchHistoricalBars },
 	};
 }
 
@@ -185,18 +181,22 @@ export async function fetchJWTToken(
 	}
 }
 
+// REMOVED: fetchHistoricalData - Now using v2 WebSocketConnectionManager
+
 /**
- * Fetches historical bars from TradingView with optional CVD indicator
+ * Fetches historical bars using v2 WebSocket connection manager
+ * 
+ * Uses v2 architecture with automatic connection management.
+ * Supports concurrent requests via connection pooling (for dual layout).
  * 
  * @param symbol - Stock symbol (e.g., 'NSE:JUNIPER')
  * @param resolution - Time resolution (e.g., '1D', '1W')
  * @param barsCount - Number of bars to fetch
  * @param jwtToken - JWT authentication token
  * @param cvdOptions - CVD indicator configuration
- * @param config - Service configuration
  * @returns Historical data result
  */
-export async function fetchHistoricalData(
+export async function fetchHistoricalDataV2(
 	symbol: string,
 	resolution: string,
 	barsCount: number,
@@ -207,96 +207,30 @@ export async function fetchHistoricalData(
 		cvdTimeframe?: string;
 		sessionId?: string;
 		sessionIdSign?: string;
-	},
-	config: ChartDataServiceConfig
+	}
 ): Promise<HistoricalDataResult> {
 	try {
-		const { bars, metadata, indicators } = await config.dataClient.fetchHistoricalBars(
-			symbol,
-			resolution as Resolution,
-			barsCount,
+		// Get connection manager for this user (singleton pattern)
+		const manager = await WebSocketConnectionManager.forUser(
 			jwtToken,
+			cvdOptions.sessionId,
+			cvdOptions.sessionIdSign,
+			undefined, // userId not needed
 			{
-				cvdEnabled: cvdOptions.cvdEnabled,
-				cvdAnchorPeriod: cvdOptions.cvdAnchorPeriod,
-				cvdTimeframe: cvdOptions.cvdTimeframe,
-				sessionId: cvdOptions.sessionId,
-				sessionIdSign: cvdOptions.sessionIdSign
+				cvdTimeout: 45000, // 45s for CVD (tested and validated)
+				enableLogging: process.env.NODE_ENV === 'development'
 			}
 		);
 		
-		return {
-			success: true,
-			bars,
-			metadata,
-			indicators
-		};
-	} catch (error) {
-		return {
-			success: false,
-			error: `Failed to fetch chart data: ${error instanceof Error ? error.message : 'Unknown error'}`
-		};
-	}
-}
-
-/**
- * Fetches historical bars using connection pool (for better performance)
- * 
- * Reuses WebSocket connections across multiple requests, eliminating handshake overhead.
- * Uses modify_series to switch symbols on the same connection.
- * 
- * @param symbol - Stock symbol (e.g., 'NSE:JUNIPER')
- * @param resolution - Time resolution (e.g., '1D', '1W')
- * @param barsCount - Number of bars to fetch
- * @param jwtToken - JWT authentication token
- * @param cvdOptions - CVD indicator configuration
- * @param connectionPool - Optional connection pool (uses default pool if not provided)
- * @returns Historical data result
- */
-export async function fetchHistoricalDataPooled(
-	symbol: string,
-	resolution: string,
-	barsCount: number,
-	jwtToken: string,
-	cvdOptions: {
-		cvdEnabled?: boolean;
-		cvdAnchorPeriod?: string;
-		cvdTimeframe?: string;
-		sessionId?: string;
-		sessionIdSign?: string;
-	},
-	connectionPool?: WebSocketConnectionPool
-): Promise<HistoricalDataResult> {
-	try {
-		// Use provided pool, or fall back to persistent manager or regular pool
-		let pool: WebSocketConnectionPool;
-		
-		if (connectionPool) {
-			pool = connectionPool;
-		} else {
-			const persistentManager = getPersistentConnectionManager();
-			pool = persistentManager.isManagerActive()
-				? persistentManager.getConnectionPool()
-				: getConnectionPool();
-			
-			if (persistentManager.isManagerActive()) {
-			} else {
-			}
-		}
-		
-		const result = await pool.fetchChartData(
-			jwtToken,
+		// Fetch chart data
+		const result = await manager.fetchChartData({
 			symbol,
 			resolution,
 			barsCount,
-			{
-				cvdEnabled: cvdOptions.cvdEnabled,
-				cvdAnchorPeriod: cvdOptions.cvdAnchorPeriod,
-				cvdTimeframe: cvdOptions.cvdTimeframe,
-				sessionId: cvdOptions.sessionId,
-				sessionIdSign: cvdOptions.sessionIdSign
-			}
-		);
+			cvdEnabled: cvdOptions.cvdEnabled,
+			cvdAnchorPeriod: cvdOptions.cvdAnchorPeriod,
+			cvdTimeframe: cvdOptions.cvdTimeframe
+		});
 		
 		return {
 			success: true,
@@ -315,9 +249,10 @@ export async function fetchHistoricalDataPooled(
 /**
  * Main orchestrator: Get chart data from TradingView
  * 
+ * Now uses v2 WebSocket architecture with connection manager.
+ * 
  * @param params - Request parameters
  * @param config - Service configuration (optional, uses defaults if not provided)
- * @param connectionPool - Optional connection pool (uses default pool if not provided)
  * @returns Chart data service result
  */
 export async function getChartData(
@@ -331,8 +266,7 @@ export async function getChartData(
 		userEmail: unknown;
 		userPassword: unknown;
 	},
-	config?: Partial<ChartDataServiceConfig>,
-	connectionPool?: WebSocketConnectionPool
+	config?: Partial<ChartDataServiceConfig>
 ): Promise<ChartDataServiceResult> {
 	// Create service config with defaults
 	const serviceConfig = createChartDataServiceConfig(config);
@@ -422,52 +356,28 @@ export async function getChartData(
 		const jwtDuration = Date.now() - jwtStart;
 		debugService.jwtComplete(jwtDuration, jwtWasCached);
 		
-		// 5. Fetch historical data
-		// Use connection pooling by default for better performance (3-5x faster)
-		// Set DISABLE_CONNECTION_POOL=true to disable
-		const useConnectionPool = !process.env.DISABLE_CONNECTION_POOL;
-		debugService.dataStart(useConnectionPool);
+		// 5. Fetch historical data using v2 WebSocket architecture
+		debugService.dataStart(true); // Always using v2 connection manager
 		const dataStart = Date.now();
-		
-		// Log CVD request parameters
 		
 		// Warn if CVD is requested but credentials missing
 		if (params.cvdEnabled === 'true' && (!sessionResult.sessionId || !sessionResult.sessionIdSign)) {
+			console.warn('[Chart Data Service] CVD requested but session credentials missing');
 		}
 		
-		// Log before calling historical data client
-		if (params.cvdEnabled === 'true') {
-		}
-		
-		const dataResult = useConnectionPool
-			? await fetchHistoricalDataPooled(
-				symbol,
-				resolution,
-				barsCount,
-				jwtResult.token!,
-				{
-					cvdEnabled: params.cvdEnabled === 'true',
-					cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
-					cvdTimeframe: params.cvdTimeframe || undefined,
-					sessionId: sessionResult.sessionId,
-					sessionIdSign: sessionResult.sessionIdSign
-				},
-				connectionPool
-			)
-			: await fetchHistoricalData(
-				symbol,
-				resolution,
-				barsCount,
-				jwtResult.token!,
-				{
-					cvdEnabled: params.cvdEnabled === 'true',
-					cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
-					cvdTimeframe: params.cvdTimeframe || undefined,
-					sessionId: sessionResult.sessionId,
-					sessionIdSign: sessionResult.sessionIdSign
-				},
-				serviceConfig
-			);
+		const dataResult = await fetchHistoricalDataV2(
+			symbol,
+			resolution,
+			barsCount,
+			jwtResult.token!,
+			{
+				cvdEnabled: params.cvdEnabled === 'true',
+				cvdAnchorPeriod: params.cvdAnchorPeriod || undefined,
+				cvdTimeframe: params.cvdTimeframe || undefined,
+				sessionId: sessionResult.sessionId,
+				sessionIdSign: sessionResult.sessionIdSign
+			}
+		);
 		
 		if (!dataResult.success) {
 			return {

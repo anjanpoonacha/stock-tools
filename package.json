@@ -30,7 +30,10 @@
     "poc-1": "tsx scripts/poc-tradingview/poc-1-get-user-id.ts",
     "poc-2": "tsx scripts/poc-tradingview/poc-2-get-jwt-token.ts",
     "poc-3": "tsx scripts/poc-tradingview/poc-3-websocket-client.ts",
-    "poc-all": "pnpm poc-1 && pnpm poc-2 && pnpm poc-3"
+    "poc-all": "pnpm poc-1 && pnpm poc-2 && pnpm poc-3",
+    "test:integration": "tsx --env-file=.env scripts/test-websocket-v2-integration.ts",
+    "test:integration:verbose": "DEBUG=* tsx --env-file=.env scripts/test-websocket-v2-integration.ts",
+    "test:v2-integration": "tsx --env-file=.env scripts/test-v2-real-integration.ts"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
