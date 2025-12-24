@@ -94,7 +94,7 @@ importers:
         specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
       react-resizable-panels:
-        specifier: ^4.0.10
+        specifier: ^4.0.13
         version: 4.0.15(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       shadcn-ui:
         specifier: ^0.9.5

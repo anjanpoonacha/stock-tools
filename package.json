@@ -63,7 +63,7 @@
     "p-limit": "^7.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-resizable-panels": "^4.0.10",
+    "react-resizable-panels": "^4.0.13",
     "shadcn-ui": "^0.9.5",
     "swr": "^2.3.8",
     "tailwind-merge": "^3.4.0",
