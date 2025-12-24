@@ -25,6 +25,7 @@ export type AddWatchlistParams = {
 export type Watchlist = {
 	id: string;
 	name: string;
+	symbols?: string[]; // Optional symbols array (populated when fetching watchlist details)
 };
 
 /**

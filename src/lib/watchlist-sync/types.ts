@@ -12,6 +12,7 @@ export interface UnifiedWatchlist {
   platforms: Platform[];         // ['mio', 'tv'] or ['mio'] or ['tv']
   mioId?: string;                // MIO watchlist ID (if exists)
   tvId?: string;                 // TradingView watchlist ID (if exists)
+  symbols?: string[];            // Combined symbols from both platforms
 }
 
 /**

@@ -22,6 +22,7 @@ import {
     Home,
     FileCode,
     TrendingUp,
+    BarChart3,
 } from 'lucide-react';
 import { MIOIcon } from '../icons/MIOIcon';
 import { TVIcon } from '../icons/TVIcon';
@@ -39,6 +40,7 @@ const iconMap = {
     TVIcon,
     FileCode,
     TrendingUp,
+    BarChart3,
 };
 
 interface Tool {

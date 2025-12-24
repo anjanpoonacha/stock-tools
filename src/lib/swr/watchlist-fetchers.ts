@@ -180,26 +180,55 @@ export async function watchlistSymbolsFetcher(
 	wlid: string | number,
 	platform: 'mio' | 'tradingview'
 ): Promise<WatchlistSymbolsResponse> {
-	// Fetch all watchlists and extract the specific one
-	// This is efficient because SWR will cache the full list
-	const watchlistsData = platform === 'mio' 
-		? await mioWatchlistFetcher()
-		: await tvWatchlistFetcher();
+	if (platform === 'tradingview') {
+		// TradingView: Fetch all watchlists and extract the specific one
+		// This is efficient because SWR will cache the full list
+		// and TradingView API returns symbols in the watchlist list
+		const watchlistsData = await tvWatchlistFetcher();
 
-	const watchlist = watchlistsData.watchlists.find(
-		wl => String(wl.id) === String(wlid)
-	);
-
-	if (!watchlist) {
-		throw new FetcherError(
-			`Watchlist ${wlid} not found on ${platform}`,
-			404
+		const watchlist = watchlistsData.watchlists.find(
+			wl => String(wl.id) === String(wlid)
 		);
-	}
 
-	return {
-		symbols: watchlist.symbols || [],
-		watchlistId: watchlist.id,
-		watchlistName: watchlist.name,
-	};
+		if (!watchlist) {
+			throw new FetcherError(
+				`Watchlist ${wlid} not found on ${platform}`,
+				404
+			);
+		}
+
+		return {
+			symbols: watchlist.symbols || [],
+			watchlistId: watchlist.id,
+			watchlistName: watchlist.name,
+		};
+	} else {
+		// MIO: Need to fetch symbols separately
+		// MIO watchlist list doesn't include symbols, so we need a separate fetch
+		const credentials = getAuthCredentials();
+
+		const response = await fetch('/api/mio-watchlist-symbols', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				wlid: String(wlid),
+				userEmail: credentials.userEmail,
+				userPassword: credentials.userPassword,
+			}),
+		});
+
+		if (!response.ok) {
+			await handleFetchError(response);
+		}
+
+		const data = await response.json();
+
+		return {
+			symbols: data.symbols || [],
+			watchlistId: wlid,
+			watchlistName: data.watchlistName || `Watchlist ${wlid}`,
+		};
+	}
 }

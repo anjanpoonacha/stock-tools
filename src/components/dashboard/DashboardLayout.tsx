@@ -18,25 +18,35 @@ import { ThemeToggle } from '../ThemeToggle';
 import { useRouter, usePathname } from 'next/navigation';
 
 const TOOLS: Tool[] = [
-    // Featured Tools (Top 3)
+    // Featured Tools
     {
-        id: 'mioformulas',
+        id: 'stocks',
+        title: 'Stocks',
+        description: 'Formula screener and watchlist manager',
+        href: '/stocks',
+        icon: 'BarChart3' as const,
+        category: 'Management',
+        featured: true,
+        keywords: ['stocks', 'formula', 'screener', 'watchlist', 'results', 'charts'],
+    },
+    {
+        id: 'formulas',
         title: 'MIO Formula Manager',
         description: 'Extract and manage stock screener formulas from MarketInOut',
         href: '/mio-formulas',
         icon: 'FileCode' as const,
         category: 'Management',
-        featured: true,
+        featured: false,
         keywords: ['formula', 'screener', 'mio', 'marketinout', 'api'],
     },
     {
-        id: 'miowatchlist',
+        id: 'watchlist',
         title: 'Manage MIO Lists',
         description: 'Create and manage MarketInOut watchlists',
         href: '/mio-watchlist',
         icon: 'List' as const,
         category: 'Management',
-        featured: true,
+        featured: false,
         keywords: ['manage', 'watchlist', 'mio', 'marketinout'],
     },
     {
@@ -46,7 +56,7 @@ const TOOLS: Tool[] = [
         href: '/tv-sync',
         icon: 'TVIcon' as const,
         category: 'Sync Operations',
-        featured: true,
+        featured: false,
         keywords: ['sync', 'screener', 'tradingview'],
     },
     // Other Tools

@@ -102,6 +102,66 @@ export class MIOService {
 	}
 
 	/**
+	 * Fetch symbols for a specific MIO watchlist using internalSessionId.
+	 * Returns MIOResponse structure for consistent error handling.
+	 */
+	static async getWatchlistSymbolsWithSession(
+		internalSessionId: string,
+		wlid: string
+	): Promise<MIOResponse<string[]>> {
+		// Validate input parameters
+		if (!internalSessionId) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.INVALID_INPUT,
+					message: 'Missing required parameter: internalSessionId',
+				},
+				meta: {
+					statusCode: 400,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
+		}
+
+		if (!wlid) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.INVALID_INPUT,
+					message: 'Missing required parameter: wlid',
+				},
+				meta: {
+					statusCode: 400,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
+		}
+
+		const sessionKeyValue = await SessionManager.getSessionKeyValue(internalSessionId);
+		
+		if (!sessionKeyValue) {
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.SESSION_EXPIRED,
+					message: 'No MIO session found for this user',
+					needsRefresh: true,
+				},
+				meta: {
+					statusCode: 401,
+					responseType: 'text',
+					url: 'N/A',
+				},
+			};
+		}
+
+		return await APIClient.getWatchlistSymbols(sessionKeyValue, wlid);
+	}
+
+	/**
 	 * Add watchlist using internalSessionId (fetches aspSessionId from session store).
 	 * Returns MIOResponse structure for consistent error handling.
 	 */

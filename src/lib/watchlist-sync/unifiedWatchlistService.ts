@@ -93,6 +93,12 @@ export function mergeWatchlistsByName(
       // Already exists (shouldn't happen in MIO, but handle it)
       existing.platforms.push('mio');
       existing.mioId = mioList.id;
+      // Merge symbols if available
+      if (mioList.symbols && mioList.symbols.length > 0) {
+        existing.symbols = existing.symbols 
+          ? Array.from(new Set([...existing.symbols, ...mioList.symbols]))
+          : mioList.symbols;
+      }
     } else {
       // Create stable ID based on MIO ID to ensure consistency across fetches
       // Format: mio-{mioId} to make it clear this is MIO-based
@@ -101,6 +107,7 @@ export function mergeWatchlistsByName(
         name: mioList.name,
         platforms: ['mio'],
         mioId: mioList.id,
+        symbols: mioList.symbols,
       });
     }
   }
@@ -117,6 +124,12 @@ export function mergeWatchlistsByName(
       // Update ID to indicate it's now a merged watchlist
       // Format: unified-{mioId}-{tvId}
       existing.id = `unified-${existing.mioId}-${tvList.id}`;
+      // Merge symbols
+      if (tvList.symbols && tvList.symbols.length > 0) {
+        existing.symbols = existing.symbols 
+          ? Array.from(new Set([...existing.symbols, ...tvList.symbols]))
+          : tvList.symbols;
+      }
     } else {
       // New TV-only watchlist
       // Format: tv-{tvId}
@@ -125,6 +138,7 @@ export function mergeWatchlistsByName(
         name: tvList.name,
         platforms: ['tv'],
         tvId: tvList.id,
+        symbols: tvList.symbols,
       });
     }
   }

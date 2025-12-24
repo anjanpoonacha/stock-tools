@@ -159,9 +159,9 @@ export default function ResultsTable({
 	}
 
 	return (
-		<div className='overflow-y-auto h-full'>
-			{/* Filters and Controls */}
-			<Card className='sticky top-0 z-10 bg-background m-4 mb-4'>
+		<div className='h-full flex flex-col overflow-hidden'>
+			{/* Filters and Controls - Fixed at top */}
+			<Card className='flex-shrink-0 m-4 mb-2'>
 				<CardHeader className='py-3'>
 					<div className='flex items-center justify-between'>
 						<div className='flex items-center gap-4'>
@@ -222,125 +222,127 @@ export default function ResultsTable({
 				</CardHeader>
 			</Card>
 
-			{/* Results Table */}
-			<div className='space-y-4 px-4'>
-			{groupedStocks.map((group, groupIndex) => (
-				<Card key={groupIndex}>
-					{group.group && (
-						<CardHeader className='py-2 px-4'>
-							<CardTitle className='text-base'>{group.group}</CardTitle>
-							<CardDescription className='text-xs'>
-								{group.stocks.length} stocks
-							</CardDescription>
-						</CardHeader>
-					)}
-					<CardContent className='p-0'>
-						<div className='overflow-x-auto'>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead className='w-[40px] text-center'>#</TableHead>
-										<TableHead>
-											<Button
-												variant='ghost'
-												size='sm'
-												className='h-8 px-2'
-												onClick={() => handleSort('symbol')}
-											>
-												Symbol
-												<ArrowUpDown className='ml-2 h-3 w-3' />
-											</Button>
-										</TableHead>
-										<TableHead>
-											<Button
-												variant='ghost'
-												size='sm'
-												className='h-8 px-2'
-												onClick={() => handleSort('name')}
-											>
-												Name
-												<ArrowUpDown className='ml-2 h-3 w-3' />
-											</Button>
-										</TableHead>
-										<TableHead>
-											<Button
-												variant='ghost'
-												size='sm'
-												className='h-8 px-2'
-												onClick={() => handleSort('price')}
-											>
-												Price
-												<ArrowUpDown className='ml-2 h-3 w-3' />
-											</Button>
-										</TableHead>
-										<TableHead>
-											<Button
-												variant='ghost'
-												size='sm'
-												className='h-8 px-2'
-												onClick={() => handleSort('sector')}
-											>
-												Sector
-												<ArrowUpDown className='ml-2 h-3 w-3' />
-											</Button>
-										</TableHead>
-										<TableHead>
-											<Button
-												variant='ghost'
-												size='sm'
-												className='h-8 px-2'
-												onClick={() => handleSort('industry')}
-											>
-												Industry
-												<ArrowUpDown className='ml-2 h-3 w-3' />
-											</Button>
-										</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{group.stocks.map((stock, index) => (
-										<TableRow key={stock.symbol}>
-											<TableCell className='text-center text-muted-foreground text-xs'>
-												{index + 1}
-											</TableCell>
-											<TableCell className='font-mono text-sm'>
-												<Badge variant='outline'>{stock.symbol}</Badge>
-											</TableCell>
-											<TableCell>{stock.name}</TableCell>
-											<TableCell className='font-mono'>
-												{stock.price ? `₹${stock.price.toFixed(2)}` : 'N/A'}
-											</TableCell>
-											<TableCell>
-												<Badge variant='secondary' className='text-xs'>
-													{stock.sector || 'N/A'}
-												</Badge>
-											</TableCell>
-											<TableCell>
-												<Badge variant='outline' className='text-xs'>
-													{stock.industry || 'N/A'}
-												</Badge>
-											</TableCell>
+			{/* Scrollable Table Area */}
+			<div className='flex-1 min-h-0 overflow-y-auto px-4'>
+				<div className='space-y-4 pb-4'>
+				{groupedStocks.map((group, groupIndex) => (
+					<Card key={groupIndex}>
+						{group.group && (
+							<CardHeader className='py-2 px-4'>
+								<CardTitle className='text-base'>{group.group}</CardTitle>
+								<CardDescription className='text-xs'>
+									{group.stocks.length} stocks
+								</CardDescription>
+							</CardHeader>
+						)}
+						<CardContent className='p-0'>
+							<div className='overflow-x-auto'>
+								<Table>
+									<TableHeader className='sticky top-0 z-10 bg-background'>
+										<TableRow className='border-b-2'>
+											<TableHead className='w-[40px] text-center bg-background'>#</TableHead>
+											<TableHead className='bg-background'>
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-8 px-2'
+													onClick={() => handleSort('symbol')}
+												>
+													Symbol
+													<ArrowUpDown className='ml-2 h-3 w-3' />
+												</Button>
+											</TableHead>
+											<TableHead className='bg-background'>
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-8 px-2'
+													onClick={() => handleSort('name')}
+												>
+													Name
+													<ArrowUpDown className='ml-2 h-3 w-3' />
+												</Button>
+											</TableHead>
+											<TableHead className='bg-background'>
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-8 px-2'
+													onClick={() => handleSort('price')}
+												>
+													Price
+													<ArrowUpDown className='ml-2 h-3 w-3' />
+												</Button>
+											</TableHead>
+											<TableHead className='bg-background'>
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-8 px-2'
+													onClick={() => handleSort('sector')}
+												>
+													Sector
+													<ArrowUpDown className='ml-2 h-3 w-3' />
+												</Button>
+											</TableHead>
+											<TableHead className='bg-background'>
+												<Button
+													variant='ghost'
+													size='sm'
+													className='h-8 px-2'
+													onClick={() => handleSort('industry')}
+												>
+													Industry
+													<ArrowUpDown className='ml-2 h-3 w-3' />
+												</Button>
+											</TableHead>
 										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						</div>
-					</CardContent>
-				</Card>
-			))}
-			</div>
+									</TableHeader>
+									<TableBody>
+										{group.stocks.map((stock, index) => (
+											<TableRow key={stock.symbol}>
+												<TableCell className='text-center text-muted-foreground text-xs'>
+													{index + 1}
+												</TableCell>
+												<TableCell className='font-mono text-sm'>
+													<Badge variant='outline'>{stock.symbol}</Badge>
+												</TableCell>
+												<TableCell>{stock.name}</TableCell>
+												<TableCell className='font-mono'>
+													{stock.price ? `₹${stock.price.toFixed(2)}` : 'N/A'}
+												</TableCell>
+												<TableCell>
+													<Badge variant='secondary' className='text-xs'>
+														{stock.sector || 'N/A'}
+													</Badge>
+												</TableCell>
+												<TableCell>
+													<Badge variant='outline' className='text-xs'>
+														{stock.industry || 'N/A'}
+													</Badge>
+												</TableCell>
+											</TableRow>
+										))}
+									</TableBody>
+								</Table>
+							</div>
+						</CardContent>
+					</Card>
+				))}
 
-			{/* Summary Footer */}
-			{filteredAndSortedStocks.length > 0 && (
-				<div className='flex justify-between items-center text-sm text-muted-foreground px-6 py-4'>
-					<span>
-						Showing {filteredAndSortedStocks.length} of {stocks.length} stocks
-					</span>
-					<span>
-						Sorted by {sortField} ({sortOrder})
-					</span>
+				{/* Summary Footer */}
+				{filteredAndSortedStocks.length > 0 && (
+					<div className='flex justify-between items-center text-sm text-muted-foreground py-4'>
+						<span>
+							Showing {filteredAndSortedStocks.length} of {stocks.length} stocks
+						</span>
+						<span>
+							Sorted by {sortField} ({sortOrder})
+						</span>
+					</div>
+				)}
 				</div>
-			)}
+			</div>
 		</div>
 	);
 }

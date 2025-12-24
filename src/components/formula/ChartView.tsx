@@ -1,7 +1,7 @@
 /**
  * ChartView - Formula Results Chart View with True DI System (REFACTORED)
  * 
- * This is the MAIN chart view used in /mio-formulas/results
+ * This is the MAIN chart view used in /stocks?tab=formulas and /stocks?tab=watchlists
  * 
  * Layout:
  * - Panel 1 (Left - 5-15%): Compact vertical toolbar with icon buttons
@@ -54,6 +54,7 @@ import { removeStockFromUnifiedWatchlist, addStockToWatchlist } from '@/lib/watc
 import { useSessionBridge } from '@/lib/useSessionBridge';
 import { useToast } from '@/components/ui/toast';
 import type { WatchlistSessions } from '@/lib/watchlist-sync/types';
+import { OHLCDisplay } from '@/components/chart/OHLCDisplay';
 
 interface ChartViewProps {
 	stocks: Stock[];
@@ -822,6 +823,7 @@ export default function ChartView({
 									<div className='p-2 border-b border-border bg-muted/30'>
 										<p className='text-xs font-medium text-muted-foreground'>
 											{getResolutionConfig(currentLayout.slots[0].resolution).label}
+											<OHLCDisplay bars={barsRefs.current[0] || []} />
 										</p>
 									</div>
 									<div className='p-2 h-[calc(100%-2.5rem)] relative'>
@@ -867,6 +869,7 @@ export default function ChartView({
 												<div className='p-2 border-b border-border bg-muted/30'>
 													<p className='text-xs font-medium text-muted-foreground'>
 														{getResolutionConfig(slot.resolution).label}
+														<OHLCDisplay bars={barsRefs.current[slotIndex] || []} />
 														{focusedChartIndex === slotIndex && (
 															<span className='ml-2 text-[10px] text-primary'>● Focused</span>
 														)}

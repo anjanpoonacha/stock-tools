@@ -119,6 +119,136 @@ export class APIClient {
 	}
 
 	/**
+	 * Fetch symbols for a specific MIO watchlist
+	 * Uses regex pattern matching to extract SYMBOL.EXCHANGE format from HTML
+	 * Returns MIOResponse structure for consistent error handling.
+	 * 
+	 * @param sessionKeyValue - Session credentials
+	 * @param wlid - Watchlist ID
+	 * @returns Promise with array of symbols with exchange suffix (e.g., ['TCS.NS', 'INFY.NS'])
+	 */
+	static async getWatchlistSymbols(
+		sessionKeyValue: SessionKeyValue,
+		wlid: string
+	): Promise<MIOResponse<string[]>> {
+		try {
+			// Validate watchlist ID
+			if (!wlid || !PATTERNS.NUMERIC_ID.test(wlid)) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.INVALID_INPUT,
+						message: `Invalid watchlist ID: ${wlid}`,
+					},
+					meta: {
+						statusCode: 400,
+						responseType: 'text',
+						url: 'N/A',
+					},
+				};
+			}
+
+		// Fetch the specific watchlist page using wl_add.php endpoint
+		// This endpoint returns cleaner HTML with ALL symbols including exchange suffixes
+		const url = `https://www.marketinout.com/wl/wl_add.php?wlid=${wlid}&overwrite=1&name=`;
+			const res = await fetch(url, {
+				headers: {
+					Cookie: `${sessionKeyValue.key}=${sessionKeyValue.value}`,
+				},
+			});
+
+			if (!res.ok) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.HTTP_ERROR,
+						message: `Failed to fetch watchlist symbols (status: ${res.status})`,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'html',
+						url: res.url,
+					},
+				};
+			}
+
+			const html = await res.text();
+
+			// Check if session expired
+			if (LOGIN_INDICATORS.some(indicator => html.includes(indicator))) {
+				return {
+					success: false,
+					error: {
+						code: ErrorCode.SESSION_EXPIRED,
+						message: 'Session expired. Please re-authenticate.',
+						needsRefresh: true,
+					},
+					meta: {
+						statusCode: res.status,
+						responseType: 'html',
+						url: res.url,
+					},
+				};
+			}
+
+		// Parse symbols from the textarea in the response
+		// The wl_add.php endpoint returns symbols in a textarea with id="stock_list"
+		// Format: SYMBOL1.EXCHANGE,SYMBOL2.EXCHANGE (comma-separated)
+		const symbols: string[] = [];
+
+		// Extract content from textarea with id="stock_list" or name="stock_list"
+		// Pattern: <textarea...id="stock_list"...>SYMBOLS_HERE</textarea>
+		// Use [\s\S] instead of . with 's' flag for wider compatibility
+		const textareaMatch = html.match(/<textarea[^>]*(?:id|name)=["']stock_list["'][^>]*>([\s\S]*?)<\/textarea>/);
+
+		if (textareaMatch && textareaMatch[1]) {
+			const stockListText = textareaMatch[1].trim();
+			
+			if (stockListText) {
+				// Split by comma and clean up
+				const rawSymbols = stockListText.split(',');
+				
+				// Clean and validate each symbol
+				for (const symbol of rawSymbols) {
+					const cleaned = symbol.trim();
+					if (cleaned) {
+						// Validate basic symbol format: LETTERS/NUMBERS.LETTERS
+						const parts = cleaned.split('.');
+						if (parts.length === 2 && parts[0].length > 0 && parts[1].length > 0) {
+							symbols.push(cleaned);
+						}
+					}
+				}
+			}
+		}
+
+			return {
+				success: true,
+				data: symbols,
+				meta: {
+					statusCode: res.status,
+					responseType: 'html',
+					url: res.url,
+				},
+			};
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return {
+				success: false,
+				error: {
+					code: ErrorCode.NETWORK_ERROR,
+					message: errorMessage,
+				},
+				meta: {
+					statusCode: 0,
+					responseType: 'text',
+					url: URLS.WATCHLIST_PAGE,
+				},
+			};
+		}
+	}
+
+	/**
 	 * Add symbols to a watchlist (bulk operation)
 	 * Returns MIOResponse structure for consistent error handling.
 	 */
