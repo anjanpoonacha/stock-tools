@@ -8,15 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { UsageGuide } from '@/components/UsageGuide';
 import { useToast } from '@/components/ui/toast';
 import type { MIOFormula } from '@/types/formula';
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ManagerTable } from '@/components/manager/ManagerTable';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Trash2, Copy, ExternalLink, Download, RefreshCw, Plus, Edit, BarChart3 } from 'lucide-react';
 import { getStoredCredentials } from '@/lib/auth/authUtils';
@@ -150,114 +143,119 @@ export const FormulaManager: React.FC = () => {
 	};
 
 	return (
-		<div className='container mx-auto py-8 space-y-6'>
-			{/* Header */}
-			<div className='space-y-2'>
-				<h1 className='text-3xl font-bold tracking-tight'>MIO Formula Manager</h1>
-				<p className='text-muted-foreground'>
-					Extract and manage your stock screener formulas from MarketInOut
-				</p>
-			</div>
+		<div className='h-full flex flex-col overflow-hidden'>
+			{/* Fixed Header Section */}
+			<div className='flex-shrink-0 space-y-4 px-8 pt-8 pb-4'>
+				{/* Header */}
+				<div className='space-y-2'>
+					<h1 className='text-3xl font-bold tracking-tight'>MIO Formula Manager</h1>
+					<p className='text-muted-foreground'>
+						Extract and manage your stock screener formulas from MarketInOut
+					</p>
+				</div>
 
-			{/* Usage Guide */}
-			<UsageGuide
-				title="How to Use Formula Manager"
-				steps={[
-					'Ensure you have captured your MIO session using the browser extension',
-					'Click "Create Formula" to build new formulas with autocomplete editor',
-					'Click "Extract Formulas from MIO" to fetch all your existing formulas',
-					'View formula details including screen ID, page URL, and API URL',
-					'Edit formulas directly from the table using the edit button',
-					'Copy individual API URLs or export all formulas as JSON',
-					'Delete formulas you no longer need from your saved list'
-				]}
-			/>
+				{/* Usage Guide */}
+				<UsageGuide
+					title="How to Use Formula Manager"
+					steps={[
+						'Ensure you have captured your MIO session using the browser extension',
+						'Click "Create Formula" to build new formulas with autocomplete editor',
+						'Click "Extract Formulas from MIO" to fetch all your existing formulas',
+						'View formula details including screen ID, page URL, and API URL',
+						'Edit formulas directly from the table using the edit button',
+						'Copy individual API URLs or export all formulas as JSON',
+						'Delete formulas you no longer need from your saved list'
+					]}
+				/>
 
-			{/* Session Status Warning */}
-			{!sessionLoading && !mioSessionAvailable && (
-				<Alert>
-					<AlertDescription>
-						No active MIO session found. Please capture your MIO session using the browser extension to extract formulas.
-					</AlertDescription>
-				</Alert>
-			)}
-
-			{/* Error Display */}
-			{error && (
-				<Alert variant='destructive'>
-					<AlertDescription>{error}</AlertDescription>
-				</Alert>
-			)}
-
-			{/* Extraction Errors */}
-			{extractionErrors.length > 0 && (
-				<Alert variant='destructive'>
-					<AlertDescription>
-						<p className='font-semibold mb-2'>Some formulas failed to extract:</p>
-						<ul className='list-disc list-inside space-y-1'>
-							{extractionErrors.map((err, idx) => (
-								<li key={idx}>
-									<strong>{err.formulaName}:</strong> {err.error}
-								</li>
-							))}
-						</ul>
-					</AlertDescription>
-				</Alert>
-			)}
-
-			{/* Action Buttons */}
-			<div className='flex flex-wrap gap-3'>
-				<Button
-					onClick={handleCreateFormula}
-					disabled={!mioSessionAvailable || sessionLoading || isCreating}
-					size='default'
-				>
-					{isCreating ? (
-						<>
-							<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-							Creating...
-						</>
-					) : (
-						<>
-							<Plus className='h-4 w-4 mr-2' />
-							Create Formula
-						</>
-					)}
-				</Button>
-
-				<Button
-					onClick={extractFormulas}
-					disabled={!mioSessionAvailable || sessionLoading || extracting}
-					size='default'
-					variant='outline'
-				>
-					{extracting ? (
-						<>
-							<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-							Extracting...
-						</>
-					) : (
-						<>
-							<RefreshCw className='h-4 w-4 mr-2' />
-							Extract Formulas from MIO
-						</>
-					)}
-				</Button>
-
-				{formulas.length > 0 && (
-					<>
-						<Button onClick={copyAllApiUrls} variant='outline' size='default'>
-							<Copy className='h-4 w-4 mr-2' />
-							Copy All API URLs
-						</Button>
-						<Button onClick={exportFormulas} variant='outline' size='default'>
-							<Download className='h-4 w-4 mr-2' />
-							Export JSON
-						</Button>
-					</>
+				{/* Session Status Warning */}
+				{!sessionLoading && !mioSessionAvailable && (
+					<Alert>
+						<AlertDescription>
+							No active MIO session found. Please capture your MIO session using the browser extension to extract formulas.
+						</AlertDescription>
+					</Alert>
 				)}
+
+				{/* Error Display */}
+				{error && (
+					<Alert variant='destructive'>
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				)}
+
+				{/* Extraction Errors */}
+				{extractionErrors.length > 0 && (
+					<Alert variant='destructive'>
+						<AlertDescription>
+							<p className='font-semibold mb-2'>Some formulas failed to extract:</p>
+							<ul className='list-disc list-inside space-y-1'>
+								{extractionErrors.map((err, idx) => (
+									<li key={idx}>
+										<strong>{err.formulaName}:</strong> {err.error}
+									</li>
+								))}
+							</ul>
+						</AlertDescription>
+					</Alert>
+				)}
+
+				{/* Action Buttons */}
+				<div className='flex flex-wrap gap-3'>
+					<Button
+						onClick={handleCreateFormula}
+						disabled={!mioSessionAvailable || sessionLoading || isCreating}
+						size='default'
+					>
+						{isCreating ? (
+							<>
+								<Loader2 className='h-4 w-4 mr-2 animate-spin' />
+								Creating...
+							</>
+						) : (
+							<>
+								<Plus className='h-4 w-4 mr-2' />
+								Create Formula
+							</>
+						)}
+					</Button>
+
+					<Button
+						onClick={extractFormulas}
+						disabled={!mioSessionAvailable || sessionLoading || extracting}
+						size='default'
+						variant='outline'
+					>
+						{extracting ? (
+							<>
+								<Loader2 className='h-4 w-4 mr-2 animate-spin' />
+								Extracting...
+							</>
+						) : (
+							<>
+								<RefreshCw className='h-4 w-4 mr-2' />
+								Extract Formulas from MIO
+							</>
+						)}
+					</Button>
+
+					{formulas.length > 0 && (
+						<>
+							<Button onClick={copyAllApiUrls} variant='outline' size='default'>
+								<Copy className='h-4 w-4 mr-2' />
+								Copy All API URLs
+							</Button>
+							<Button onClick={exportFormulas} variant='outline' size='default'>
+								<Download className='h-4 w-4 mr-2' />
+								Export JSON
+							</Button>
+						</>
+					)}
+				</div>
 			</div>
 
+		{/* Scrollable Table Section */}
+		<div className='flex-1 min-h-0 px-8 pb-8'>
 			{/* Formulas Table */}
 			{loading ? (
 				<div className='flex items-center justify-center min-h-[300px]'>
@@ -266,145 +264,144 @@ export const FormulaManager: React.FC = () => {
 						<p className='text-muted-foreground'>Loading formulas...</p>
 					</div>
 				</div>
-			) : formulas.length === 0 ? (
-				<Card>
-					<CardHeader>
-						<CardTitle>No Formulas Found</CardTitle>
-						<CardDescription>
-							Click &quot;Extract Formulas from MIO&quot; to fetch your formulas from MarketInOut
-						</CardDescription>
-					</CardHeader>
-				</Card>
 			) : (
-				<Card>
-					<CardHeader>
-						<CardTitle>Your Formulas ({formulas.length})</CardTitle>
-						<CardDescription>
-							Manage your extracted formulas and their API URLs
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<div className='rounded-md border'>
-							<Table>
-								<TableHeader>
-									<TableRow>
-										<TableHead>Name</TableHead>
-										<TableHead>Screen ID</TableHead>
-										<TableHead>Page URL</TableHead>
-										<TableHead>API URL</TableHead>
-										<TableHead>Status</TableHead>
-										<TableHead className='text-right'>Actions</TableHead>
-									</TableRow>
-								</TableHeader>
-								<TableBody>
-									{formulas.map(formula => (
-										<TableRow key={formula.id}>
-											<TableCell className='font-medium'>{formula.name}</TableCell>
-											<TableCell>
-												<Badge variant='outline'>{formula.screenId}</Badge>
-											</TableCell>
-											<TableCell>
-												<a
-													href={formula.pageUrl}
-													target='_blank'
-													rel='noopener noreferrer'
-													className='text-foreground hover:underline flex items-center gap-1'
-												>
-													View Page
-													<ExternalLink className='h-3 w-3' />
-												</a>
-											</TableCell>
-											<TableCell>
-												{formula.apiUrl ? (
-													<div className='flex items-center gap-2'>
-														<a
-															href={formula.apiUrl}
-															target='_blank'
-															rel='noopener noreferrer'
-															className='text-foreground hover:underline flex items-center gap-1 truncate max-w-[200px]'
-															title={formula.apiUrl}
-														>
-															{formula.apiUrl.substring(0, 40)}...
-															<ExternalLink className='h-3 w-3' />
-														</a>
-														<Button
-															size='sm'
-															variant='ghost'
-															onClick={() =>
-																copyToClipboard(formula.apiUrl!, 'API URL')
-															}
-														>
-															<Copy className='h-3 w-3' />
-														</Button>
-													</div>
-												) : (
-													<span className='text-muted-foreground text-sm'>
-														{formula.extractionError || 'Not found'}
-													</span>
-												)}
-											</TableCell>
-											<TableCell>{getStatusBadge(formula)}</TableCell>
-											<TableCell className='text-right'>
-												<div className='flex items-center justify-end gap-1'>
-													<Button
-														size='sm'
-														variant='ghost'
-														onClick={() => router.push(`/stocks?tab=formulas&formulaId=${formula.id}`)}
-														title='View results'
-													>
-														<BarChart3 className='h-4 w-4' />
-													</Button>
-													<Button
-														size='sm'
-														variant='ghost'
-														onClick={() => handleEditFormula(formula)}
-														title='Edit formula'
-														disabled={editingFormulaId === formula.id}
-													>
-														{editingFormulaId === formula.id ? (
-															<Loader2 className='h-4 w-4 animate-spin' />
-														) : (
-															<Edit className='h-4 w-4' />
-														)}
-													</Button>
-													<AlertDialog>
-														<AlertDialogTrigger asChild>
-															<Button
-																size='sm'
-																variant='ghost'
-																title='Delete formula'
-															>
-																<Trash2 className='h-4 w-4 text-destructive' />
-															</Button>
-														</AlertDialogTrigger>
-														<AlertDialogContent>
-															<AlertDialogHeader>
-																<AlertDialogTitle>Delete Formula?</AlertDialogTitle>
-																<AlertDialogDescription>
-																	Are you sure you want to delete &quot;{formula.name}&quot;? This will remove it from both MIO and your local storage. This action cannot be undone.
-																</AlertDialogDescription>
-															</AlertDialogHeader>
-															<AlertDialogFooter>
-																<AlertDialogCancel>Cancel</AlertDialogCancel>
-																<AlertDialogAction
-																	onClick={() => deleteFormula(formula.id)}
-																	className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-																>
-																	Delete
-																</AlertDialogAction>
-															</AlertDialogFooter>
-														</AlertDialogContent>
-													</AlertDialog>
-												</div>
-											</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
+				<ManagerTable
+					title='Your Formulas'
+					description='Manage your extracted formulas and their API URLs'
+					items={formulas}
+					columns={[
+						{
+							key: 'name',
+							label: 'Name',
+							render: (formula: MIOFormula) => (
+								<span className='font-medium'>{formula.name}</span>
+							),
+						},
+						{
+							key: 'screenId',
+							label: 'Screen ID',
+							render: (formula: MIOFormula) => (
+								<Badge variant='outline'>{formula.screenId}</Badge>
+							),
+						},
+						{
+							key: 'pageUrl',
+							label: 'Page URL',
+							render: (formula: MIOFormula) => (
+								<a
+									href={formula.pageUrl}
+									target='_blank'
+									rel='noopener noreferrer'
+									className='text-foreground hover:underline flex items-center gap-1'
+								>
+									View Page
+									<ExternalLink className='h-3 w-3' />
+								</a>
+							),
+						},
+						{
+							key: 'apiUrl',
+							label: 'API URL',
+							render: (formula: MIOFormula) => (
+								formula.apiUrl ? (
+									<div className='flex items-center gap-2'>
+										<a
+											href={formula.apiUrl}
+											target='_blank'
+											rel='noopener noreferrer'
+											className='text-foreground hover:underline flex items-center gap-1 truncate max-w-[200px]'
+											title={formula.apiUrl}
+										>
+											{formula.apiUrl.substring(0, 40)}...
+											<ExternalLink className='h-3 w-3' />
+										</a>
+										<Button
+											size='sm'
+											variant='ghost'
+											onClick={() => copyToClipboard(formula.apiUrl!, 'API URL')}
+										>
+											<Copy className='h-3 w-3' />
+										</Button>
+									</div>
+								) : (
+									<span className='text-muted-foreground text-sm'>
+										{formula.extractionError || 'Not found'}
+									</span>
+								)
+							),
+						},
+						{
+							key: 'status',
+							label: 'Status',
+							render: (formula: MIOFormula) => getStatusBadge(formula),
+						},
+					]}
+					actions={(formula: MIOFormula) => (
+						<div className='flex items-center justify-end gap-1'>
+							<Button
+								size='sm'
+								variant='ghost'
+								onClick={() => router.push(`/stocks?tab=formulas&formulaId=${formula.id}`)}
+								title='View results'
+							>
+								<BarChart3 className='h-4 w-4' />
+							</Button>
+							<Button
+								size='sm'
+								variant='ghost'
+								onClick={() => handleEditFormula(formula)}
+								title='Edit formula'
+								disabled={editingFormulaId === formula.id}
+							>
+								{editingFormulaId === formula.id ? (
+									<Loader2 className='h-4 w-4 animate-spin' />
+								) : (
+									<Edit className='h-4 w-4' />
+								)}
+							</Button>
+							<AlertDialog>
+								<AlertDialogTrigger asChild>
+									<Button
+										size='sm'
+										variant='ghost'
+										title='Delete formula'
+									>
+										<Trash2 className='h-4 w-4 text-destructive' />
+									</Button>
+								</AlertDialogTrigger>
+								<AlertDialogContent>
+									<AlertDialogHeader>
+										<AlertDialogTitle>Delete Formula?</AlertDialogTitle>
+										<AlertDialogDescription>
+											Are you sure you want to delete &quot;{formula.name}&quot;? This will remove it from both MIO and your local storage. This action cannot be undone.
+										</AlertDialogDescription>
+									</AlertDialogHeader>
+									<AlertDialogFooter>
+										<AlertDialogCancel>Cancel</AlertDialogCancel>
+										<AlertDialogAction
+											onClick={() => deleteFormula(formula.id)}
+											className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+										>
+											Delete
+										</AlertDialogAction>
+									</AlertDialogFooter>
+								</AlertDialogContent>
+							</AlertDialog>
 						</div>
-					</CardContent>
-				</Card>
+					)}
+					emptyState={
+						<Card>
+							<CardHeader>
+								<CardTitle>No Formulas Found</CardTitle>
+								<CardDescription>
+									Click &quot;Extract Formulas from MIO&quot; to fetch your formulas from MarketInOut
+								</CardDescription>
+							</CardHeader>
+						</Card>
+					}
+				/>
 			)}
+		</div>
 		</div>
 	);
 };
