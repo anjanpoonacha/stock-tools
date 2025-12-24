@@ -239,17 +239,26 @@ export class ConnectionClosedError extends ConnectionError {
  */
 export class InvalidStateError extends ConnectionError {
 	constructor(operation: string, currentState: string, requiredState: string) {
+		// CLOSED state is recoverable - connection can be recreated
+		const isRecoverable = currentState === 'CLOSED';
+		
 		super(
 			`Cannot ${operation} in state ${currentState}. Required state: ${requiredState}`,
 			'INVALID_STATE',
-			false, // Cannot retry without state change
+			isRecoverable,
 			{ operation, currentState, requiredState }
 		);
 		this.name = 'InvalidStateError';
 	}
 
 	getUserMessage(): string {
-		const { operation } = this.context as { operation: string };
+		const { operation, currentState } = this.context as { operation: string; currentState: string };
+		
+		// Provide helpful message for CLOSED state
+		if (currentState === 'CLOSED') {
+			return `Connection closed. Reconnecting automatically...`;
+		}
+		
 		return `Cannot ${operation} right now. Please wait for the connection to be ready.`;
 	}
 }

@@ -213,6 +213,26 @@ export class WebSocketConnectionManager {
 			slot.currentSymbol = request.symbol;
 			slot.lastUsed = Date.now();
 			
+			// Check if connection is ready - if not, recreate it (handles AFK scenario)
+			if (!slot.connection.isReady()) {
+				const currentState = slot.connection.getState();
+				
+				if (this.config.enableLogging) {
+					console.log(`[ConnectionManager] Connection not ready (state: ${currentState}). Recreating connection...`);
+				}
+				
+				// Dispose old connection
+				await slot.connection.dispose();
+				
+				// Create new connection
+				const newSlot = await this.createConnection();
+				slot.connection = newSlot.connection;
+				
+				if (this.config.enableLogging) {
+					console.log('[ConnectionManager] ✅ Connection recreated successfully');
+				}
+			}
+			
 			// Build symbol request
 			const symbolRequest: SymbolRequest = {
 				symbol: request.symbol,
