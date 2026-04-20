@@ -215,7 +215,7 @@ jobs:
                   echo "- Real-time session monitoring" >> release-notes.md
 
             - name: Create Release
-              uses: softprops/action-gh-release@v2
+              uses: softprops/action-gh-release@v3
               with:
                   tag_name: v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
                   name: Extension v${{ steps.version_bump.outputs.new_version || needs.check-changes.outputs.version }}
